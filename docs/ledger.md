@@ -47,6 +47,15 @@ user transitions.
    name wins.
 5. **WAL durability:** committed state survives reopening the database file.
 
+## Concurrency posture
+
+`claim_next` uses `BEGIN IMMEDIATE`, so cross-process double-claims are impossible. Other transitions use
+plain sessions; until a later hardening pass (Step 15), the supported mode is **one writer process per
+pipeline at a time** — for example, do not run `conveyor run --oneshot` against a pipeline that
+`conveyor serve` is actively serving. WAL mode and dedup unique constraints keep exactly-once intact
+regardless; the only risk without single-writer discipline is benign status-update races between
+concurrent writers.
+
 ## Flag escalation
 
 ```

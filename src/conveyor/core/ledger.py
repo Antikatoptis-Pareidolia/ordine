@@ -301,6 +301,7 @@ class Ledger:
             session.commit()
             return task.id
         except IntegrityError:
+            # Broad catch is intentional: dedup is the only unique constraint reachable from valid inputs.
             session.rollback()
             return None
         finally:
