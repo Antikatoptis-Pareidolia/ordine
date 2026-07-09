@@ -1,0 +1,10 @@
+# expected: message contains not both
+version: 1
+name: ordinal-conflict
+trigger:
+  type: folder_watch
+  path: ~/renders
+  ordinal_regex: 'img_(\d+)\.png'
+  arrival_order_ordinals: true
+steps:
+  - image.trim

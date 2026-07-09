@@ -1,0 +1,330 @@
+{
+  "$defs": {
+    "FailurePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "retries": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Retries",
+          "type": "integer"
+        },
+        "branches": {
+          "items": {
+            "$ref": "#/$defs/RecoveryBranch"
+          },
+          "title": "Branches",
+          "type": "array"
+        },
+        "then": {
+          "default": "mark_failed",
+          "enum": [
+            "mark_failed",
+            "skip"
+          ],
+          "title": "Then",
+          "type": "string"
+        }
+      },
+      "title": "FailurePolicy",
+      "type": "object"
+    },
+    "FolderWatchTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "folder_watch",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "glob": {
+          "default": "*",
+          "title": "Glob",
+          "type": "string"
+        },
+        "settle_seconds": {
+          "default": 2.0,
+          "minimum": 0,
+          "title": "Settle Seconds",
+          "type": "number"
+        },
+        "ordinal_regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ordinal Regex"
+        },
+        "arrival_order_ordinals": {
+          "default": false,
+          "title": "Arrival Order Ordinals",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "title": "FolderWatchTrigger",
+      "type": "object"
+    },
+    "ManifestTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "manifest",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "poll_seconds": {
+          "default": 30.0,
+          "minimum": 0,
+          "title": "Poll Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "title": "ManifestTrigger",
+      "type": "object"
+    },
+    "ManualTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "manual",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "glob": {
+          "default": "*",
+          "title": "Glob",
+          "type": "string"
+        },
+        "ordinal_regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ordinal Regex"
+        },
+        "arrival_order_ordinals": {
+          "default": false,
+          "title": "Arrival Order Ordinals",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "title": "ManualTrigger",
+      "type": "object"
+    },
+    "PlaybookMeta": {
+      "additionalProperties": false,
+      "properties": {
+        "version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Id"
+        },
+        "parent_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Version Id"
+        }
+      },
+      "title": "PlaybookMeta",
+      "type": "object"
+    },
+    "RecoveryBranch": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "retries": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Retries",
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/StepSpec"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "steps"
+      ],
+      "title": "RecoveryBranch",
+      "type": "object"
+    },
+    "StepSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        },
+        "on_failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailurePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "StepSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "trigger": {
+      "discriminator": {
+        "mapping": {
+          "folder_watch": "#/$defs/FolderWatchTrigger",
+          "manifest": "#/$defs/ManifestTrigger",
+          "manual": "#/$defs/ManualTrigger"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FolderWatchTrigger"
+        },
+        {
+          "$ref": "#/$defs/ManualTrigger"
+        },
+        {
+          "$ref": "#/$defs/ManifestTrigger"
+        }
+      ],
+      "title": "Trigger"
+    },
+    "dedup": {
+      "default": "content_hash",
+      "enum": [
+        "content_hash",
+        "filename",
+        "none"
+      ],
+      "title": "Dedup",
+      "type": "string"
+    },
+    "engine": {
+      "default": "headless",
+      "title": "Engine",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/StepSpec"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "on_failure": {
+      "$ref": "#/$defs/FailurePolicy"
+    },
+    "meta": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlaybookMeta"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "version",
+    "name",
+    "trigger",
+    "steps"
+  ],
+  "title": "Playbook",
+  "type": "object"
+}

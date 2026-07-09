@@ -1,0 +1,15 @@
+version: 1
+name: png-cleanup
+trigger:
+  type: folder_watch
+  path: ~/renders
+  glob: "*.png"
+  settle_seconds: 2
+dedup: content_hash
+engine: headless
+steps:
+  - image.white_to_alpha: { fuzz: 8 }
+  - image.trim: {}
+  - file.rename_from_manifest: { manifest: ~/renders/assets.csv }
+  - image.export: { dest: ~/output, format: png }
+on_failure: { retries: 1, then: mark_failed }

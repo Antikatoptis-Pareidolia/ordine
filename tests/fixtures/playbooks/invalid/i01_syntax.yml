@@ -1,0 +1,8 @@
+# expected: PlaybookSyntaxError with line/column
+version: 1
+name: syntax-error
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - [unclosed

@@ -1,0 +1,9 @@
+# expected: message contains capture group
+version: 1
+name: bad-ordinal-regex
+trigger:
+  type: folder_watch
+  path: ~/renders
+  ordinal_regex: 'img_\d+'
+steps:
+  - image.trim

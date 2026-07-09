@@ -1,0 +1,8 @@
+version: 1
+name: manifest-gen
+trigger:
+  type: manifest
+  path: ~/assets.csv
+  poll_seconds: 30
+steps:
+  - llm.generate_image

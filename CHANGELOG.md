@@ -10,3 +10,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Repo scaffold, tooling, CI (Step 1)
+- Playbook schema, loader, JSON Schema export, and validation tests (Step 2)

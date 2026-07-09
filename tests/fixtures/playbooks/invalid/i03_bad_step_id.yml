@@ -1,0 +1,8 @@
+# expected: path contains steps.0
+version: 1
+name: bad-step-id
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - Trim

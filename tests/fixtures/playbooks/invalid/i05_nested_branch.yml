@@ -1,0 +1,18 @@
+# expected: message contains no nesting
+version: 1
+name: nested-branch
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
+on_failure:
+  branches:
+    - name: fallback
+      steps:
+        - id: image.export
+          params:
+            dest: ~/output
+            format: png
+          on_failure:
+            retries: 1

@@ -1,0 +1,7 @@
+# expected: empty steps list
+version: 1
+name: no-steps
+trigger:
+  type: manual
+  path: ~/input
+steps: []

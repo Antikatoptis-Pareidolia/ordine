@@ -1,0 +1,20 @@
+# expected: message contains duplicate recovery branch name
+version: 1
+name: dup-branches
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
+on_failure:
+  branches:
+    - name: fallback
+      steps:
+        - image.export:
+            dest: ~/a
+            format: png
+    - name: fallback
+      steps:
+        - image.export:
+            dest: ~/b
+            format: png

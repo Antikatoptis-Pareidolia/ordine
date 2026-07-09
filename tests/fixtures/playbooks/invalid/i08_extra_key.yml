@@ -1,0 +1,9 @@
+# expected: extra-forbidden error on colour
+version: 1
+name: extra-key
+colour: red
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim

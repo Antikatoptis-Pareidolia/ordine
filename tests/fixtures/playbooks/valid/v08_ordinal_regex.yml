@@ -1,0 +1,9 @@
+version: 1
+name: ordinal-regex
+trigger:
+  type: folder_watch
+  path: ~/renders
+  glob: "*.png"
+  ordinal_regex: 'img_(\d+)\.png'
+steps:
+  - image.trim

@@ -1,0 +1,8 @@
+# expected: error path starts with trigger
+version: 1
+name: bad-trigger
+trigger:
+  type: cron
+  path: ~/input
+steps:
+  - shell.run

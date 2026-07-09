@@ -1,0 +1,10 @@
+version: 1
+name: gimp-pipeline
+engine: gimp
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
+  - image.white_to_alpha:
+      fuzz: 10

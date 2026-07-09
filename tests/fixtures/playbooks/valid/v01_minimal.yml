@@ -1,0 +1,7 @@
+version: 1
+name: minimal
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - shell.run

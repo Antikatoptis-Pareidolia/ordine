@@ -1,0 +1,16 @@
+version: 1
+name: step-on-failure
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - id: image.white_to_alpha
+    params:
+      fuzz: 8
+    on_failure:
+      retries: 1
+      branches:
+        - name: retry-trim
+          retries: 0
+          steps:
+            - image.trim

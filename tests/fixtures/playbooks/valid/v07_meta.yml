@@ -1,0 +1,11 @@
+version: 1
+name: with-meta
+dedup: filename
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - shell.run
+meta:
+  version_id: pv_0002
+  parent_version_id: pv_0001

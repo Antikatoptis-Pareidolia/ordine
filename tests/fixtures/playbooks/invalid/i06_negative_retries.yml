@@ -1,0 +1,10 @@
+# expected: negative retries validation error
+version: 1
+name: negative-retries
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
+on_failure:
+  retries: -1

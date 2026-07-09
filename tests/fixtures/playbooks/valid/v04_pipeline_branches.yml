@@ -1,0 +1,23 @@
+version: 1
+name: pipeline-branches
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
+on_failure:
+  retries: 0
+  branches:
+    - name: branch-a
+      retries: 2
+      steps:
+        - image.export:
+            dest: ~/output-a
+            format: png
+    - name: branch-b
+      retries: 0
+      steps:
+        - image.export:
+            dest: ~/output-b
+            format: png
+  then: mark_failed

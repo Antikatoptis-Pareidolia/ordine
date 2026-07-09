@@ -1,0 +1,8 @@
+# expected: wrong version literal
+version: 2
+name: wrong-version
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - image.trim
