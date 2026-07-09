@@ -40,3 +40,21 @@ class PlaybookValidationError(PlaybookError):
         self.source, self.errors = source, errors
         detail = "; ".join(f"{e.path}: {e.message}" for e in errors)
         super().__init__(f"{source}: invalid playbook: {detail}")
+
+
+class LedgerError(ConveyorError):
+    """Base class for ledger errors."""
+
+
+class IllegalTransitionError(LedgerError):
+    """Raised when a task state transition is not allowed."""
+
+    def __init__(self, task_id: int, current: str, target: str) -> None:
+        self.task_id = task_id
+        self.current = current
+        self.target = target
+        super().__init__(f"task {task_id}: illegal transition {current} -> {target}")
+
+
+class SchemaVersionError(LedgerError):
+    """Raised when the database schema version is unsupported."""
