@@ -95,6 +95,20 @@ def _run_white_to_alpha(
     return result.output_path
 
 
+def _assert_opaque_red(pixel: tuple[int, ...]) -> None:
+    assert pixel[3] == 255
+    assert abs(pixel[0] - 255) <= 10
+    assert pixel[1] <= 10
+    assert pixel[2] <= 10
+
+
+def make_transparent_image(path: Path) -> Path:
+    """Fully transparent PNG for trim failure tests."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGBA", (64, 64), (0, 0, 0, 0)).save(path, format="PNG")
+    return path
+
+
 def _pixel_agreement(a: Image.Image, b: Image.Image) -> tuple[float, int]:
     if a.size != b.size:
         raise ValueError("size mismatch")
@@ -214,8 +228,10 @@ def test_trim_golden(tmp_path: Path, backend: str) -> None:
     assert r0.output_path is not None
     with Image.open(r0.output_path) as trimmed:
         assert trimmed.size == (20, 20)
-        px = trimmed.convert("RGBA").getpixel((10, 10))
-    assert px[3] == 255 and abs(px[0] - 255) <= 10
+        rgba = trimmed.convert("RGBA")
+        w, h = rgba.size
+        for corner in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+            _assert_opaque_red(rgba.getpixel(corner))
 
     ctx3 = _ctx(tmp_path, input_path=alpha_path, step_id="image.trim")
     r3 = TrimStep().run(ctx3, TrimStep.Params(backend=backend, border=3))
@@ -223,6 +239,40 @@ def test_trim_golden(tmp_path: Path, backend: str) -> None:
     assert r3.output_path is not None
     with Image.open(r3.output_path) as bordered:
         assert bordered.size == (26, 26)
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_trim_fully_transparent_fails(tmp_path: Path, backend: str) -> None:
+    if backend == "imagemagick" and not IM_AVAILABLE:
+        pytest.skip("ImageMagick not installed")
+    src = make_transparent_image(tmp_path / "empty.png")
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.trim")
+    result = TrimStep().run(ctx, TrimStep.Params(backend=backend))
+    assert result.status == "fail"
+    assert result.message is not None
+    assert "nothing to trim" in result.message
+
+
+def test_export_collision_replace(tmp_path: Path) -> None:
+    src = make_test_image(tmp_path / "in.png")
+    dest = tmp_path / "out"
+    dest.mkdir()
+    existing = dest / "goat.png"
+    existing.write_bytes(b"existing")
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.export")
+    result = ExportStep().run(
+        ctx,
+        ExportStep.Params(
+            dest=str(dest),
+            format="png",
+            filename="goat.png",
+            on_collision="replace",
+        ),
+    )
+    assert result.status == "ok"
+    assert result.output_path == existing
+    assert existing.read_bytes() == src.read_bytes()
+    assert list(dest.glob(".tmp-*")) == []
 
 
 @pytest.mark.skipif(not IM_AVAILABLE, reason="ImageMagick not installed")

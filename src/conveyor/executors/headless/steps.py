@@ -105,14 +105,20 @@ def _white_to_alpha_im(
     )
 
 
-def _trim_pillow(input_path: Path, output_path: Path, border: int) -> StepResult | None:
+def _trim_content_bbox(input_path: Path) -> tuple[int, int, int, int] | None:
     with Image.open(input_path) as img:
         rgba = img.convert("RGBA")
         bbox = rgba.getchannel("A").getbbox()
         if bbox is None:
             bbox = rgba.getbbox()
-        if bbox is None:
-            return StepResult(status="fail", message="nothing to trim: image is fully transparent")
+        return bbox
+
+
+def _trim_pillow(
+    input_path: Path, output_path: Path, border: int, bbox: tuple[int, int, int, int]
+) -> None:
+    with Image.open(input_path) as img:
+        rgba = img.convert("RGBA")
         cropped = rgba.crop(bbox)
         if border > 0:
             w, h = cropped.size
@@ -120,7 +126,6 @@ def _trim_pillow(input_path: Path, output_path: Path, border: int) -> StepResult
             canvas.paste(cropped, (border, border))
             cropped = canvas
         cropped.save(output_path, format="PNG")
-    return None
 
 
 def _trim_im(
@@ -279,6 +284,9 @@ class TrimStep:
             return _imagemagick_unavailable()
 
         output_path = _output_png_path(ctx, input_path)
+        bbox = _trim_content_bbox(input_path)
+        if bbox is None:
+            return StepResult(status="fail", message="nothing to trim: image is fully transparent")
         try:
             if backend == "imagemagick":
                 _trim_im(
@@ -289,9 +297,7 @@ class TrimStep:
                     timeout=params.timeout_seconds,
                 )
             else:
-                fail = _trim_pillow(input_path, output_path, params.border)
-                if fail is not None:
-                    return fail
+                _trim_pillow(input_path, output_path, params.border, bbox)
         except ImageBackendError as exc:
             return StepResult(status="fail", message=str(exc))
         return StepResult(status="ok", output_path=output_path)
