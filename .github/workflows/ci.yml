@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - name: Install
-        run: uv venv && uv pip install -e ".[dev]"
+        run: uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Typecheck

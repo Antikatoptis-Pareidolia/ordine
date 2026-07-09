@@ -13,7 +13,7 @@ Local-first, AI-assisted task automation pipelines for Linux.
 ## Dev setup
 
 ```bash
-uv venv && uv pip install -e ".[dev]" && pre-commit install && pytest
+uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin && pre-commit install && pytest
 ```
 
 ## License

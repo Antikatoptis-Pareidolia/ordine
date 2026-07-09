@@ -58,3 +58,42 @@ class IllegalTransitionError(LedgerError):
 
 class SchemaVersionError(LedgerError):
     """Raised when the database schema version is unsupported."""
+
+
+class StepError(ConveyorError):
+    """Base class for step-domain errors."""
+
+
+class UnknownStepError(StepError):
+    """Raised when a step id is not registered."""
+
+    def __init__(self, step_id: str) -> None:
+        self.step_id = step_id
+        super().__init__(f"unknown step id: {step_id}")
+
+
+class StepParamError(StepError):
+    """Raised when step parameters fail validation."""
+
+    def __init__(self, step_id: str, errors: list[FieldError]) -> None:
+        self.step_id = step_id
+        self.errors = errors
+        detail = "; ".join(f"{e.path}: {e.message}" for e in errors)
+        super().__init__(f"step {step_id}: invalid params: {detail}")
+
+
+class UnknownEngineError(ConveyorError):
+    """Raised when an engine name is not registered."""
+
+    def __init__(self, engine_name: str) -> None:
+        self.engine_name = engine_name
+        super().__init__(f"unknown engine: {engine_name}")
+
+
+class EngineMismatchError(ConveyorError):
+    """Raised when a step does not support the requested engine."""
+
+    def __init__(self, step_id: str, engine: str) -> None:
+        self.step_id = step_id
+        self.engine = engine
+        super().__init__(f"step {step_id} does not support engine {engine}")

@@ -54,3 +54,11 @@ addopts = "-q --cov=conveyor --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["src/conveyor"]
+
+[project.entry-points."conveyor.steps"]
+util_noop = "conveyor.executors.builtin.steps:NoopStep"
+util_fail = "conveyor.executors.builtin.steps:FailStep"
+util_copy = "conveyor.executors.builtin.steps:CopyStep"
+
+[project.entry-points."conveyor.engines"]
+headless = "conveyor.core.engines:HeadlessEngine"
