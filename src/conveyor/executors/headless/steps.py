@@ -107,11 +107,13 @@ def _white_to_alpha_im(
 
 def _trim_content_bbox(input_path: Path) -> tuple[int, int, int, int] | None:
     with Image.open(input_path) as img:
-        rgba = img.convert("RGBA")
-        bbox = rgba.getchannel("A").getbbox()
-        if bbox is None:
-            bbox = rgba.getbbox()
-        return bbox
+        if "A" in img.getbands():
+            rgba = img.convert("RGBA")
+            bbox = rgba.getchannel("A").getbbox()
+            if bbox is None:
+                bbox = rgba.getbbox()
+            return bbox
+        return img.getbbox()
 
 
 def _trim_pillow(

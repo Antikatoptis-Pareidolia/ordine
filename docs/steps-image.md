@@ -70,6 +70,12 @@ Output: `step_dir / {input_stem}.png`
 
 Output: `step_dir / {input_stem}.png`
 
+Before either backend runs, a shared bbox pre-check decides whether there is content to trim: when the
+source image has an alpha channel, the alpha-channel bbox is used (falling back to RGBA `getbbox()` when
+that bbox is empty); when there is no alpha channel, `getbbox()` on the source image applies — including
+for the ImageMagick backend. If no bbox is found, both backends return `fail` with
+`"nothing to trim: image is fully transparent"`.
+
 Fully transparent images → `fail`, message `"nothing to trim: image is fully transparent"`.
 
 ### `image.export`
