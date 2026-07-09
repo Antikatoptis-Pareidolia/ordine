@@ -65,6 +65,17 @@ def test_util_copy_missing_input(tmp_path: Path, registry: StepRegistry) -> None
     assert result.message is not None
 
 
+def test_util_copy_missing_file(tmp_path: Path, registry: StepRegistry) -> None:
+    missing = tmp_path / "does-not-exist.txt"
+    ctx = _ctx(tmp_path, input_path=missing)
+    params = registry.validate_params("util.copy", {})
+    result = CopyStep().run(ctx, params)
+    assert result.status == "fail"
+    assert result.message is not None
+    assert "input not found" in result.message
+    assert str(missing) in result.message
+
+
 def test_util_fail_times_counter(tmp_path: Path, registry: StepRegistry) -> None:
     ctx = _ctx(tmp_path)
     params = registry.validate_params("util.fail", {"message": "nope", "times": 2})

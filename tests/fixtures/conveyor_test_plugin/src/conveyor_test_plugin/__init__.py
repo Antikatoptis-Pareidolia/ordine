@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pydantic import BaseModel, ConfigDict
 
 from conveyor.core.steps import StepContext, StepResult
@@ -17,7 +19,7 @@ class EchoStep:
     id = "test.echo"
     engines = frozenset({"headless"})
     Params = EchoParams
-    OUTPUT_DIR_PARAMS = frozenset()
+    OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
         assert isinstance(params, EchoParams)
