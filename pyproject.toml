@@ -9,6 +9,7 @@ dependencies = [
   "pydantic>=2.8",
   "PyYAML>=6.0",
   "SQLAlchemy>=2.0",
+  "Pillow>=10",  # headless image steps: validate, transform, export fallback backend
 ]
 
 [project.optional-dependencies]
@@ -59,6 +60,10 @@ source = ["src/conveyor"]
 util_noop = "conveyor.executors.builtin.steps:NoopStep"
 util_fail = "conveyor.executors.builtin.steps:FailStep"
 util_copy = "conveyor.executors.builtin.steps:CopyStep"
+image_validate = "conveyor.executors.headless.steps:ValidateStep"
+image_white_to_alpha = "conveyor.executors.headless.steps:WhiteToAlphaStep"
+image_trim = "conveyor.executors.headless.steps:TrimStep"
+image_export = "conveyor.executors.headless.steps:ExportStep"
 
 [project.entry-points."conveyor.engines"]
 headless = "conveyor.core.engines:HeadlessEngine"

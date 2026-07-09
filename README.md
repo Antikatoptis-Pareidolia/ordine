@@ -13,6 +13,7 @@ Local-first, AI-assisted task automation pipelines for Linux.
 ## Dev setup
 
 ```bash
+sudo apt install imagemagick   # ImageMagick backend for headless image steps (optional locally; required in CI)
 uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin && pre-commit install && pytest
 ```
 

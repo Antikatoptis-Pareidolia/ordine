@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
       - name: Install
         run: uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin
       - name: Lint

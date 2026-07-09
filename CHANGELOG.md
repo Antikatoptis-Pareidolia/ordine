@@ -13,3 +13,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Playbook schema, loader, JSON Schema export, and validation tests (Step 2)
 - SQLite ledger with task state machine, branch attempts, flags, and name reservations (Step 3)
 - Step contract, plugin registry, headless engine, and task workdirs (Step 4)
+- Headless image steps (`image.validate`, `image.white_to_alpha`, `image.trim`, `image.export`) with ImageMagick/Pillow backends (Step 5)
