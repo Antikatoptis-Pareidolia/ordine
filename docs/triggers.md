@@ -34,11 +34,19 @@ re-emitted after settling — under `content_hash` dedup a content change yields
 
 ## Startup rescan
 
-On `FolderWatchService.start()`, every matching file already on disk is scanned (sorted by name) and
-emitted. The ledger dedup key drops files already ingested — this reconciles folder contents after a
-crash or restart. Files that arrived while the process was down become tasks; known files are ignored.
+On `FolderWatchService.start()`, every matching file already on disk is **seeded into the settle
+tracker** (sorted by name) — rescan does not emit directly. The poller emits each seeded file only
+after the same stability and readability checks used for live arrivals. This prevents a restart
+mid-write from hashing a partial file into a phantom task.
 
-`FolderWatchService.rescan()` runs the same scan on demand (useful after recovery).
+The ledger dedup key drops files already ingested — this reconciles folder contents after a crash or
+restart. Files that arrived while the process was down become tasks once settled; known files are
+ignored on re-emit.
+
+`FolderWatchService.rescan()` seeds the settle tracker on demand (useful after recovery).
+
+`ManualScanService` performs its own per-file size-stable and openable check before emitting (no
+background poller).
 
 ## Ordinal sources
 

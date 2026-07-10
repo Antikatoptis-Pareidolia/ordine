@@ -53,6 +53,7 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --cov=conveyor --cov-report=term-missing"
+markers = ["integration: long-running trigger integration tests (default run)"]
 
 [tool.coverage.run]
 source = ["src/conveyor"]

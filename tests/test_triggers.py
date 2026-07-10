@@ -300,6 +300,70 @@ def test_build_trigger_service_manifest_raises() -> None:
         build_trigger_service(spec, "none", lambda _c: None)
 
 
+def test_rescan_mid_write_emits_complete_file_once(tmp_path: Path, ledger: Ledger) -> None:
+    import hashlib
+
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    keys: list[str | None] = []
+
+    def capture(candidate: TaskCandidate) -> int | None:
+        keys.append(candidate.dedup_key)
+        return ledger.create_task(
+            pipeline_id,
+            candidate.source_ref,
+            candidate.dedup_key,
+            candidate.ordinal,
+        )
+
+    spec = FolderWatchTrigger(
+        type="folder_watch",
+        path=str(watch),
+        glob="*",
+        settle_seconds=0.3,
+    )
+    service1 = FolderWatchService(
+        spec,
+        "content_hash",
+        capture,
+        poll_interval=0.05,
+    )
+    service1.start()
+
+    target = watch / "midwrite.bin"
+    complete = b"part1-part2-part3"
+
+    def writer() -> None:
+        with target.open("wb") as handle:
+            for chunk in (b"part1-", b"part2-", b"part3"):
+                handle.write(chunk)
+                handle.flush()
+                time.sleep(0.15)
+
+    writer_thread = threading.Thread(target=writer, name="writer", daemon=True)
+    writer_thread.start()
+    time.sleep(0.1)
+
+    service1.stop()
+    service2 = FolderWatchService(
+        spec,
+        "content_hash",
+        capture,
+        poll_interval=0.05,
+    )
+    service2.start()
+
+    writer_thread.join(timeout=5.0)
+    assert not writer_thread.is_alive()
+    service2.drain(timeout=5.0)
+    service2.stop()
+
+    expected = f"sha256:{hashlib.sha256(complete).hexdigest()}"
+    assert keys == [expected]
+    assert ledger.counts(pipeline_id)["pending"] == 1
+
+
 @pytest.mark.integration
 def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
     watch = tmp_path / "watch"
@@ -323,8 +387,6 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
 
     written = threading.Event()
     stop_writer = threading.Event()
-    staging = tmp_path / "staging"
-    staging.mkdir()
     order = list(range(1, 101))
     random.shuffle(order)
 
@@ -334,18 +396,16 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
                 return
             name = f"img_{n:04d}.png"
             target = watch / name
-            staging_file = staging / name
             payload = f"payload-{n}".encode()
             chunks = random.randint(1, 3)
             part_size = max(1, len(payload) // chunks)
-            with staging_file.open("wb") as handle:
+            with target.open("wb") as handle:
                 for i in range(chunks):
                     start = i * part_size
                     end = len(payload) if i == chunks - 1 else (i + 1) * part_size
                     handle.write(payload[start:end])
                     handle.flush()
                     time.sleep(0.02)
-            staging_file.replace(target)
             if n == 5:
                 (watch / ".hidden.png").write_bytes(b"decoy")
                 (watch / ".tmp-decoy").write_bytes(b"decoy")
@@ -365,7 +425,6 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
 
     writer_thread.join(timeout=15.0)
     assert not writer_thread.is_alive()
-    service2.rescan()
     service2.drain(timeout=15.0)
     service2.stop()
 

@@ -162,6 +162,32 @@ def ledger_sink(ledger: Ledger, pipeline_id: int, *, arrival_order: bool = False
     return sink
 
 
+def _file_readable(path: Path) -> bool:
+    try:
+        with path.open("rb"):
+            return True
+    except OSError:
+        return False
+
+
+def _file_ready_for_emit(path: Path, *, settle_seconds: float) -> bool:
+    """Return True when *path* is openable and size-stable for *settle_seconds*."""
+    if should_ignore(path) or not path.is_file():
+        return False
+    wait = settle_seconds if settle_seconds > 0 else 0.05
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return False
+    time.sleep(wait)
+    try:
+        if path.stat().st_size != size:
+            return False
+    except OSError:
+        return False
+    return _file_readable(path)
+
+
 def scan_directory(
     watch_path: Path,
     glob_pattern: str,
@@ -170,13 +196,14 @@ def scan_directory(
     sink: Sink,
     *,
     log: logging.Logger | None = None,
+    settle_seconds: float = 0.0,
 ) -> int:
-    """Scan *watch_path* and emit matching candidates; return emit count."""
+    """Scan *watch_path* and emit settled candidates; return emit count."""
     emit_log = log or logger
     watch_path = watch_path.expanduser()
     emitted = 0
     for path in _iter_scan_paths(watch_path, glob_pattern):
-        if should_ignore(path):
+        if not _file_ready_for_emit(path, settle_seconds=settle_seconds):
             continue
         candidate = _build_candidate(path, dedup_mode, ordinal_regex, log=emit_log)
         if candidate is None:
@@ -284,13 +311,6 @@ class FolderWatchService:
         with self._lock:
             self._settle.pop(path.resolve(), None)
 
-    def _file_readable(self, path: Path) -> bool:
-        try:
-            with path.open("rb"):
-                return True
-        except OSError:
-            return False
-
     def _emit_settled(self, path: Path) -> None:
         candidate = _build_candidate(
             path,
@@ -336,7 +356,7 @@ class FolderWatchService:
                     continue
                 if now - last_change < self._spec.settle_seconds:
                     continue
-                if not self._file_readable(path):
+                if not _file_readable(path):
                     continue
                 ready.append(path)
                 self._settle.pop(path, None)
@@ -344,15 +364,14 @@ class FolderWatchService:
             self._emit_settled(path)
 
     def rescan(self) -> int:
-        """Emit candidates for every matching file currently on disk."""
-        return scan_directory(
-            self._watch_path,
-            self._spec.glob,
-            self._dedup,
-            self._spec.ordinal_regex,
-            self._sink,
-            log=self._log,
-        )
+        """Seed matching on-disk files into the settle tracker; return paths seeded."""
+        seeded = 0
+        for path in _iter_scan_paths(self._watch_path, self._spec.glob):
+            if should_ignore(path):
+                continue
+            self._note_path(path)
+            seeded += 1
+        return seeded
 
     def start(self) -> None:
         """Rescan on startup, then watch and settle new arrivals."""
