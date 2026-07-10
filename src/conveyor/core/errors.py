@@ -109,3 +109,7 @@ class ManifestError(ConveyorError):
 
 class RunnerError(ConveyorError):
     """Raised when the pipeline runner cannot start or execute."""
+
+
+class ConfigError(ConveyorError):
+    """Raised when application configuration is invalid or conflicts."""

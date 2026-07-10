@@ -100,6 +100,13 @@ class StepRegistry:
         """Return registered step ids sorted."""
         return sorted(self._steps)
 
+    def list_step_metadata(self) -> list[tuple[str, frozenset[str], str]]:
+        """Return (step_id, engines, plugin_origin) for every registered step."""
+        return [
+            (step_id, self._steps[step_id].engines, self._sources[step_id])
+            for step_id in self.ids()
+        ]
+
     def validate_params(self, step_id: str, params: dict[str, Any]) -> BaseModel:
         """Validate params against the step's Params model."""
         step_cls = self.get(step_id)

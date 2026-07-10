@@ -80,6 +80,29 @@ class VersionInfo:
 
 
 @dataclass(frozen=True)
+class PipelineSummary:
+    """Read-only snapshot of a registered pipeline."""
+
+    id: int
+    name: str
+    current_version: str | None
+
+
+@dataclass(frozen=True)
+class BranchAttemptView:
+    """Read-only snapshot of a branch attempt row."""
+
+    id: int
+    task_id: int
+    branch_name: str | None
+    attempt_no: int
+    ok: bool
+    last_step_id: str | None
+    error: str | None
+    finished_at: datetime | None
+
+
+@dataclass(frozen=True)
 class FlagView:
     """Read-only snapshot of a ledger flag."""
 
@@ -272,6 +295,51 @@ class Ledger:
                     parent_public_id=row.parent_public_id,
                     created_at=row.created_at,
                     note=row.note,
+                )
+                for row in rows
+            ]
+
+    def find_pipeline_id(self, name: str) -> int | None:
+        """Return a pipeline id by name, or None when not registered."""
+        with self._session() as session:
+            pipeline = session.scalar(select(Pipeline).where(Pipeline.name == name))
+            return None if pipeline is None else pipeline.id
+
+    def list_pipelines(self) -> list[PipelineSummary]:
+        """List registered pipelines with their current version public id."""
+        with self._session() as session:
+            rows = session.scalars(select(Pipeline).order_by(Pipeline.name)).all()
+            summaries: list[PipelineSummary] = []
+            for row in rows:
+                public_id: str | None = None
+                if row.current_version_id is not None:
+                    version = session.get(PlaybookVersion, row.current_version_id)
+                    if version is not None:
+                        public_id = version.public_id
+                summaries.append(
+                    PipelineSummary(id=row.id, name=row.name, current_version=public_id)
+                )
+            return summaries
+
+    def list_branch_attempts(self, task_id: int) -> list[BranchAttemptView]:
+        """List branch attempts for a task, oldest first."""
+        with self._session() as session:
+            self._get_task_row(session, task_id)
+            rows = session.scalars(
+                select(BranchAttempt)
+                .where(BranchAttempt.task_id == task_id)
+                .order_by(BranchAttempt.id)
+            ).all()
+            return [
+                BranchAttemptView(
+                    id=row.id,
+                    task_id=row.task_id,
+                    branch_name=row.branch_name,
+                    attempt_no=row.attempt_no,
+                    ok=row.ok,
+                    last_step_id=row.last_step_id,
+                    error=row.error,
+                    finished_at=row.finished_at,
                 )
                 for row in rows
             ]
@@ -531,19 +599,23 @@ class Ledger:
             flag.resolved_at = _utcnow()
             flag.resolution = resolution
 
-    def open_flags(self, pipeline_id: int, min_level: int = 0) -> list[FlagView]:
+    def list_open_flags(
+        self, *, pipeline_id: int | None = None, min_level: int = 0
+    ) -> list[FlagView]:
         """Return unresolved flags at or above *min_level*, highest level first."""
         with self._session() as session:
-            rows = session.scalars(
-                select(Flag)
-                .where(
-                    Flag.pipeline_id == pipeline_id,
-                    Flag.resolved_at.is_(None),
-                    Flag.level >= min_level,
-                )
-                .order_by(Flag.level.desc(), Flag.created_at.desc())
-            ).all()
+            query = select(Flag).where(
+                Flag.resolved_at.is_(None),
+                Flag.level >= min_level,
+            )
+            if pipeline_id is not None:
+                query = query.where(Flag.pipeline_id == pipeline_id)
+            rows = session.scalars(query.order_by(Flag.level.desc(), Flag.created_at.desc())).all()
             return [_flag_view(row) for row in rows]
+
+    def open_flags(self, pipeline_id: int, min_level: int = 0) -> list[FlagView]:
+        """Return unresolved flags for one pipeline at or above *min_level*."""
+        return self.list_open_flags(pipeline_id=pipeline_id, min_level=min_level)
 
     def next_arrival_ordinal(self, pipeline_id: int) -> int:
         """Return the next arrival-order ordinal for a pipeline (race-safe)."""

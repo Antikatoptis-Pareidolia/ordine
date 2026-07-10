@@ -1,0 +1,338 @@
+"""CLI tests using Typer's CliRunner."""
+
+from __future__ import annotations
+
+import json
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from conveyor.cli.main import app
+from conveyor.core.db import create_engine_for, init_db
+from conveyor.core.ledger import Ledger
+from tests.test_image_steps import make_test_image
+from tests.test_runner_e2e import ASSET_NAMES
+
+RUNNER = CliRunner()
+FIXTURE_PLAYBOOK = Path("tests/fixtures/playbooks/valid/v02_flagship.yml")
+
+
+def _write_config(tmp_path: Path) -> Path:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        f"""[paths]
+db = "{tmp_path / "conveyor.sqlite3"}"
+workdir_root = "{tmp_path / "workdirs"}"
+""",
+        encoding="utf-8",
+    )
+    return config_file
+
+
+def _invoke(config_file: Path, *args: str, **kwargs: object):
+    return RUNNER.invoke(app, ["--config", str(config_file), *args], **kwargs)
+
+
+def _game_assets_yaml(*, watch: Path, manifest: Path, output: Path, fuzz: int = 8) -> str:
+    return f"""version: 1
+name: cli-game-assets
+trigger:
+  type: manual
+  path: {watch}
+  glob: "*.png"
+  ordinal_regex: 'img_(\\d+)\\.png'
+steps:
+  - image.validate
+  - image.white_to_alpha:
+      fuzz: {fuzz}
+  - image.trim
+  - file.rename_from_manifest:
+      manifest: {manifest}
+  - id: image.export
+    params:
+      dest: {output}
+      use_reserved_name: true
+"""
+
+
+def _seed_five_images(watch: Path) -> None:
+    watch.mkdir(parents=True, exist_ok=True)
+    for ordinal in range(1, 6):
+        path = watch / f"img_{ordinal:04d}.png"
+        make_test_image(path)
+        path.write_bytes(path.read_bytes() + bytes([ordinal]))
+
+
+def _write_manifest(path: Path, names: list[str]) -> None:
+    rows = "\n".join(names)
+    path.write_text(f"name\n{rows}\n", encoding="utf-8")
+
+
+def test_init_creates_config_and_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    config_file = tmp_path / "config.toml"
+    result = RUNNER.invoke(app, ["init", "--config", str(config_file)])
+    assert result.exit_code == 0
+    assert config_file.exists()
+    assert (tmp_path / "data" / "conveyor" / "conveyor.sqlite3").parent.exists()
+
+
+def test_init_second_time_exits_one(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    first = RUNNER.invoke(app, ["init", "--config", str(config_file)])
+    assert first.exit_code == 0
+    second = RUNNER.invoke(app, ["init", "--config", str(config_file)])
+    assert second.exit_code == 1
+
+
+def test_check_valid_playbook(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    result = _invoke(config_file, "check", str(FIXTURE_PLAYBOOK))
+    assert result.exit_code == 0
+
+
+def test_check_unknown_step_json(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    bad = tmp_path / "bad.yml"
+    bad.write_text(
+        """version: 1
+name: bad
+trigger:
+  type: manual
+  path: /tmp
+steps:
+  - id: unknown.step
+""",
+        encoding="utf-8",
+    )
+    result = _invoke(config_file, "check", str(bad), "--json")
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "valid": False,
+        "problems": [{"path": "steps.0.id", "message": "unknown step id: unknown.step"}],
+    }
+
+
+def test_run_oneshot_game_assets(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_five_images(watch)
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    result = _invoke(config_file, "run", str(playbook), "--oneshot", "--json")
+    assert result.exit_code == 0
+    summary = json.loads(result.stdout)
+    assert summary["processed"] == 5
+    status = _invoke(config_file, "status", "--json")
+    payload = json.loads(status.stdout)
+    assert payload["pipelines"][0]["counts"]["done"] == 5
+    for name in ASSET_NAMES[:5]:
+        assert (output / name).exists()
+
+
+def test_run_oneshot_exactly_once(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_five_images(watch)
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    assert _invoke(config_file, "run", str(playbook), "--oneshot", "--json").exit_code == 0
+    second = _invoke(config_file, "run", str(playbook), "--oneshot", "--json")
+    assert second.exit_code == 0
+    assert json.loads(second.stdout)["processed"] == 0
+
+
+def test_run_auto_registration_version_churn(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_five_images(watch)
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    yaml_text = _game_assets_yaml(watch=watch, manifest=manifest, output=output, fuzz=8)
+    playbook.write_text(yaml_text, encoding="utf-8")
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    engine = create_engine_for(tmp_path / "conveyor.sqlite3")
+    init_db(engine)
+    ledger = Ledger(engine)
+    pipeline_id = ledger.find_pipeline_id("cli-game-assets")
+    assert pipeline_id is not None
+    before = len(ledger.list_versions(pipeline_id))
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    assert len(ledger.list_versions(pipeline_id)) == before
+    playbook.write_text(
+        _game_assets_yaml(watch=watch, manifest=manifest, output=output, fuzz=9),
+        encoding="utf-8",
+    )
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    assert len(ledger.list_versions(pipeline_id)) == before + 1
+
+
+def test_json_stdout_separates_logs_with_verbose(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    result = _invoke(config_file, "-v", "steps", "--json")
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert "steps" in payload
+    assert result.stdout.strip().startswith("{")
+
+
+def test_tasks_task_flags_json_keys(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_five_images(watch)
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    tasks = json.loads(_invoke(config_file, "tasks", "cli-game-assets", "--json").stdout)
+    assert set(tasks.keys()) == {"pipeline", "tasks"}
+    assert set(tasks["tasks"][0].keys()) == {
+        "id",
+        "ordinal",
+        "status",
+        "source",
+        "updated_at",
+    }
+    task_id = tasks["tasks"][0]["id"]
+    task = json.loads(_invoke(config_file, "task", str(task_id), "--json").stdout)
+    assert set(task.keys()) == {
+        "id",
+        "pipeline_id",
+        "status",
+        "ordinal",
+        "source_ref",
+        "workdir",
+        "current_branch",
+        "attempts",
+        "error",
+        "created_at",
+        "updated_at",
+        "branch_attempts",
+        "flags",
+    }
+    flags = json.loads(_invoke(config_file, "flags", "--json").stdout)
+    assert set(flags.keys()) == {"flags"}
+
+
+def test_retry_done_illegal_and_flagged_pending(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_five_images(watch)
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    tasks = json.loads(_invoke(config_file, "tasks", "cli-game-assets", "--json").stdout)
+    done_id = next(item["id"] for item in tasks["tasks"] if item["status"] == "done")
+    illegal = _invoke(config_file, "retry", str(done_id))
+    assert illegal.exit_code == 1
+    assert "illegal transition" in illegal.stderr
+
+    extra = watch / "img_0006.png"
+    make_test_image(extra)
+    _invoke(config_file, "run", str(playbook), "--oneshot")
+    flagged = json.loads(
+        _invoke(config_file, "tasks", "cli-game-assets", "--status", "flagged", "--json").stdout
+    )
+    flagged_id = flagged["tasks"][0]["id"]
+    ok = _invoke(config_file, "retry", str(flagged_id), "--json")
+    assert ok.exit_code == 0
+    assert json.loads(ok.stdout)["status"] == "pending"
+
+
+@pytest.mark.integration
+def test_run_sigint_graceful_stop(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "watch"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    watch.mkdir()
+    _write_manifest(manifest, ASSET_NAMES[:1])
+    playbook = tmp_path / "watch.yml"
+    playbook.write_text(
+        f"""version: 1
+name: cli-watch
+trigger:
+  type: folder_watch
+  path: {watch}
+  glob: "*.png"
+  ordinal_regex: 'img_(\\d+)\\.png'
+  settle_seconds: 0.5
+steps:
+  - image.validate
+  - file.rename_from_manifest:
+      manifest: {manifest}
+  - id: image.export
+    params:
+      dest: {output}
+      use_reserved_name: true
+""",
+        encoding="utf-8",
+    )
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "conveyor.cli.main",
+            "--config",
+            str(config_file),
+            "run",
+            str(playbook),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        time.sleep(0.5)
+        path = watch / "img_0001.png"
+        make_test_image(path)
+        path.write_bytes(path.read_bytes() + b"1")
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            status = _invoke(config_file, "status", "--json")
+            counts = json.loads(status.stdout)["pipelines"][0]["counts"]
+            if counts.get("done", 0) >= 1:
+                break
+            time.sleep(0.2)
+        proc.send_signal(signal.SIGINT)
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired as exc:
+            proc.kill()
+            raise AssertionError("process did not exit within 5s after SIGINT") from exc
+        assert proc.returncode == 0, (stdout, stderr)
+    finally:
+        if proc.poll() is None:
+            proc.kill()

@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ledger.create_task_arrival` — atomic arrival-order ordinal assignment + insert (planned Step 3 amendment, landed Step 6)
 - Pipeline runner with retries, recovery branches, flag escalation, manifest naming, and `PipelineService` (Step 7)
 - `file.rename_from_manifest` and `file.move` built-in steps; `LedgerNamingService`; job manifest parsing (CSV/JSON/txt)
+- Typer CLI (`conveyor`) with XDG app config, `--json` output contract, and `run --oneshot` (Step 8)
+- Ledger read helpers for CLI (`list_pipelines`, `find_pipeline_id`, `list_branch_attempts`, `list_open_flags`)
+- `StepRegistry.list_step_metadata()` for plugin visibility
 
 ### Fixed
 

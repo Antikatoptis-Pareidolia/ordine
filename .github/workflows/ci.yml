@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq
       - name: Install
         run: uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin
       - name: Lint
@@ -21,3 +21,64 @@ jobs:
         run: uv run mypy
       - name: Test
         run: uv run pytest
+      - name: CLI e2e
+        run: |
+          set -euo pipefail
+          FIXTURE_DIR=$(mktemp -d)
+          export XDG_CONFIG_HOME="$FIXTURE_DIR/xdg-config"
+          export XDG_DATA_HOME="$FIXTURE_DIR/xdg-data"
+          CONFIG="$FIXTURE_DIR/config.toml"
+          WATCH="$FIXTURE_DIR/in"
+          OUT="$FIXTURE_DIR/out"
+          MANIFEST="$FIXTURE_DIR/assets.csv"
+          PLAYBOOK="$FIXTURE_DIR/playbook.yml"
+          mkdir -p "$WATCH" "$OUT"
+          export WATCH="$WATCH" MANIFEST="$MANIFEST" OUT="$OUT" PLAYBOOK="$PLAYBOOK"
+          uv run python - <<'PY'
+          import os
+          from pathlib import Path
+          from PIL import Image
+
+          def make_test_image(path: Path) -> None:
+              img = Image.new("RGB", (64, 64), (255, 255, 255))
+              for x in range(10, 30):
+                  for y in range(12, 32):
+                      img.putpixel((x, y), (255, 0, 0))
+              img.save(path)
+
+          watch = Path(os.environ["WATCH"])
+          manifest = Path(os.environ["MANIFEST"])
+          out = Path(os.environ["OUT"])
+          playbook = Path(os.environ["PLAYBOOK"])
+          for i in range(1, 6):
+              p = watch / f"img_{i:04d}.png"
+              make_test_image(p)
+              p.write_bytes(p.read_bytes() + bytes([i]))
+          names = ["goat.png", "jug.png", "crown.png", "ring.png", "sword.png"]
+          manifest.write_text("name\n" + "\n".join(names) + "\n")
+          playbook.write_text(f"""version: 1
+          name: ci-game-assets
+          trigger:
+            type: manual
+            path: {watch}
+            glob: "*.png"
+            ordinal_regex: 'img_(\\d+)\\.png'
+          steps:
+            - image.validate
+            - image.white_to_alpha: {{fuzz: 8}}
+            - image.trim
+            - file.rename_from_manifest:
+                manifest: {manifest}
+            - id: image.export
+              params:
+                dest: {out}
+                use_reserved_name: true
+          """)
+          PY
+          uv run conveyor init --config "$CONFIG"
+          uv run conveyor --config "$CONFIG" check "$PLAYBOOK"
+          uv run conveyor --config "$CONFIG" run --oneshot "$PLAYBOOK"
+          uv run conveyor --config "$CONFIG" status --json | jq -e '.pipelines[0].counts.done == 5'
+          for name in goat.png jug.png crown.png ring.png sword.png; do
+            test -f "$OUT/$name"
+          done
