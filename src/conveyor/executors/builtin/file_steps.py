@@ -116,6 +116,7 @@ class MoveStep:
                 os.replace(ctx.input_path, write_tmp)
             except OSError:
                 shutil.copy2(ctx.input_path, write_tmp)
+                ctx.input_path.unlink()
             os.replace(write_tmp, final)
             tmp = None
             return StepResult(status="ok", output_path=final)

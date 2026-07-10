@@ -104,6 +104,8 @@ def _seed_images(watch: Path, *, corrupt_ordinals: set[int] | None = None) -> di
         make_test_image(path)
         unique = path.read_bytes() + bytes([ordinal])
         if ordinal in corrupt_ordinals:
+            # Unique invalid bytes per ordinal (not truncate_image): identical truncated
+            # PNG prefixes collide under dedup:content_hash and collapse distinct tasks.
             path.write_bytes(b"truncated" + bytes([ordinal]))
         else:
             path.write_bytes(unique)

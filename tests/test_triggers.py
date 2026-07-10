@@ -366,6 +366,15 @@ def test_rescan_mid_write_emits_complete_file_once(tmp_path: Path, ledger: Ledge
 
 @pytest.mark.integration
 def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
+    file_count = 100
+    settle_seconds = 0.2
+    poll_interval = settle_seconds / 4
+    chunk_sleep = settle_seconds / 10
+    # Budgets scale with settle_seconds and file_count: draining N files can take ~N settle windows.
+    written_wait = settle_seconds * file_count * 2
+    join_timeout = settle_seconds * file_count * 2
+    drain_timeout = settle_seconds * file_count * 3
+
     watch = tmp_path / "watch"
     watch.mkdir()
     db_path = tmp_path / "ledger.db"
@@ -378,16 +387,16 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
         type="folder_watch",
         path=str(watch),
         glob="*",
-        settle_seconds=0.2,
+        settle_seconds=settle_seconds,
         ordinal_regex=r"img_(\d+)\.png",
     )
     sink = ledger_sink(ledger, pipeline_id)
-    service = FolderWatchService(spec, "content_hash", sink, poll_interval=0.05)
+    service = FolderWatchService(spec, "content_hash", sink, poll_interval=poll_interval)
     service.start()
 
     written = threading.Event()
     stop_writer = threading.Event()
-    order = list(range(1, 101))
+    order = list(range(1, file_count + 1))
     random.shuffle(order)
 
     def writer() -> None:
@@ -405,7 +414,7 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
                     end = len(payload) if i == chunks - 1 else (i + 1) * part_size
                     handle.write(payload[start:end])
                     handle.flush()
-                    time.sleep(0.02)
+                    time.sleep(chunk_sleep)
             if n == 5:
                 (watch / ".hidden.png").write_bytes(b"decoy")
                 (watch / ".tmp-decoy").write_bytes(b"decoy")
@@ -415,23 +424,30 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
 
     writer_thread = threading.Thread(target=writer, name="writer", daemon=True)
     writer_thread.start()
-    assert written.wait(timeout=15.0)
+    assert written.wait(timeout=written_wait)
 
     service.stop()
     ledger2 = Ledger(engine)
     sink2 = ledger_sink(ledger2, pipeline_id)
-    service2 = FolderWatchService(spec, "content_hash", sink2, poll_interval=0.05)
+    service2 = FolderWatchService(spec, "content_hash", sink2, poll_interval=poll_interval)
     service2.start()
 
-    writer_thread.join(timeout=15.0)
+    writer_thread.join(timeout=join_timeout)
     assert not writer_thread.is_alive()
-    service2.drain(timeout=15.0)
+    service2.rescan()
+    service2.drain(timeout=drain_timeout)
     service2.stop()
 
-    tasks = ledger2.list_tasks(pipeline_id, status="pending", limit=200)
-    assert len(tasks) == 100
+    tasks = ledger2.list_tasks(pipeline_id, status="pending", limit=file_count + 10)
+    expected_names = {f"img_{n:04d}.png" for n in range(1, file_count + 1)}
+    actual_names = {Path(task.source_ref).name for task in tasks}
+    missing = sorted(expected_names - actual_names)
+    extra = sorted(actual_names - expected_names)
+    assert (
+        len(tasks) == file_count
+    ), f"expected {file_count} tasks, got {len(tasks)}; missing={missing!r} extra={extra!r}"
     dedup_keys = [t.dedup_key for t in tasks]
-    assert len(set(dedup_keys)) == 100
+    assert len(set(dedup_keys)) == file_count
     for task in tasks:
         name = Path(task.source_ref).name
         expected = int(name.replace("img_", "").replace(".png", ""))
