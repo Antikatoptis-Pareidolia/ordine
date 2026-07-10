@@ -101,3 +101,11 @@ class EngineMismatchError(ConveyorError):
 
 class TriggerError(ConveyorError):
     """Base class for trigger configuration and runtime errors."""
+
+
+class ManifestError(ConveyorError):
+    """Raised when a job manifest cannot be loaded or parsed."""
+
+
+class RunnerError(ConveyorError):
+    """Raised when the pipeline runner cannot start or execute."""

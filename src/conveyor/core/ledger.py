@@ -400,6 +400,13 @@ class Ledger:
             task.workdir = str(workdir.expanduser())
             task.updated_at = _utcnow()
 
+    def set_current_branch(self, task_id: int, branch_name: str | None) -> None:
+        """Record which recovery branch last succeeded for a task."""
+        with self._session() as session:
+            task = self._get_task_row(session, task_id)
+            task.current_branch = branch_name
+            task.updated_at = _utcnow()
+
     def get_task(self, task_id: int) -> TaskView:
         """Return a task snapshot."""
         with self._session() as session:

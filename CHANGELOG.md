@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Headless image steps (`image.validate`, `image.white_to_alpha`, `image.trim`, `image.export`) with ImageMagick/Pillow backends (Step 5)
 - Folder watch and manual triggers with settle detection, startup rescan, and ledger sink (Step 6)
 - `Ledger.create_task_arrival` — atomic arrival-order ordinal assignment + insert (planned Step 3 amendment, landed Step 6)
+- Pipeline runner with retries, recovery branches, flag escalation, manifest naming, and `PipelineService` (Step 7)
+- `file.rename_from_manifest` and `file.move` built-in steps; `LedgerNamingService`; job manifest parsing (CSV/JSON/txt)
 
 ### Fixed
 
