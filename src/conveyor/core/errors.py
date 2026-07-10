@@ -97,3 +97,7 @@ class EngineMismatchError(ConveyorError):
         self.step_id = step_id
         self.engine = engine
         super().__init__(f"step {step_id} does not support engine {engine}")
+
+
+class TriggerError(ConveyorError):
+    """Base class for trigger configuration and runtime errors."""

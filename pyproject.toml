@@ -10,6 +10,7 @@ dependencies = [
   "PyYAML>=6.0",
   "SQLAlchemy>=2.0",
   "Pillow>=10",  # headless image steps: validate, transform, export fallback backend
+  "watchdog>=4",  # folder_watch trigger: filesystem events + settle detection
 ]
 
 [project.optional-dependencies]

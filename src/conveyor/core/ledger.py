@@ -307,6 +307,40 @@ class Ledger:
         finally:
             session.close()
 
+    def create_task_arrival(
+        self,
+        pipeline_id: int,
+        source_ref: str,
+        dedup_key: str | None,
+    ) -> int | None:
+        """Atomically assign the next arrival ordinal and insert a pending task."""
+        session = self._session_factory()
+        try:
+            session.execute(text("BEGIN IMMEDIATE"))
+            pipeline = self._get_pipeline(session, pipeline_id)
+            if pipeline.current_version_id is None:
+                raise LedgerError(f"pipeline {pipeline_id} has no current version")
+            current_max = session.scalar(
+                select(func.max(Task.ordinal)).where(Task.pipeline_id == pipeline_id)
+            )
+            ordinal = 1 if current_max is None else int(current_max) + 1
+            task = Task(
+                pipeline_id=pipeline_id,
+                playbook_version_id=pipeline.current_version_id,
+                source_ref=source_ref,
+                ordinal=ordinal,
+                dedup_key=dedup_key,
+                status="pending",
+            )
+            session.add(task)
+            session.commit()
+            return task.id
+        except IntegrityError:
+            session.rollback()
+            return None
+        finally:
+            session.close()
+
     def claim_next(self, pipeline_id: int) -> TaskView | None:
         """Atomically claim the oldest pending task for processing."""
         with self._immediate() as session:
