@@ -274,6 +274,7 @@ class FolderWatchService:
         *,
         poll_interval: float | None = None,
         enable_poller: bool = True,
+        startup_hook_after_observer: Callable[[], None] | None = None,
     ) -> None:
         self._spec = spec
         self._dedup = dedup
@@ -283,6 +284,7 @@ class FolderWatchService:
             poll_interval if poll_interval is not None else _poll_interval(spec.settle_seconds)
         )
         self._enable_poller = enable_poller
+        self._startup_hook_after_observer = startup_hook_after_observer
         self._log = logging.getLogger(f"{__name__}.watch.{spec.path}")
         self._lock = threading.Lock()
         self._settle: dict[Path, tuple[int, float]] = {}
@@ -374,16 +376,18 @@ class FolderWatchService:
         return seeded
 
     def start(self) -> None:
-        """Rescan on startup, then watch and settle new arrivals."""
+        """Attach the observer, seed on-disk files into the settle tracker, then start the poller."""
         if self._started:
             return
         self._started = True
         self._stop.clear()
-        self.rescan()
         handler = _WatchHandler(self)
         self._observer = Observer()
         self._observer.schedule(handler, str(self._watch_path), recursive=False)
         self._observer.start()
+        if self._startup_hook_after_observer is not None:
+            self._startup_hook_after_observer()
+        self.rescan()
         if self._enable_poller:
             self._poller_thread = threading.Thread(
                 target=self._poller_loop,

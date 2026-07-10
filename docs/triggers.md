@@ -34,10 +34,16 @@ re-emitted after settling — under `content_hash` dedup a content change yields
 
 ## Startup rescan
 
-On `FolderWatchService.start()`, every matching file already on disk is **seeded into the settle
-tracker** (sorted by name) — rescan does not emit directly. The poller emits each seeded file only
-after the same stability and readability checks used for live arrivals. This prevents a restart
-mid-write from hashing a partial file into a phantom task.
+`FolderWatchService.start()` attaches the **watchdog observer first**, then seeds every matching
+on-disk file into the settle tracker (sorted by name). Observer-before-rescan closes the blind window
+that existed when rescan ran before the observer: a file created after the directory listing but before
+the watcher attached was invisible to both paths and could be lost forever. With observer-first
+ordering, arrivals during the rescan pass are picked up by filesystem events; overlap with rescan
+seeding is harmless (the settle tracker and ledger dedup absorb duplicates).
+
+Rescan does not emit directly. The poller emits each seeded or watched file only after the same
+stability and readability checks used for live arrivals. This prevents a restart mid-write from
+hashing a partial file into a phantom task.
 
 The ledger dedup key drops files already ingested — this reconciles folder contents after a crash or
 restart. Files that arrived while the process was down become tasks once settled; known files are

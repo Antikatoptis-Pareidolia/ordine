@@ -364,6 +364,42 @@ def test_rescan_mid_write_emits_complete_file_once(tmp_path: Path, ledger: Ledge
     assert ledger.counts(pipeline_id)["pending"] == 1
 
 
+def test_startup_blind_window_file_caught_after_observer_before_rescan(
+    tmp_path: Path, ledger: Ledger
+) -> None:
+    """A file arriving after the observer attaches but before rescan must not be lost."""
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    settle_seconds = 0.2
+    spec = FolderWatchTrigger(
+        type="folder_watch",
+        path=str(watch),
+        glob="*",
+        settle_seconds=settle_seconds,
+    )
+    straggler = watch / "straggler.png"
+
+    def hook() -> None:
+        straggler.write_bytes(b"arrived-during-startup-gap")
+
+    sink = ledger_sink(ledger, pipeline_id)
+    service = FolderWatchService(
+        spec,
+        "content_hash",
+        sink,
+        poll_interval=settle_seconds / 4,
+        startup_hook_after_observer=hook,
+    )
+    service.start()
+    service.drain(timeout=settle_seconds * 10)
+    service.stop()
+
+    tasks = ledger.list_tasks(pipeline_id, status="pending")
+    assert len(tasks) == 1
+    assert Path(tasks[0].source_ref).name == "straggler.png"
+
+
 @pytest.mark.integration
 def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
     file_count = 100
@@ -434,7 +470,6 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
 
     writer_thread.join(timeout=join_timeout)
     assert not writer_thread.is_alive()
-    service2.rescan()
     service2.drain(timeout=drain_timeout)
     service2.stop()
 
