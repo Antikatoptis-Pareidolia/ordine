@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 
@@ -67,3 +68,10 @@ def format_age(created_at: datetime) -> str:
         return f"{hours}h"
     days = hours // 24
     return f"{days}d"
+
+
+def format_status_counts(counts: Mapping[str, int]) -> str:
+    """Format non-zero task status counts for plain-text status output."""
+    order = ("pending", "processing", "done", "skipped", "failed", "flagged")
+    parts = [f"{status}={counts[status]}" for status in order if counts.get(status, 0) > 0]
+    return " ".join(parts)

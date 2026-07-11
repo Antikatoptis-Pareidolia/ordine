@@ -95,6 +95,93 @@ def test_check_valid_playbook(tmp_path: Path) -> None:
     config_file = _write_config(tmp_path)
     result = _invoke(config_file, "check", str(FIXTURE_PLAYBOOK))
     assert result.exit_code == 0
+    assert result.stdout.strip() == "png-cleanup: valid (4 steps, trigger=folder_watch)"
+
+
+def _game_assets_yaml_with_corrupt(*, watch: Path, manifest: Path, output: Path) -> str:
+    return f"""version: 1
+name: cli-corrupt-mix
+trigger:
+  type: manual
+  path: {watch}
+  glob: "*.png"
+  ordinal_regex: 'img_(\\d+)\\.png'
+steps:
+  - image.validate
+  - image.white_to_alpha:
+      fuzz: 8
+  - image.trim
+  - file.rename_from_manifest:
+      manifest: {manifest}
+  - id: image.export
+    params:
+      dest: {output}
+      use_reserved_name: true
+"""
+
+
+def _seed_images_with_corrupt(watch: Path, *, corrupt_ordinals: set[int]) -> None:
+    watch.mkdir(parents=True, exist_ok=True)
+    for ordinal in range(1, 6):
+        path = watch / f"img_{ordinal:04d}.png"
+        make_test_image(path)
+        if ordinal in corrupt_ordinals:
+            path.write_bytes(b"truncated" + bytes([ordinal]))
+        else:
+            path.write_bytes(path.read_bytes() + bytes([ordinal]))
+
+
+def test_status_plain_shows_all_nonzero_counts(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_images_with_corrupt(watch, corrupt_ordinals={2, 3})
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml_with_corrupt(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    assert _invoke(config_file, "run", str(playbook), "--oneshot").exit_code == 0
+    result = _invoke(config_file, "status")
+    assert result.exit_code == 0
+    line = result.stdout.strip()
+    assert "done=3" in line
+    assert "skipped=2" in line
+    assert "pending=0" not in line
+
+
+def test_task_plain_shows_attempts_flags_and_error(tmp_path: Path) -> None:
+    config_file = _write_config(tmp_path)
+    watch = tmp_path / "in"
+    manifest = tmp_path / "assets.csv"
+    output = tmp_path / "out"
+    _seed_images_with_corrupt(watch, corrupt_ordinals={2})
+    _write_manifest(manifest, ASSET_NAMES[:5])
+    playbook = tmp_path / "playbook.yml"
+    playbook.write_text(
+        _game_assets_yaml_with_corrupt(watch=watch, manifest=manifest, output=output),
+        encoding="utf-8",
+    )
+    assert _invoke(config_file, "run", str(playbook), "--oneshot").exit_code == 0
+    skipped = json.loads(
+        _invoke(config_file, "tasks", "cli-corrupt-mix", "--status", "skipped", "--json").stdout
+    )
+    task_id = skipped["tasks"][0]["id"]
+    result = _invoke(config_file, "task", str(task_id))
+    assert result.exit_code == 0
+    text = result.stdout
+    assert "attempts:" in text
+    assert "flags:" in text
+    assert "corrupt_input" in text
+    assert "skip:" in text or "error:" in text
+
+    done = json.loads(
+        _invoke(config_file, "tasks", "cli-corrupt-mix", "--status", "done", "--json").stdout
+    )
+    done_result = _invoke(config_file, "task", str(done["tasks"][0]["id"]))
+    assert "attempts:" in done_result.stdout
 
 
 def test_check_unknown_step_json(tmp_path: Path) -> None:

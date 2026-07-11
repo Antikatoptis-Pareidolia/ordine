@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import typer
 
@@ -28,7 +28,7 @@ from conveyor.core.errors import (
     PlaybookValidationError,
     RunnerError,
 )
-from conveyor.core.ledger import Ledger, PipelineSummary, TaskStatus
+from conveyor.core.ledger import Ledger, PipelineSummary, TaskStatus, TaskView
 from conveyor.core.playbook import FolderWatchTrigger, ManualTrigger, Playbook, load_playbook
 from conveyor.core.registry import StepRegistry
 from conveyor.core.runner import PipelineRunner, PipelineService
@@ -206,6 +206,10 @@ def check(
     elif problems:
         for problem in problems:
             output.print_line(f"{problem['path']}: {problem['message']}")
+    else:
+        output.print_line(
+            f"{playbook.name}: valid ({len(playbook.steps)} steps, trigger={playbook.trigger.type})"
+        )
     if problems:
         raise typer.Exit(code=1)
 
@@ -328,10 +332,10 @@ def status(
         output.print_line("(no pipelines)")
         return
     for summary, counts, open_flags, max_level in summaries:
+        count_text = output.format_status_counts(cast(dict[str, int], counts))
         output.print_line(
             f"{summary.name} {summary.current_version or '-'} "
-            f"pending={counts['pending']} done={counts['done']} "
-            f"flags={open_flags} max_level={max_level}"
+            f"{count_text} flags={open_flags} max_level={max_level}"
         )
 
 
@@ -380,6 +384,26 @@ def tasks_cmd(
             for item in payload
         ],
     )
+
+
+def _task_detail_message(
+    task: TaskView,
+    attempts: list[dict[str, Any]],
+    flags: list[dict[str, Any]],
+) -> None:
+    """Print a human-readable skip/error line when the task or its attempts carry one."""
+    if task.error:
+        output.print_line(f"error: {task.error}")
+        return
+    for item in attempts:
+        attempt_error = item.get("error")
+        if attempt_error:
+            label = "skip" if task.status == "skipped" else "error"
+            output.print_line(f"{label}: {attempt_error}")
+            return
+    if flags and task.status in ("skipped", "failed", "flagged"):
+        label = "skip" if task.status == "skipped" else "error"
+        output.print_line(f"{label}: {flags[0]['message']}")
 
 
 @app.command("task")
@@ -440,6 +464,21 @@ def task_cmd(
     output.print_line(f"task {task.id} status={task.status} ordinal={task.ordinal}")
     output.print_line(f"source: {task.source_ref}")
     output.print_line(f"workdir: {task.workdir or '-'}")
+    _task_detail_message(task, attempts, flags)
+    if attempts:
+        output.print_line("attempts:")
+        for item in attempts:
+            branch = item["branch"] or "-"
+            output.print_line(
+                f"  #{item['attempt']} branch={branch} ok={item['ok']} "
+                f"last={item['last_step_id'] or '-'} error={item['error'] or '-'}"
+            )
+    if flags:
+        output.print_line("flags:")
+        for item in flags:
+            output.print_line(
+                f"  #{item['id']} level={item['level']} kind={item['kind']} {item['message']}"
+            )
 
 
 @app.command()

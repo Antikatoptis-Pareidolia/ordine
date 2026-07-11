@@ -36,6 +36,12 @@ Load and statically validate a playbook (`load_playbook` + `StepRegistry.check_p
 
 Exit codes: `0` valid; `1` validation problems; `2` unreadable or syntactically invalid.
 
+Plain output on success:
+
+```
+png-cleanup: valid (4 steps, trigger=folder_watch)
+```
+
 **`--json` shape:**
 
 ```json
@@ -79,7 +85,13 @@ Exit codes: `0` success; `1` check problems; `2` runtime error.
 
 ### `conveyor status [--json]`
 
-Summarize all registered pipelines.
+Summarize all registered pipelines. Plain output lists every **non-zero** task status count, plus open-flag totals.
+
+Example plain line:
+
+```
+cli-game-assets pv_0001 done=3 skipped=2 flags=2 max_level=1
+```
 
 **`--json` shape:**
 
@@ -128,6 +140,19 @@ List tasks for a pipeline.
 ### `conveyor task ID [--json]`
 
 Show one task with branch attempts and open flags (ledger reads only).
+
+Plain output example:
+
+```
+task 2 status=skipped ordinal=2
+source: /tmp/in/img_0002.png
+workdir: /tmp/workdirs/2
+skip: cannot identify image file '/tmp/in/img_0002.png'
+attempts:
+  #1 branch=- ok=false last=image.validate error=cannot identify image file '/tmp/in/img_0002.png'
+flags:
+  #1 level=0 kind=corrupt_input cannot identify image file '/tmp/in/img_0002.png'
+```
 
 **`--json` shape:**
 
