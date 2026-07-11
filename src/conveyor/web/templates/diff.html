@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Diff {{ version_id }} · {{ pipeline_name }}{% endblock %}
+{% block content %}
+<h1>Diff — {{ pipeline_name }}</h1>
+<p>
+  <code>{{ against_id or '(empty)' }}</code> → <code>{{ version_id }}</code>
+  · <a href="/pipelines/{{ pipeline_id }}/versions">Back to history</a>
+</p>
+<pre class="diff">
+{% for line in diff_lines %}
+{% if line.startswith('+') and not line.startswith('+++') %}<span class="diff-add">{{ line }}</span>
+{% elif line.startswith('-') and not line.startswith('---') %}<span class="diff-del">{{ line }}</span>
+{% else %}{{ line }}
+{% endif %}
+{% endfor %}
+</pre>
+{% endblock %}

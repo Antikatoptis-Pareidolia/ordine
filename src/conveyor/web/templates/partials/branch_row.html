@@ -1,0 +1,12 @@
+{# Recovery branch row fragment — expanded in a future editor iteration. #}
+<fieldset class="branch-row">
+  <legend>Branch {{ branch_index }}</legend>
+  <p>
+    <label for="{{ prefix }}-name">Name</label>
+    <input id="{{ prefix }}-name" name="{{ prefix }}-name" value="{{ form_fields.get(prefix ~ '-name', '') }}" />
+  </p>
+  <p>
+    <label for="{{ prefix }}-retries">Retries</label>
+    <input id="{{ prefix }}-retries" name="{{ prefix }}-retries" value="{{ form_fields.get(prefix ~ '-retries', '0') }}" />
+  </p>
+</fieldset>

@@ -20,7 +20,9 @@ from conveyor.core.db import create_engine_for, init_db
 from conveyor.core.engines import EngineRegistry
 from conveyor.core.ledger import Ledger
 from conveyor.core.registry import StepRegistry
-from conveyor.web.routes import router
+from conveyor.web.routes import dashboard as dashboard_routes
+from conveyor.web.routes import editor as editor_routes
+from conveyor.web.routes import router as core_router
 from conveyor.web.security import post_is_allowed
 from conveyor.web.services import ServiceManager
 
@@ -65,5 +67,7 @@ def create_app(config: AppConfig) -> FastAPI:
         return response
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    app.include_router(router)
+    app.include_router(dashboard_routes.router)
+    app.include_router(editor_routes.router)
+    app.include_router(core_router)
     return app

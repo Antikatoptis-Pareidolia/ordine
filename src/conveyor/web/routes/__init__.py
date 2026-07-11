@@ -21,14 +21,17 @@ from conveyor.cli import output as cli_output
 from conveyor.core.config import AppConfig, load_config, save_web_runner_settings
 from conveyor.core.errors import (
     ConfigError,
+    FieldError,
     IllegalTransitionError,
     LedgerError,
     PlaybookSyntaxError,
     PlaybookValidationError,
 )
 from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import loads_playbook
+from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
+from conveyor.web.forms import validate_editor_content
+from conveyor.web.routes.dashboard import pipeline_cards
 from conveyor.web.security import resolve_artifact
 from conveyor.web.services import ServiceManager
 from conveyor.web.views import can_cancel, can_retry
@@ -68,106 +71,108 @@ def _flash(request: Request) -> dict[str, str | None]:
 
 def _redirect(path: str, *, flash: str | None = None, level: str = "info") -> RedirectResponse:
     if flash:
+        separator = "&" if "?" in path else "?"
         return RedirectResponse(
-            f"{path}?flash={quote(flash)}&flash_level={quote(level)}",
+            f"{path}{separator}flash={quote(flash)}&flash_level={quote(level)}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
     return RedirectResponse(path, status_code=status.HTTP_303_SEE_OTHER)
 
 
-def _pipeline_cards(request: Request) -> list[dict[str, Any]]:
-    ledger = _ledger(request)
-    services = _services(request)
-    cards: list[dict[str, Any]] = []
-    for summary in ledger.list_pipelines():
-        counts = ledger.counts(summary.id)
-        flags = ledger.list_open_flags(pipeline_id=summary.id)
-        max_level = max((flag.level for flag in flags), default=0)
-        runtime = services.runtime(summary.id)
-        cards.append(
-            {
-                "id": summary.id,
-                "name": summary.name,
-                "current_version": summary.current_version,
-                "running_version": runtime.running_version,
-                "service_status": runtime.status,
-                "counts": counts,
-                "open_flags": len(flags),
-                "max_flag_level": max_level,
-                "start_problems": runtime.start_problems,
-                "start_error": runtime.start_error,
-            }
+def _parse_register_content(
+    registry: StepRegistry,
+    form_dict: dict[str, str],
+) -> tuple[Playbook | None, str, list[FieldError]]:
+    tab = form_dict.get("tab", "yaml")
+    if form_dict.get("editor_save") == "1":
+        return validate_editor_content(
+            registry,
+            tab="yaml" if tab == "yaml" else "form",
+            form=form_dict,
+            yaml_text=form_dict.get("yaml_text", ""),
         )
-    return cards
-
-
-@router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request) -> HTMLResponse:
-    templates = _templates(request)
-    return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
-            "request": request,
-            "cards": _pipeline_cards(request),
-            **_flash(request),
-        },
-    )
-
-
-@router.get("/partials/pipelines", response_class=HTMLResponse)
-async def pipelines_partial(request: Request) -> HTMLResponse:
-    templates = _templates(request)
-    return templates.TemplateResponse(
-        request,
-        "partials/pipeline_cards.html",
-        {"request": request, "cards": _pipeline_cards(request)},
-    )
+    yaml_text = form_dict.get("yaml_text", "")
+    try:
+        playbook = loads_playbook(yaml_text, source="<paste>")
+        return playbook, dump_playbook(playbook), registry.check_playbook(playbook)
+    except PlaybookSyntaxError as exc:
+        return None, yaml_text, [FieldError("yaml_text", str(exc))]
+    except PlaybookValidationError as exc:
+        return None, yaml_text, list(exc.errors)
 
 
 @router.post("/pipelines", response_model=None)
-async def register_pipeline(
-    request: Request, yaml_text: Annotated[str, Form()]
-) -> HTMLResponse | RedirectResponse:
+async def register_pipeline(request: Request) -> HTMLResponse | RedirectResponse:
+    raw = await request.form()
+    form_dict = {key: value for key, value in raw.multi_items() if isinstance(value, str)}
     ledger = _ledger(request)
     registry = _registry(request)
     templates = _templates(request)
-    try:
-        playbook = loads_playbook(yaml_text, source="<paste>")
-    except (PlaybookSyntaxError, PlaybookValidationError) as exc:
-        return templates.TemplateResponse(
-            request,
-            "dashboard.html",
-            {
-                "request": request,
-                "cards": _pipeline_cards(request),
-                "register_yaml": yaml_text,
-                "register_error": str(exc),
-                "register_problems": [],
-                **_flash(request),
-            },
-            status_code=200,
+    playbook, yaml_text, problems = _parse_register_content(registry, form_dict)
+    if form_dict.get("editor_save") == "1":
+        from conveyor.web.routes import editor as editor_routes
+
+        if problems or playbook is None:
+            return templates.TemplateResponse(
+                request,
+                "editor.html",
+                editor_routes._editor_context(
+                    request,
+                    pipeline_id=None,
+                    tab="yaml" if form_dict.get("tab") == "yaml" else "form",
+                    form_fields=form_dict,
+                    yaml_text=form_dict.get("yaml_text", yaml_text),
+                    base_version=None,
+                    current_version=None,
+                    errors=problems,
+                ),
+                status_code=200,
+            )
+        existing = ledger.find_pipeline_id(playbook.name)
+        if existing is not None:
+            return templates.TemplateResponse(
+                request,
+                "editor.html",
+                editor_routes._editor_context(
+                    request,
+                    pipeline_id=None,
+                    tab="yaml" if form_dict.get("tab") == "yaml" else "form",
+                    form_fields=form_dict,
+                    yaml_text=yaml_text,
+                    base_version=None,
+                    current_version=None,
+                    errors=[FieldError("name", f"pipeline name already exists: {playbook.name}")],
+                ),
+                status_code=200,
+            )
+        note = (form_dict.get("note") or "").strip() or None
+        new_pipeline_id, version_id = ledger.register_pipeline(playbook, yaml_text, note=note)
+        return _redirect(
+            f"/pipelines/{new_pipeline_id}/edit?version={version_id}",
+            flash=f"Created {version_id}",
         )
-    problems = registry.check_playbook(playbook)
-    if problems:
+    if problems or playbook is None:
+        register_error = problems[0].message if len(problems) == 1 else None
+        if isinstance(problems, list) and problems and register_error is None:
+            register_error = str(problems)
         return templates.TemplateResponse(
             request,
             "dashboard.html",
             {
                 "request": request,
-                "cards": _pipeline_cards(request),
-                "register_yaml": yaml_text,
+                "cards": pipeline_cards(request),
+                "register_yaml": form_dict.get("yaml_text", ""),
+                "register_error": register_error,
                 "register_problems": problems,
-                "register_error": None,
                 **_flash(request),
             },
             status_code=200,
         )
-    pipeline_id = ledger.find_pipeline_id(playbook.name)
-    if pipeline_id is None:
+    existing_id = ledger.find_pipeline_id(playbook.name)
+    if existing_id is None:
         ledger.register_pipeline(playbook, yaml_text)
     else:
-        _, current_yaml = ledger.get_current_playbook(pipeline_id)
+        _, current_yaml = ledger.get_current_playbook(existing_id)
         if current_yaml != yaml_text:
             ledger.register_pipeline(playbook, yaml_text)
     return _redirect("/", flash=f"Registered pipeline {playbook.name}")

@@ -1,0 +1,40 @@
+<fieldset class="step-row">
+  <legend>Step {{ idx }}</legend>
+  <p>
+    <label for="steps-{{ idx }}-id">Step id</label>
+    <select id="steps-{{ idx }}-id" name="steps-{{ idx }}-id">
+      <option value="">— select —</option>
+      {% for step_id in step_ids %}
+      <option value="{{ step_id }}"
+        {% if form_fields.get('steps-' ~ idx ~ '-id') == step_id %}selected{% endif %}
+        {% if step_id in engine_mismatch %}class="engine-mismatch"{% endif %}>{{ step_id }}</option>
+      {% endfor %}
+    </select>
+    {% if errors_by_path.get('steps.' ~ idx ~ '.id') %}
+    <span class="error">{{ errors_by_path['steps.' ~ idx ~ '.id'] }}</span>
+    {% endif %}
+  </p>
+  <p>
+    <label for="steps-{{ idx }}-params">Params (YAML)</label>
+    <textarea id="steps-{{ idx }}-params" name="steps-{{ idx }}-params" rows="4">{{ form_fields.get('steps-' ~ idx ~ '-params', '') }}</textarea>
+    {% if errors_by_path.get('steps.' ~ idx ~ '.params') %}
+    <span class="error">{{ errors_by_path['steps.' ~ idx ~ '.params'] }}</span>
+    {% endif %}
+  </p>
+  <p>
+    <label><input type="checkbox" name="steps-{{ idx }}-onfail-enabled" value="on"
+      {% if form_fields.get('steps-' ~ idx ~ '-onfail-enabled') == 'on' %}checked{% endif %} /> Step on_failure</label>
+  </p>
+  <p>
+    <button type="submit"
+            formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/rows{% else %}/pipelines/new/edit/rows{% endif %}"
+            formmethod="post"
+            name="row_action"
+            value="remove-step"
+            hx-post="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/rows{% else %}/pipelines/new/edit/rows{% endif %}"
+            hx-include="#editor-form"
+            hx-vals='{"row_action": "remove-step", "row_index": "{{ idx }}"}'
+            hx-target="#editor-steps"
+            hx-swap="innerHTML">Remove step</button>
+  </p>
+</fieldset>

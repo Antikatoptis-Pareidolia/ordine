@@ -5,6 +5,9 @@
     current <code>{{ card.current_version or "-" }}</code>
     {% if card.running_version %}
     · running <code>{{ card.running_version }}</code>
+    {% if card.version_drift %}
+    <span class="chip chip-warning">restart to apply</span>
+    {% endif %}
     {% endif %}
     · service <span class="chip chip-{{ card.service_status }}">{{ card.service_status }}</span>
   </p>
@@ -36,6 +39,8 @@
     </form>
     {% endif %}
     <a href="/pipelines/{{ card.id }}/tasks">Tasks</a>
+    <a href="/pipelines/{{ card.id }}/edit">Edit</a>
+    <a href="/pipelines/{{ card.id }}/versions">History</a>
   </p>
 </article>
 {% else %}

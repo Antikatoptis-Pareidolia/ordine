@@ -15,6 +15,7 @@
 
 <section aria-labelledby="register-heading">
   <h2 id="register-heading">Register pipeline</h2>
+  <p><a href="/pipelines/new">Open editor for new pipeline</a></p>
   <form action="/pipelines" method="post">
     <label for="yaml_text">Paste playbook YAML</label>
     <textarea id="yaml_text" name="yaml_text" rows="12" required>{{ register_yaml or "" }}</textarea>

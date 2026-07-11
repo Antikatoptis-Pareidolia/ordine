@@ -1,0 +1,15 @@
+{% for idx in step_indices %}
+{% include "partials/step_row.html" %}
+{% endfor %}
+<p>
+  <button type="submit"
+          formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/rows{% else %}/pipelines/new/edit/rows{% endif %}"
+          formmethod="post"
+          name="row_action"
+          value="add-step"
+          hx-post="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/rows{% else %}/pipelines/new/edit/rows{% endif %}"
+          hx-include="#editor-form"
+          hx-vals='{"row_action": "add-step"}'
+          hx-target="#editor-steps"
+          hx-swap="innerHTML">Add step</button>
+</p>

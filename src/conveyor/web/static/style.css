@@ -67,6 +67,13 @@ body {
 .chip-flagged { background: var(--chip-flagged); }
 .chip-running { background: var(--chip-running); }
 .chip-paused { background: var(--chip-paused); }
+.chip-warning { background: #ca8a04; color: #fff; }
+
+.diff { background: #fff; border: 1px solid #e2e8f0; padding: 1rem; overflow-x: auto; }
+.diff-add { color: #16a34a; display: block; }
+.diff-del { color: #dc2626; display: block; }
+
+.engine-mismatch { color: #b91c1c; }
 
 .flash { padding: 0.5rem 0.75rem; border-radius: 4px; }
 .flash-info { background: #dbeafe; }

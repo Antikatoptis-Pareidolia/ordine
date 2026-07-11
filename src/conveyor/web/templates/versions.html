@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Versions · {{ pipeline_name }}{% endblock %}
+{% block content %}
+<h1>Version history — {{ pipeline_name }}</h1>
+<p>
+  <a href="/pipelines/{{ pipeline_id }}/edit">Edit current</a>
+  · current <code>{{ current_version }}</code>
+  {% if running_version %}· running <code>{{ running_version }}</code>{% endif %}
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>Version</th>
+      <th>Note</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% set v = row.version %}
+    <tr>
+      <td style="padding-left: {{ row.depth * 1.5 }}rem">
+        <code>{{ v.public_id }}</code>
+        {% if v.public_id == current_version %}<span class="chip">current</span>{% endif %}
+        {% if v.public_id == running_version %}<span class="chip chip-running">running</span>{% endif %}
+      </td>
+      <td>{{ v.note or "" }}</td>
+      <td>{{ v.created_at }}</td>
+      <td class="actions">
+        <a href="/pipelines/{{ pipeline_id }}/edit?version={{ v.public_id }}">View</a>
+        {% if v.parent_public_id %}
+        <a href="/pipelines/{{ pipeline_id }}/versions/{{ v.public_id }}/diff">Diff vs parent</a>
+        {% endif %}
+        <a href="/pipelines/{{ pipeline_id }}/edit?version={{ v.public_id }}">Open in editor</a>
+        <form action="/pipelines/{{ pipeline_id }}/versions/{{ v.public_id }}/revert" method="post" style="display:inline">
+          <button type="submit">Revert</button>
+        </form>
+        {% if v.public_id != current_version %}
+        <form action="/pipelines/{{ pipeline_id }}/versions/{{ v.public_id }}/make-current" method="post" style="display:inline">
+          <button type="submit">Make current</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

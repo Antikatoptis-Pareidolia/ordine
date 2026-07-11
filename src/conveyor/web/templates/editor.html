@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Editor · Conveyor{% endblock %}
+{% block content %}
+<h1>{% if pipeline_id %}Edit pipeline{% else %}New pipeline{% endif %}</h1>
+
+{% if branch_banner %}
+<p class="flash flash-info" role="status">
+  Saved as <code>{{ branch_banner.saved }}</code> (branch of <code>{{ branch_banner.base }}</code>).
+  Current is still <code>{{ branch_banner.current }}</code>.
+  <form action="/pipelines/{{ pipeline_id }}/versions/{{ branch_banner.saved }}/make-current" method="post" style="display:inline">
+    <button type="submit">Make current</button>
+  </form>
+</p>
+{% endif %}
+
+{% if current_version %}
+<p>Current version: <code>{{ current_version }}</code> · editing from <code>{{ base_version }}</code>
+  · <a href="/pipelines/{{ pipeline_id }}/versions">History</a></p>
+{% endif %}
+
+<form id="editor-form" method="post"
+      action="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/versions{% else %}/pipelines{% endif %}">
+  <input type="hidden" name="tab" value="{{ tab }}" />
+  <input type="hidden" name="base_version" value="{{ base_version }}" />
+  {% if not pipeline_id %}<input type="hidden" name="editor_save" value="1" />{% endif %}
+
+  <p>
+    <label for="name">Name</label>
+    <input id="name" name="name" value="{{ form_fields.get('name', '') }}" required />
+    {% if errors_by_path.get('name') %}<span class="error">{{ errors_by_path.name }}</span>{% endif %}
+  </p>
+  <p>
+    <label for="description">Description</label>
+    <input id="description" name="description" value="{{ form_fields.get('description', '') }}" />
+  </p>
+  <p>
+    <label for="engine">Engine</label>
+    <input id="engine" name="engine" value="{{ form_fields.get('engine', 'headless') }}" />
+    {% if errors_by_path.get('engine') %}<span class="error">{{ errors_by_path.engine }}</span>{% endif %}
+  </p>
+  <p>
+    <label for="dedup">Dedup</label>
+    <select id="dedup" name="dedup">
+      {% for value in ['content_hash', 'filename', 'none'] %}
+      <option value="{{ value }}" {% if form_fields.get('dedup', 'content_hash') == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+  </p>
+  <p>
+    <label for="note">Version note</label>
+    <input id="note" name="note" value="{{ form_fields.get('note', '') }}" />
+  </p>
+
+  <div class="editor-tabs">
+    <button type="submit"
+            formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/to-yaml{% else %}/pipelines/new/edit/to-yaml{% endif %}"
+            formmethod="post">Form → YAML</button>
+    <button type="submit"
+            formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/to-form{% else %}/pipelines/new/edit/to-form{% endif %}"
+            formmethod="post">YAML → Form</button>
+    <button type="submit"
+            formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/validate{% else %}/pipelines/new/edit/validate{% endif %}"
+            formmethod="post">Validate</button>
+  </div>
+
+  {% if tab == 'yaml' %}
+  <section aria-labelledby="yaml-heading">
+    <h2 id="yaml-heading">YAML</h2>
+    <p class="hint">Comments in YAML are not preserved when saving (PyYAML discards them).</p>
+    <textarea id="yaml_text" name="yaml_text" rows="24">{{ yaml_text }}</textarea>
+    {% if errors_by_path.get('yaml_text') %}<p class="error">{{ errors_by_path.yaml_text }}</p>{% endif %}
+  </section>
+  {% else %}
+  <section aria-labelledby="form-heading">
+    <h2 id="form-heading">Form</h2>
+    <fieldset>
+      <legend>Trigger</legend>
+      <p>
+        <label for="trigger-type">Type</label>
+        <select id="trigger-type" name="trigger-type">
+          {% for value in ['folder_watch', 'manual', 'manifest'] %}
+          <option value="{{ value }}" {% if form_fields.get('trigger-type', 'manual') == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </p>
+      <p>
+        <label for="trigger-path">Path</label>
+        <input id="trigger-path" name="trigger-path" value="{{ form_fields.get('trigger-path', '') }}" />
+        {% if errors_by_path.get('trigger.path') %}<span class="error">{{ errors_by_path['trigger.path'] }}</span>{% endif %}
+      </p>
+      <p>
+        <label for="trigger-glob">Glob</label>
+        <input id="trigger-glob" name="trigger-glob" value="{{ form_fields.get('trigger-glob', '*') }}" />
+      </p>
+      <p>
+        <label for="trigger-settle_seconds">Settle seconds</label>
+        <input id="trigger-settle_seconds" name="trigger-settle_seconds" value="{{ form_fields.get('trigger-settle_seconds', '2') }}" />
+      </p>
+      <p>
+        <label for="trigger-poll_seconds">Poll seconds (manifest)</label>
+        <input id="trigger-poll_seconds" name="trigger-poll_seconds" value="{{ form_fields.get('trigger-poll_seconds', '30') }}" />
+      </p>
+      <p>
+        <label for="trigger-ordinal_regex">Ordinal regex</label>
+        <input id="trigger-ordinal_regex" name="trigger-ordinal_regex" value="{{ form_fields.get('trigger-ordinal_regex', '') }}" />
+      </p>
+      <p>
+        <label><input type="checkbox" name="trigger-arrival_order_ordinals" value="on"
+          {% if form_fields.get('trigger-arrival_order_ordinals') == 'on' %}checked{% endif %} /> Arrival order ordinals</label>
+      </p>
+    </fieldset>
+
+    <div id="editor-steps"
+         hx-target="#editor-steps"
+         hx-swap="innerHTML">
+      {% include "partials/editor_steps.html" %}
+    </div>
+
+    <fieldset>
+      <legend>Pipeline on_failure</legend>
+      <p>
+        <label><input type="checkbox" name="onfail-enabled" value="on"
+          {% if form_fields.get('onfail-enabled') == 'on' %}checked{% endif %} /> Enabled</label>
+      </p>
+      <p>
+        <label for="onfail-retries">Retries</label>
+        <input id="onfail-retries" name="onfail-retries" value="{{ form_fields.get('onfail-retries', '0') }}" />
+      </p>
+      <p>
+        <label for="onfail-then">Then</label>
+        <select id="onfail-then" name="onfail-then">
+          <option value="mark_failed" {% if form_fields.get('onfail-then', 'mark_failed') == 'mark_failed' %}selected{% endif %}>mark_failed</option>
+          <option value="skip" {% if form_fields.get('onfail-then') == 'skip' %}selected{% endif %}>skip</option>
+        </select>
+      </p>
+    </fieldset>
+  </section>
+  {% endif %}
+
+  {% if errors %}
+  <ul class="problems">
+    {% for error in errors %}
+    <li><code>{{ error.path }}</code>: {{ error.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <p>
+    <button type="submit">Save version</button>
+    {% if pipeline_id %}
+    <a href="/pipelines/{{ pipeline_id }}/versions">Cancel</a>
+    {% else %}
+    <a href="/">Cancel</a>
+    {% endif %}
+  </p>
+</form>
+{% endblock %}

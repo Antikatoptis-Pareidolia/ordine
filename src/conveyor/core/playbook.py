@@ -282,6 +282,116 @@ def load_playbook(path: Path) -> Playbook:
     return loads_playbook(text, source=str(expanded))
 
 
+def _is_default_failure_policy(policy: FailurePolicy) -> bool:
+    return policy.retries == 0 and not policy.branches and policy.then == "mark_failed"
+
+
+def _dump_failure_policy_dict(policy: FailurePolicy) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    if policy.retries != 0:
+        result["retries"] = policy.retries
+    if policy.branches:
+        result["branches"] = [_dump_recovery_branch(branch) for branch in policy.branches]
+    if policy.then != "mark_failed":
+        result["then"] = policy.then
+    return result
+
+
+def _dump_recovery_branch(branch: RecoveryBranch) -> dict[str, Any]:
+    result: dict[str, Any] = {"name": branch.name}
+    if branch.retries != 0:
+        result["retries"] = branch.retries
+    result["steps"] = [_dump_step_spec(step) for step in branch.steps]
+    return result
+
+
+def _dump_step_spec(step: StepSpec) -> str | dict[str, Any]:
+    has_params = bool(step.params)
+    has_on_failure = step.on_failure is not None
+    if not has_params and not has_on_failure:
+        return step.id
+    if has_on_failure:
+        assert step.on_failure is not None
+        long_form: dict[str, Any] = {"id": step.id}
+        if has_params:
+            long_form["params"] = step.params
+        long_form["on_failure"] = _dump_failure_policy_dict(step.on_failure)
+        return long_form
+    return {step.id: step.params}
+
+
+def _dump_trigger_dict(trigger: Trigger) -> dict[str, Any]:
+    if trigger.type == "folder_watch":
+        result: dict[str, Any] = {
+            "type": trigger.type,
+            "path": trigger.path,
+        }
+        if trigger.glob != "*":
+            result["glob"] = trigger.glob
+        if trigger.settle_seconds != 2.0:
+            result["settle_seconds"] = trigger.settle_seconds
+        if trigger.ordinal_regex is not None:
+            result["ordinal_regex"] = trigger.ordinal_regex
+        if trigger.arrival_order_ordinals:
+            result["arrival_order_ordinals"] = True
+        return result
+    if trigger.type == "manual":
+        result = {
+            "type": trigger.type,
+            "path": trigger.path,
+        }
+        if trigger.glob != "*":
+            result["glob"] = trigger.glob
+        if trigger.ordinal_regex is not None:
+            result["ordinal_regex"] = trigger.ordinal_regex
+        if trigger.arrival_order_ordinals:
+            result["arrival_order_ordinals"] = True
+        return result
+    result = {
+        "type": trigger.type,
+        "path": trigger.path,
+    }
+    if trigger.poll_seconds != 30.0:
+        result["poll_seconds"] = trigger.poll_seconds
+    return result
+
+
+def _playbook_to_dump_dict(playbook: Playbook) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "version": playbook.version,
+        "name": playbook.name,
+    }
+    if playbook.description is not None:
+        data["description"] = playbook.description
+    data["trigger"] = _dump_trigger_dict(playbook.trigger)
+    if playbook.dedup != "content_hash":
+        data["dedup"] = playbook.dedup
+    if playbook.engine != "headless":
+        data["engine"] = playbook.engine
+    data["steps"] = [_dump_step_spec(step) for step in playbook.steps]
+    if not _is_default_failure_policy(playbook.on_failure):
+        data["on_failure"] = _dump_failure_policy_dict(playbook.on_failure)
+    if playbook.meta is not None:
+        data["meta"] = playbook.meta.model_dump(exclude_none=True)
+    return data
+
+
+def dump_playbook(playbook: Playbook) -> str:
+    """Serialize a validated playbook to YAML with stable key order and compact step forms.
+
+    Round-trip guarantee: ``loads_playbook(dump_playbook(pb)) == pb`` for valid playbooks.
+    Comments are not preserved (PyYAML safe_load discards them).
+    """
+    data = _playbook_to_dump_dict(playbook)
+    dumped: str = yaml.safe_dump(
+        data,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    return dumped
+
+
 def emit_json_schema(dest: Path) -> None:
     """Write the Playbook JSON Schema to *dest*."""
     schema = Playbook.model_json_schema()
