@@ -1,0 +1,43 @@
+{% for card in cards %}
+<article class="pipeline-card">
+  <h3>{{ card.name }}</h3>
+  <p>
+    current <code>{{ card.current_version or "-" }}</code>
+    {% if card.running_version %}
+    · running <code>{{ card.running_version }}</code>
+    {% endif %}
+    · service <span class="chip chip-{{ card.service_status }}">{{ card.service_status }}</span>
+  </p>
+  <p class="counts">
+    {% for status, count in card.counts.items() if count > 0 %}
+    <span class="chip chip-{{ status }}">{{ status }}={{ count }}</span>
+    {% endfor %}
+    {% if card.open_flags %}
+    <span class="flag-badge">flags={{ card.open_flags }} (max {{ card.max_flag_level }})</span>
+    {% endif %}
+  </p>
+  {% if card.start_problems %}
+  <ul class="problems">
+    {% for problem in card.start_problems %}
+    <li><code>{{ problem.path }}</code>: {{ problem.message }}</li>
+    {% endfor %}
+  </ul>
+  {% elif card.start_error %}
+  <p class="error">{{ card.start_error }}</p>
+  {% endif %}
+  <p class="actions">
+    {% if card.service_status == "running" %}
+    <form action="/pipelines/{{ card.id }}/pause" method="post" style="display:inline">
+      <button type="submit">Pause</button>
+    </form>
+    {% else %}
+    <form action="/pipelines/{{ card.id }}/start" method="post" style="display:inline">
+      <button type="submit">Start</button>
+    </form>
+    {% endif %}
+    <a href="/pipelines/{{ card.id }}/tasks">Tasks</a>
+  </p>
+</article>
+{% else %}
+<p>(no pipelines)</p>
+{% endfor %}

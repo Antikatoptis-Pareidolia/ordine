@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Conveyor{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<section aria-labelledby="pipelines-heading">
+  <h2 id="pipelines-heading">Pipelines</h2>
+  <div id="pipeline-cards"
+       hx-get="/partials/pipelines"
+       hx-trigger="every 2s"
+       hx-swap="outerHTML">
+    {% include "partials/pipeline_cards_inner.html" %}
+  </div>
+</section>
+
+<section aria-labelledby="register-heading">
+  <h2 id="register-heading">Register pipeline</h2>
+  <form action="/pipelines" method="post">
+    <label for="yaml_text">Paste playbook YAML</label>
+    <textarea id="yaml_text" name="yaml_text" rows="12" required>{{ register_yaml or "" }}</textarea>
+    <button type="submit">Register</button>
+  </form>
+  {% if register_error %}
+  <p class="error">{{ register_error }}</p>
+  {% endif %}
+  {% if register_problems %}
+  <ul class="problems">
+    {% for problem in register_problems %}
+    <li><code>{{ problem.path }}</code>: {{ problem.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

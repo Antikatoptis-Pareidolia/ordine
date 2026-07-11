@@ -1,0 +1,133 @@
+/* Conveyor web UI — system fonts, no framework. htmx 2.0.4 vendored in static/htmx.min.js */
+
+:root {
+  --chip-pending: #6b7280;
+  --chip-processing: #2563eb;
+  --chip-done: #16a34a;
+  --chip-skipped: #ca8a04;
+  --chip-failed: #dc2626;
+  --chip-flagged: #dc2626;
+  --chip-running: #16a34a;
+  --chip-paused: #6b7280;
+  --max-width: 960px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  margin: 0;
+  color: #111;
+  background: #fafafa;
+}
+
+.site-header {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 0.75rem 1rem;
+}
+
+.site-header a {
+  color: #f8fafc;
+  margin-right: 1rem;
+  text-decoration: none;
+}
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.pipeline-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #fff;
+  background: var(--chip-pending);
+}
+
+.chip-pending { background: var(--chip-pending); }
+.chip-processing { background: var(--chip-processing); }
+.chip-done { background: var(--chip-done); }
+.chip-skipped { background: var(--chip-skipped); }
+.chip-failed { background: var(--chip-failed); }
+.chip-flagged { background: var(--chip-flagged); }
+.chip-running { background: var(--chip-running); }
+.chip-paused { background: var(--chip-paused); }
+
+.flash { padding: 0.5rem 0.75rem; border-radius: 4px; }
+.flash-info { background: #dbeafe; }
+.flash-error { background: #fee2e2; }
+
+.error { color: #b91c1c; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+th, td {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+textarea, input, select, button {
+  font: inherit;
+}
+
+textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+}
+
+button {
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e2e8f0;
+}
+
+pre {
+  overflow-x: auto;
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  padding: 0.5rem;
+}
+
+.hint {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.problems code {
+  font-family: ui-monospace, monospace;
+}

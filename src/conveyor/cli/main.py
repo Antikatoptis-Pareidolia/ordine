@@ -596,6 +596,31 @@ def steps(
     )
 
 
+@app.command()
+def serve(
+    ctx: typer.Context,
+    host: Annotated[str | None, typer.Option("--host", help="Bind host")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Bind port")] = None,
+) -> None:
+    """Start the web UI and pipeline service manager."""
+    import uvicorn
+
+    from conveyor.web.app import create_app
+
+    assert isinstance(ctx.obj, AppContext)
+    config = ctx.obj.config
+    bind_host = host if host is not None else config.web_host
+    bind_port = port if port is not None else config.web_port
+    if bind_host not in ("127.0.0.1", "localhost"):
+        typer.echo(
+            "WARNING: binding to a non-local host without authentication — "
+            "anyone on the network can control pipelines.",
+            err=True,
+        )
+    app = create_app(config)
+    uvicorn.run(app, host=bind_host, port=bind_port, log_level="info")
+
+
 def main() -> None:
     """Console script entry point."""
     app()

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typer CLI (`conveyor`) with XDG app config, `--json` output contract, and `run --oneshot` (Step 8)
 - Ledger read helpers for CLI (`list_pipelines`, `find_pipeline_id`, `list_branch_attempts`, `list_open_flags`)
 - `StepRegistry.list_step_metadata()` for plugin visibility
+- FastAPI web UI (`conveyor serve`) with ServiceManager, dashboard, tasks, flags, settings, and vendored HTMX 2.0.4 (Step 9)
 
 ### Fixed
 

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Flags · Conveyor{% endblock %}
+{% block content %}
+<h1>Flags inbox</h1>
+<table>
+  <thead>
+    <tr><th>Level</th><th>Pipeline</th><th>Task</th><th>Kind</th><th>Age</th><th>Message</th><th>Resolve</th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% set flag = row.flag %}
+    <tr>
+      <td>L{{ flag.level }}</td>
+      <td>{{ row.pipeline_name }}</td>
+      <td>{% if flag.task_id %}<a href="/tasks/{{ flag.task_id }}">{{ flag.task_id }}</a>{% else %}-{% endif %}</td>
+      <td>{{ flag.kind }}</td>
+      <td>{{ row.age }}</td>
+      <td>{{ flag.message }}</td>
+      <td>
+        <form action="/flags/{{ flag.id }}/resolve" method="post">
+          <label class="sr-only" for="note-{{ flag.id }}">Resolution note</label>
+          <input id="note-{{ flag.id }}" name="note" required placeholder="note" />
+          <button type="submit">Resolve</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">(no open flags)</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

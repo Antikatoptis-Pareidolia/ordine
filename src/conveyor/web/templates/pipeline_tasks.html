@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ pipeline.name }} tasks · Conveyor{% endblock %}
+{% block content %}
+<h1>{{ pipeline.name }} tasks</h1>
+<nav aria-label="Status filter">
+  <a href="/pipelines/{{ pipeline.id }}/tasks"{% if not status_filter %} aria-current="page"{% endif %}>All</a>
+  {% for s in ["pending", "processing", "done", "skipped", "failed", "flagged"] %}
+  <a href="/pipelines/{{ pipeline.id }}/tasks?status={{ s }}"{% if status_filter == s %} aria-current="page"{% endif %}>{{ s }}</a>
+  {% endfor %}
+</nav>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Ordinal</th><th>Status</th><th>Source</th><th>Branch</th><th>Updated</th></tr>
+  </thead>
+  <tbody>
+    {% for task in tasks %}
+    <tr>
+      <td><a href="/tasks/{{ task.id }}">{{ task.id }}</a></td>
+      <td>{{ task.ordinal if task.ordinal is not none else "" }}</td>
+      <td><span class="chip chip-{{ task.status }}">{{ task.status }}</span></td>
+      <td>{{ task.source_ref.split("/")[-1] }}</td>
+      <td>{{ task.current_branch or "-" }}</td>
+      <td>{{ task.updated_at }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">(no tasks)</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

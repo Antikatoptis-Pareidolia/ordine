@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Task {{ task.id }} · Conveyor{% endblock %}
+{% block content %}
+<h1>Task {{ task.id }}</h1>
+<p>
+  <span class="chip chip-{{ task.status }}">{{ task.status }}</span>
+  ordinal {{ task.ordinal if task.ordinal is not none else "-" }}
+</p>
+<p>Source: <code>{{ task.source_ref }}</code></p>
+<p>Workdir: <code>{{ task.workdir or "-" }}</code></p>
+{% if task.error %}
+<p class="error">error: {{ task.error }}</p>
+{% endif %}
+
+{% if source_is_image and last_output_rel %}
+<section aria-labelledby="preview-heading">
+  <h2 id="preview-heading">Preview</h2>
+  {% if source_artifact %}
+  <figure>
+    <figcaption>Before</figcaption>
+    <img src="/artifacts/{{ task.id }}/{{ source_artifact }}" alt="Source preview" />
+  </figure>
+  {% else %}
+  <p>Source image: {{ task.source_ref.split("/")[-1] }}</p>
+  {% endif %}
+  <figure>
+    <figcaption>After</figcaption>
+    <img src="/artifacts/{{ task.id }}/{{ last_output_rel }}" alt="Output preview" />
+  </figure>
+</section>
+{% endif %}
+
+<section aria-labelledby="steps-heading">
+  <h2 id="steps-heading">Steps</h2>
+  {% if task_json %}
+  <ol>
+    {% for entry in step_logs %}
+    {% set step = entry.step %}
+    <li>
+      <strong>{{ step.id }}</strong>
+      {% if step.branch %} (branch {{ step.branch }}){% endif %}
+      — {{ step.status }}
+      {% if step.message %}<br />{{ step.message }}{% endif %}
+      {% if entry.log %}
+      <details>
+        <summary>log.txt</summary>
+        <pre>{{ entry.log }}</pre>
+      </details>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p>(no task.json)</p>
+  {% endif %}
+</section>
+
+{% if attempts %}
+<section aria-labelledby="attempts-heading">
+  <h2 id="attempts-heading">Branch attempts</h2>
+  <ul>
+    {% for attempt in attempts %}
+    <li>#{{ attempt.attempt_no }} branch={{ attempt.branch_name or "-" }} ok={{ attempt.ok }} last={{ attempt.last_step_id or "-" }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if flags %}
+<section aria-labelledby="flags-heading">
+  <h2 id="flags-heading">Flags</h2>
+  <ul>
+    {% for flag in flags %}
+    <li>L{{ flag.level }} {{ flag.kind }}: {{ flag.message }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<p class="actions">
+  {% if can_retry %}
+  <form action="/tasks/{{ task.id }}/retry" method="post" style="display:inline">
+    <button type="submit">Retry</button>
+  </form>
+  {% endif %}
+  {% if can_cancel %}
+  <form action="/tasks/{{ task.id }}/cancel" method="post" style="display:inline">
+    <button type="submit">Cancel</button>
+  </form>
+  {% endif %}
+  <a href="/pipelines/{{ task.pipeline_id }}/tasks">Back to tasks</a>
+</p>
+{% endblock %}
