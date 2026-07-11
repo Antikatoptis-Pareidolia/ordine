@@ -15,6 +15,8 @@ Config precedence: `--config` > `$CONVEYOR_CONFIG` > `$XDG_CONFIG_HOME/conveyor/
 
 ## Output contract
 
+All human-readable output is **plain text by design** (fixed-width tables and simple lines); the CLI does not use Rich or other TUI rendering even though Typer may install Rich as a transitive dependency.
+
 - Human-readable tables and lines go to **stdout**.
 - With `--json`, **stdout** carries exactly one JSON object and nothing else.
 - All logging goes to **stderr**, including when `-v` is set.
