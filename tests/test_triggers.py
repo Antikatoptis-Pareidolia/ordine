@@ -478,9 +478,9 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
     actual_names = {Path(task.source_ref).name for task in tasks}
     missing = sorted(expected_names - actual_names)
     extra = sorted(actual_names - expected_names)
-    assert (
-        len(tasks) == file_count
-    ), f"expected {file_count} tasks, got {len(tasks)}; missing={missing!r} extra={extra!r}"
+    assert len(tasks) == file_count, (
+        f"expected {file_count} tasks, got {len(tasks)}; missing={missing!r} extra={extra!r}"
+    )
     dedup_keys = [t.dedup_key for t in tasks]
     assert len(set(dedup_keys)) == file_count
     for task in tasks:
