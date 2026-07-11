@@ -11,11 +11,18 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 
 
+def _ensure_utc(value: datetime) -> datetime:
+    """Interpret naive datetimes as UTC (SQLite round-trip); normalize aware values."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def iso_timestamp(value: datetime | None) -> str | None:
     """Format a timezone-aware datetime as ISO-8601 UTC."""
     if value is None:
         return None
-    return value.astimezone(UTC).isoformat()
+    return _ensure_utc(value).isoformat()
 
 
 def emit_json(payload: object) -> None:
@@ -54,9 +61,10 @@ def print_line(message: str) -> None:
     sys.stdout.write(message + "\n")
 
 
-def format_age(created_at: datetime) -> str:
-    """Return a short human age string for *created_at*."""
-    delta = datetime.now(tz=UTC) - created_at.astimezone(UTC)
+def format_age(created_at: datetime, *, now: datetime | None = None) -> str:
+    """Return a short human age string for *created_at* (stored UTC, convention 14)."""
+    reference = _ensure_utc(now) if now is not None else datetime.now(tz=UTC)
+    delta = reference - _ensure_utc(created_at)
     seconds = int(delta.total_seconds())
     if seconds < 60:
         return f"{seconds}s"
