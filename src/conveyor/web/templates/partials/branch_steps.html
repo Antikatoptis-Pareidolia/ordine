@@ -1,0 +1,15 @@
+{% for step_idx in branch_step_indices %}
+{% include "partials/branch_step_row.html" %}
+{% endfor %}
+<p>
+  <button type="submit"
+          formaction="{{ rows_url }}"
+          formmethod="post"
+          name="row_action"
+          value="{{ add_branch_step_action }}"
+          hx-post="{{ rows_url }}"
+          hx-include="#editor-form"
+          hx-vals='{"row_action": "{{ add_branch_step_action }}", "onfail_scope": "{{ onfail_scope }}", "onfail_prefix": "{{ prefix }}", "step_index": "{{ step_index | default('') }}", "branch_index": "{{ branch_idx }}", "branch_key": "{{ branch_key }}"}'
+          hx-target="#{{ branch_key }}-steps-container"
+          hx-swap="innerHTML">Add branch step</button>
+</p>

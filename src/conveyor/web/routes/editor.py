@@ -20,7 +20,12 @@ from conveyor.core.errors import FieldError
 from conveyor.core.ledger import Ledger, VersionInfo
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
-from conveyor.web.forms import playbook_to_form, validate_editor_content
+from conveyor.web.forms import (
+    branch_step_indices,
+    onfail_branch_indices,
+    playbook_to_form,
+    validate_editor_content,
+)
 from conveyor.web.services import ServiceManager
 
 logger = logging.getLogger(__name__)
@@ -47,7 +52,105 @@ steps:
 
 
 def _templates(request: Request) -> Jinja2Templates:
-    return Jinja2Templates(directory=str(request.app.state.templates_dir))
+    templates = Jinja2Templates(directory=str(request.app.state.templates_dir))
+    templates.env.globals["onfail_branch_indices"] = onfail_branch_indices
+    templates.env.globals["branch_step_indices"] = branch_step_indices
+    return templates
+
+
+def _rows_base_url(pipeline_id: int | None) -> str:
+    if pipeline_id is None:
+        return "/pipelines/new/edit/rows"
+    return f"/pipelines/{pipeline_id}/edit/rows"
+
+
+def _delete_prefix_keys(data: dict[str, str], prefix: str) -> None:
+    for key in list(data):
+        if key.startswith(prefix):
+            del data[key]
+
+
+def _engine_mismatch(registry: StepRegistry, engine: str) -> set[str]:
+    return {
+        step_id
+        for step_id, engines, _origin in registry.list_step_metadata()
+        if engine not in engines
+    }
+
+
+def _onfail_scope_for_prefix(prefix: str) -> tuple[str, str]:
+    if prefix.startswith("steps-"):
+        step_index = prefix.removeprefix("steps-").removesuffix("-onfail")
+        return "step", step_index
+    return "pipeline", ""
+
+
+def _onfail_error_prefix(prefix: str) -> str:
+    if prefix.startswith("steps-"):
+        step_index = prefix.removeprefix("steps-").removesuffix("-onfail")
+        return f"steps.{step_index}.on_failure"
+    return "on_failure"
+
+
+def _onfail_branches_context(
+    request: Request,
+    form_fields: dict[str, str],
+    *,
+    prefix: str,
+    branches_target_id: str,
+    pipeline_id: int | None,
+    errors_by_path: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    onfail_scope, step_index = _onfail_scope_for_prefix(prefix)
+    registry = _registry(request)
+    engine = form_fields.get("engine", "headless")
+    return {
+        "request": request,
+        "form_fields": form_fields,
+        "prefix": prefix,
+        "error_prefix": _onfail_error_prefix(prefix),
+        "branches_target_id": branches_target_id,
+        "onfail_scope": onfail_scope,
+        "step_index": step_index,
+        "rows_base_url": _rows_base_url(pipeline_id),
+        "step_ids": registry.ids(),
+        "engine_mismatch": _engine_mismatch(registry, engine),
+        "errors_by_path": errors_by_path or {},
+        "pipeline_id": pipeline_id,
+    }
+
+
+def _branch_steps_context(
+    request: Request,
+    form_fields: dict[str, str],
+    *,
+    prefix: str,
+    branch_key: str,
+    branch_idx: str,
+    pipeline_id: int | None,
+    errors_by_path: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    onfail_scope, step_index = _onfail_scope_for_prefix(prefix)
+    registry = _registry(request)
+    engine = form_fields.get("engine", "headless")
+    return {
+        "request": request,
+        "form_fields": form_fields,
+        "prefix": prefix,
+        "error_prefix": _onfail_error_prefix(prefix),
+        "branch_key": branch_key,
+        "branch_idx": branch_idx,
+        "branch_step_indices": branch_step_indices(form_fields, branch_key),
+        "onfail_scope": onfail_scope,
+        "step_index": step_index,
+        "rows_url": _rows_base_url(pipeline_id),
+        "add_branch_step_action": f"add-{onfail_scope}-onfail-branch-step",
+        "remove_branch_step_action": f"remove-{onfail_scope}-onfail-branch-step",
+        "step_ids": registry.ids(),
+        "engine_mismatch": _engine_mismatch(registry, engine),
+        "errors_by_path": errors_by_path or {},
+        "pipeline_id": pipeline_id,
+    }
 
 
 def _ledger(request: Request) -> Ledger:
@@ -148,6 +251,7 @@ def _editor_context(
         "errors": errors,
         "branch_banner": branch_banner,
         "save_error": save_error,
+        "rows_base_url": _rows_base_url(pipeline_id),
         **_flash(request),
     }
 
@@ -375,27 +479,135 @@ async def editor_rows_existing(request: Request, pipeline_id: int) -> HTMLRespon
 async def _editor_rows_impl(request: Request, pipeline_id: int | None) -> HTMLResponse:
     form = await _form_mapping(request)
     action = form.get("row_action", "")
-    indices = _step_indices(form)
     updated = dict(form)
-    if action == "add-step":
-        idx = _next_index(indices)
-        updated[f"steps-{idx}-id"] = ""
-        updated[f"steps-{idx}-params"] = ""
-    elif action == "remove-step":
-        remove = form.get("row_index", "")
-        if remove.isdigit():
-            prefix = f"steps-{remove}-"
-            for key in list(updated):
-                if key.startswith(prefix):
-                    del updated[key]
     templates = _templates(request)
     registry = _registry(request)
-    engine = updated.get("engine", "headless")
-    engine_mismatch = {
-        step_id
-        for step_id, engines, _origin in registry.list_step_metadata()
-        if engine not in engines
-    }
+
+    if action == "add-step":
+        idx = _next_index(_step_indices(updated))
+        updated[f"steps-{idx}-id"] = ""
+        updated[f"steps-{idx}-params"] = ""
+        return templates.TemplateResponse(
+            request,
+            "partials/editor_steps.html",
+            {
+                "request": request,
+                "form_fields": updated,
+                "step_indices": _step_indices(updated),
+                "step_ids": registry.ids(),
+                "engine_mismatch": _engine_mismatch(registry, updated.get("engine", "headless")),
+                "errors_by_path": _errors_by_path([]),
+                "pipeline_id": pipeline_id,
+                "rows_base_url": _rows_base_url(pipeline_id),
+            },
+        )
+
+    if action == "remove-step":
+        remove = form.get("row_index", "")
+        if remove.isdigit():
+            _delete_prefix_keys(updated, f"steps-{remove}-")
+        return templates.TemplateResponse(
+            request,
+            "partials/editor_steps.html",
+            {
+                "request": request,
+                "form_fields": updated,
+                "step_indices": _step_indices(updated),
+                "step_ids": registry.ids(),
+                "engine_mismatch": _engine_mismatch(registry, updated.get("engine", "headless")),
+                "errors_by_path": _errors_by_path([]),
+                "pipeline_id": pipeline_id,
+                "rows_base_url": _rows_base_url(pipeline_id),
+            },
+        )
+
+    prefix = form.get("onfail_prefix") or (
+        f"steps-{form.get('step_index', '')}-onfail"
+        if action.startswith(("add-step", "remove-step"))
+        else "onfail"
+    )
+    branches_target_id = form.get("branches_target_id") or (
+        f"steps-{form.get('step_index', '')}-onfail-branches"
+        if prefix.startswith("steps-")
+        else "pipeline-onfail-branches"
+    )
+
+    if action in {"add-step-onfail-branch", "add-pipeline-onfail-branch"}:
+        if prefix.startswith("steps-"):
+            step_index = prefix.removeprefix("steps-").removesuffix("-onfail")
+            updated[f"steps-{step_index}-onfail-enabled"] = "on"
+        else:
+            updated["onfail-enabled"] = "on"
+        branch_indices = onfail_branch_indices(updated, prefix)
+        new_branch_index = _next_index(branch_indices)
+        branch_key = f"{prefix}-branches-{new_branch_index}"
+        updated[f"{branch_key}-name"] = ""
+        updated[f"{branch_key}-retries"] = "0"
+        return templates.TemplateResponse(
+            request,
+            "partials/onfail_branches.html",
+            _onfail_branches_context(
+                request,
+                updated,
+                prefix=prefix,
+                branches_target_id=branches_target_id,
+                pipeline_id=pipeline_id,
+            ),
+        )
+
+    if action in {"remove-step-onfail-branch", "remove-pipeline-onfail-branch"}:
+        branch_index = form.get("branch_index", "")
+        if branch_index.isdigit():
+            _delete_prefix_keys(updated, f"{prefix}-branches-{branch_index}-")
+        return templates.TemplateResponse(
+            request,
+            "partials/onfail_branches.html",
+            _onfail_branches_context(
+                request,
+                updated,
+                prefix=prefix,
+                branches_target_id=branches_target_id,
+                pipeline_id=pipeline_id,
+            ),
+        )
+
+    if action in {"add-step-onfail-branch-step", "add-pipeline-onfail-branch-step"}:
+        branch_key = form.get("branch_key") or f"{prefix}-branches-{form.get('branch_index', '')}"
+        step_indices = branch_step_indices(updated, branch_key)
+        new_step_index = _next_index(step_indices)
+        updated[f"{branch_key}-steps-{new_step_index}-id"] = ""
+        updated[f"{branch_key}-steps-{new_step_index}-params"] = ""
+        return templates.TemplateResponse(
+            request,
+            "partials/branch_steps.html",
+            _branch_steps_context(
+                request,
+                updated,
+                prefix=prefix,
+                branch_key=branch_key,
+                branch_idx=form.get("branch_index", ""),
+                pipeline_id=pipeline_id,
+            ),
+        )
+
+    if action in {"remove-step-onfail-branch-step", "remove-pipeline-onfail-branch-step"}:
+        branch_key = form.get("branch_key", "")
+        branch_step_index = form.get("branch_step_index", "")
+        if branch_key and branch_step_index.isdigit():
+            _delete_prefix_keys(updated, f"{branch_key}-steps-{branch_step_index}-")
+        return templates.TemplateResponse(
+            request,
+            "partials/branch_steps.html",
+            _branch_steps_context(
+                request,
+                updated,
+                prefix=prefix,
+                branch_key=branch_key,
+                branch_idx=form.get("branch_index", ""),
+                pipeline_id=pipeline_id,
+            ),
+        )
+
     return templates.TemplateResponse(
         request,
         "partials/editor_steps.html",
@@ -404,9 +616,10 @@ async def _editor_rows_impl(request: Request, pipeline_id: int | None) -> HTMLRe
             "form_fields": updated,
             "step_indices": _step_indices(updated),
             "step_ids": registry.ids(),
-            "engine_mismatch": engine_mismatch,
+            "engine_mismatch": _engine_mismatch(registry, updated.get("engine", "headless")),
             "errors_by_path": _errors_by_path([]),
             "pipeline_id": pipeline_id,
+            "rows_base_url": _rows_base_url(pipeline_id),
         },
     )
 

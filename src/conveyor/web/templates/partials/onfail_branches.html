@@ -1,0 +1,23 @@
+{% set branch_indices = onfail_branch_indices(form_fields, prefix) %}
+{% set rows_url = rows_base_url %}
+{% set add_branch_action = 'add-' ~ onfail_scope ~ '-onfail-branch' %}
+{% set remove_branch_action = 'remove-' ~ onfail_scope ~ '-onfail-branch' %}
+{% for branch_idx in branch_indices %}
+{% set branch_key = prefix ~ '-branches-' ~ branch_idx %}
+{% set branch_step_indices = branch_step_indices(form_fields, branch_key) %}
+{% set add_branch_step_action = 'add-' ~ onfail_scope ~ '-onfail-branch-step' %}
+{% set remove_branch_step_action = 'remove-' ~ onfail_scope ~ '-onfail-branch-step' %}
+{% include "partials/branch_row.html" %}
+{% endfor %}
+<p>
+  <button type="submit"
+          formaction="{{ rows_url }}"
+          formmethod="post"
+          name="row_action"
+          value="{{ add_branch_action }}"
+          hx-post="{{ rows_url }}"
+          hx-include="#editor-form"
+          hx-vals='{"row_action": "{{ add_branch_action }}", "onfail_scope": "{{ onfail_scope }}", "onfail_prefix": "{{ prefix }}", "step_index": "{{ step_index | default('') }}", "branches_target_id": "{{ branches_target_id }}"}'
+          hx-target="#{{ branches_target_id }}"
+          hx-swap="innerHTML">Add branch</button>
+</p>

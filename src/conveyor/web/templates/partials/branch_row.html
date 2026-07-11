@@ -1,12 +1,31 @@
-{# Recovery branch row fragment — expanded in a future editor iteration. #}
 <fieldset class="branch-row">
-  <legend>Branch {{ branch_index }}</legend>
+  <legend>Branch {{ branch_idx }}</legend>
   <p>
-    <label for="{{ prefix }}-name">Name</label>
-    <input id="{{ prefix }}-name" name="{{ prefix }}-name" value="{{ form_fields.get(prefix ~ '-name', '') }}" />
+    <label for="{{ branch_key }}-name">Name</label>
+    <input id="{{ branch_key }}-name" name="{{ branch_key }}-name"
+           value="{{ form_fields.get(branch_key ~ '-name', '') }}" />
+    {% if errors_by_path.get(error_prefix ~ '.branches.' ~ branch_idx ~ '.name') %}
+    <span class="error">{{ errors_by_path[error_prefix ~ '.branches.' ~ branch_idx ~ '.name'] }}</span>
+    {% endif %}
   </p>
   <p>
-    <label for="{{ prefix }}-retries">Retries</label>
-    <input id="{{ prefix }}-retries" name="{{ prefix }}-retries" value="{{ form_fields.get(prefix ~ '-retries', '0') }}" />
+    <label for="{{ branch_key }}-retries">Retries</label>
+    <input id="{{ branch_key }}-retries" name="{{ branch_key }}-retries"
+           value="{{ form_fields.get(branch_key ~ '-retries', '0') }}" />
+  </p>
+  <div id="{{ branch_key }}-steps-container">
+    {% include "partials/branch_steps.html" %}
+  </div>
+  <p>
+    <button type="submit"
+            formaction="{{ rows_url }}"
+            formmethod="post"
+            name="row_action"
+            value="{{ remove_branch_action }}"
+            hx-post="{{ rows_url }}"
+            hx-include="#editor-form"
+            hx-vals='{"row_action": "{{ remove_branch_action }}", "onfail_scope": "{{ onfail_scope }}", "onfail_prefix": "{{ prefix }}", "step_index": "{{ step_index | default('') }}", "branch_index": "{{ branch_idx }}", "branches_target_id": "{{ branches_target_id }}"}'
+            hx-target="#{{ branches_target_id }}"
+            hx-swap="innerHTML">Remove branch</button>
   </p>
 </fieldset>

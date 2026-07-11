@@ -38,6 +38,16 @@ def _collect_indices(form: Mapping[str, str], prefix: str) -> list[int]:
     return sorted(indices)
 
 
+def onfail_branch_indices(form: Mapping[str, str], prefix: str) -> list[int]:
+    """Return sorted branch indices for a failure-policy prefix (e.g. ``steps-0-onfail``)."""
+    return _collect_indices(form, f"{prefix}-branches")
+
+
+def branch_step_indices(form: Mapping[str, str], branch_key: str) -> list[int]:
+    """Return sorted step indices inside a branch (e.g. ``steps-0-onfail-branches-1``)."""
+    return _collect_indices(form, f"{branch_key}-steps")
+
+
 def _parse_yaml_params(text: str, path: str) -> dict[str, Any]:
     stripped = text.strip()
     if not stripped:

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FastAPI web UI (`conveyor serve`) with ServiceManager, dashboard, tasks, flags, settings, and vendored HTMX 2.0.4 (Step 9)
 - Pipeline editor with form ⟷ YAML conversion, immutable version history, diffs, revert, and branch-from-version (Step 10)
 - `dump_playbook()` in core with round-trip guarantee; `docs/editor.md`
+- Form-tab recovery branch editing (step-level and pipeline-level) with HTMX add/remove fragments (Step 10 follow-up)
 
 ### Fixed
 

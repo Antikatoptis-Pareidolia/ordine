@@ -1,0 +1,32 @@
+<fieldset class="on-failure-block">
+  <legend>{{ legend }}</legend>
+  <p>
+    <label>
+      <input type="checkbox" name="{{ prefix }}-enabled" value="on"
+        {% if form_fields.get(prefix ~ '-enabled') == 'on' %}checked{% endif %} />
+      Enabled
+    </label>
+  </p>
+  <p>
+    <label for="{{ prefix }}-retries">Retries</label>
+    <input id="{{ prefix }}-retries" name="{{ prefix }}-retries"
+           value="{{ form_fields.get(prefix ~ '-retries', '0') }}" />
+    {% if errors_by_path.get(error_prefix ~ '.retries') %}
+    <span class="error">{{ errors_by_path[error_prefix ~ '.retries'] }}</span>
+    {% endif %}
+  </p>
+  <p>
+    <label for="{{ prefix }}-then">Then</label>
+    <select id="{{ prefix }}-then" name="{{ prefix }}-then">
+      <option value="mark_failed"
+        {% if form_fields.get(prefix ~ '-then', 'mark_failed') == 'mark_failed' %}selected{% endif %}>mark_failed</option>
+      <option value="skip"
+        {% if form_fields.get(prefix ~ '-then') == 'skip' %}selected{% endif %}>skip</option>
+    </select>
+  </p>
+  <div id="{{ branches_target_id }}">
+    {% set onfail_scope = 'step' if prefix.startswith('steps-') else 'pipeline' %}
+    {% set step_index = prefix.split('-')[1] if onfail_scope == 'step' else '' %}
+    {% include "partials/onfail_branches.html" %}
+  </div>
+</fieldset>

@@ -21,10 +21,14 @@
     <span class="error">{{ errors_by_path['steps.' ~ idx ~ '.params'] }}</span>
     {% endif %}
   </p>
-  <p>
-    <label><input type="checkbox" name="steps-{{ idx }}-onfail-enabled" value="on"
-      {% if form_fields.get('steps-' ~ idx ~ '-onfail-enabled') == 'on' %}checked{% endif %} /> Step on_failure</label>
-  </p>
+  <details class="on-failure-details" {% if form_fields.get('steps-' ~ idx ~ '-onfail-enabled') == 'on' %}open{% endif %}>
+    <summary>Step on_failure</summary>
+    {% set prefix = 'steps-' ~ idx ~ '-onfail' %}
+    {% set error_prefix = 'steps.' ~ idx ~ '.on_failure' %}
+    {% set branches_target_id = 'steps-' ~ idx ~ '-onfail-branches' %}
+    {% set legend = 'Recovery policy' %}
+    {% include "partials/on_failure_block.html" %}
+  </details>
   <p>
     <button type="submit"
             formaction="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/edit/rows{% else %}/pipelines/new/edit/rows{% endif %}"

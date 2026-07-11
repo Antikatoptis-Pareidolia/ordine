@@ -1,0 +1,38 @@
+<fieldset class="branch-step-row">
+  <legend>Branch step {{ step_idx }}</legend>
+  <p>
+    <label for="{{ branch_key }}-steps-{{ step_idx }}-id">Step id</label>
+    <select id="{{ branch_key }}-steps-{{ step_idx }}-id" name="{{ branch_key }}-steps-{{ step_idx }}-id">
+      <option value="">— select —</option>
+      {% for step_id in step_ids %}
+      <option value="{{ step_id }}"
+        {% if form_fields.get(branch_key ~ '-steps-' ~ step_idx ~ '-id') == step_id %}selected{% endif %}
+        {% if step_id in engine_mismatch %}class="engine-mismatch"{% endif %}>{{ step_id }}</option>
+      {% endfor %}
+    </select>
+    {% if errors_by_path.get(error_prefix ~ '.branches.' ~ branch_idx ~ '.steps.' ~ step_idx ~ '.id') %}
+    <span class="error">{{ errors_by_path[error_prefix ~ '.branches.' ~ branch_idx ~ '.steps.' ~ step_idx ~ '.id'] }}</span>
+    {% endif %}
+  </p>
+  <p>
+    <label for="{{ branch_key }}-steps-{{ step_idx }}-params">Params (YAML)</label>
+    <textarea id="{{ branch_key }}-steps-{{ step_idx }}-params"
+              name="{{ branch_key }}-steps-{{ step_idx }}-params"
+              rows="3">{{ form_fields.get(branch_key ~ '-steps-' ~ step_idx ~ '-params', '') }}</textarea>
+    {% if errors_by_path.get(error_prefix ~ '.branches.' ~ branch_idx ~ '.steps.' ~ step_idx ~ '.params') %}
+    <span class="error">{{ errors_by_path[error_prefix ~ '.branches.' ~ branch_idx ~ '.steps.' ~ step_idx ~ '.params'] }}</span>
+    {% endif %}
+  </p>
+  <p>
+    <button type="submit"
+            formaction="{{ rows_url }}"
+            formmethod="post"
+            name="row_action"
+            value="{{ remove_branch_step_action }}"
+            hx-post="{{ rows_url }}"
+            hx-include="#editor-form"
+            hx-vals='{"row_action": "{{ remove_branch_step_action }}", "onfail_scope": "{{ onfail_scope }}", "onfail_prefix": "{{ prefix }}", "step_index": "{{ step_index | default('') }}", "branch_index": "{{ branch_idx }}", "branch_key": "{{ branch_key }}", "branch_step_index": "{{ step_idx }}"}'
+            hx-target="#{{ branch_key }}-steps-container"
+            hx-swap="innerHTML">Remove branch step</button>
+  </p>
+</fieldset>

@@ -118,21 +118,11 @@
 
     <fieldset>
       <legend>Pipeline on_failure</legend>
-      <p>
-        <label><input type="checkbox" name="onfail-enabled" value="on"
-          {% if form_fields.get('onfail-enabled') == 'on' %}checked{% endif %} /> Enabled</label>
-      </p>
-      <p>
-        <label for="onfail-retries">Retries</label>
-        <input id="onfail-retries" name="onfail-retries" value="{{ form_fields.get('onfail-retries', '0') }}" />
-      </p>
-      <p>
-        <label for="onfail-then">Then</label>
-        <select id="onfail-then" name="onfail-then">
-          <option value="mark_failed" {% if form_fields.get('onfail-then', 'mark_failed') == 'mark_failed' %}selected{% endif %}>mark_failed</option>
-          <option value="skip" {% if form_fields.get('onfail-then') == 'skip' %}selected{% endif %}>skip</option>
-        </select>
-      </p>
+      {% set prefix = 'onfail' %}
+      {% set error_prefix = 'on_failure' %}
+      {% set branches_target_id = 'pipeline-onfail-branches' %}
+      {% set legend = 'Pipeline recovery policy' %}
+      {% include "partials/on_failure_block.html" %}
     </fieldset>
   </section>
   {% endif %}

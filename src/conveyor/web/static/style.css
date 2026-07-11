@@ -69,6 +69,22 @@ body {
 .chip-paused { background: var(--chip-paused); }
 .chip-warning { background: #ca8a04; color: #fff; }
 
+.on-failure-details {
+  margin: 0.75rem 0;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #f8fafc;
+}
+
+.branch-row,
+.branch-step-row {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+}
+
 .diff { background: #fff; border: 1px solid #e2e8f0; padding: 1rem; overflow-x: auto; }
 .diff-add { color: #16a34a; display: block; }
 .diff-del { color: #dc2626; display: block; }
