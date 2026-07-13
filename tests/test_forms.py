@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from conveyor.core.playbook import load_playbook
+from conveyor.core.playbook import Playbook, load_playbook
 from conveyor.web.forms import FormConversionError, form_to_dict, playbook_to_form
 
 FLAGSHIP = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v02_flagship.yml"
@@ -21,9 +22,7 @@ def _round_trip_form(playbook_path: Path) -> None:
     assert again == form
 
 
-def load_playbook_from_dict(data: dict) -> object:
-    from conveyor.core.playbook import Playbook
-
+def load_playbook_from_dict(data: dict[str, Any]) -> Playbook:
     return Playbook.model_validate(data)
 
 

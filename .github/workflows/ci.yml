@@ -11,10 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y imagemagick jq
       - name: Install
-        run: uv venv && uv pip install -e ".[dev]" -e tests/fixtures/conveyor_test_plugin
+        run: |
+          uv sync --locked --extra dev
+          uv pip install -e tests/fixtures/conveyor_test_plugin
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Typecheck
