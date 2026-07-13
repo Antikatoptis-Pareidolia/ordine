@@ -425,6 +425,46 @@ steps:
     session.close()
 
 
+def test_no_ordinal_rename_run_all_report_has_message(
+    tmp_path: Path,
+    engines: EngineRegistry,
+) -> None:
+    registry = StepRegistry.load()
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name\ngoat.png\n", encoding="utf-8")
+    sample = samples / "input.png"
+    sample.write_bytes(b"\x89PNG\r\n")
+    yaml_text = f"""version: 1
+name: ordinal-fidelity
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - util.noop
+  - util.noop
+  - util.noop
+  - file.rename_from_manifest:
+      manifest: {manifest}
+"""
+    session, _ = _session(
+        tmp_path,
+        registry,
+        engines,
+        yaml_text=yaml_text,
+        samples=[sample],
+    )
+    session.run_all()
+    report = session.report()
+    step_four = report["tasks"][0]["steps"][3]
+    assert step_four["id"] == "file.rename_from_manifest"
+    assert step_four["status"] == "fail"
+    assert step_four["message"] is not None
+    assert "task has no ordinal" in step_four["message"]
+    session.close()
+
+
 def test_resume_replays_prefix_and_continues(
     tmp_path: Path, registry: StepRegistry, engines: EngineRegistry
 ) -> None:

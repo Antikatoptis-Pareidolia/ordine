@@ -234,6 +234,41 @@ steps:
     assert "file.rename_from_manifest" in setup.text
 
 
+def test_lab_run_all_shows_no_ordinal_failure_message(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name\ngoat.png\n", encoding="utf-8")
+    (samples / "input.png").write_bytes(b"\x89PNG\r\n")
+    yaml_text = f"""version: 1
+name: lab-ordinal-fail-msg
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - util.noop
+  - util.noop
+  - util.noop
+  - file.rename_from_manifest:
+      manifest: {manifest}
+"""
+    pipeline_id, _ = ledger.register_pipeline(loads_playbook(yaml_text), yaml_text)
+    sid = _start_lab(client, pipeline_id, samples)
+    response = client.post(
+        f"/lab/{sid}/run-all",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    view = client.get(f"/lab/{sid}")
+    assert view.status_code == 200
+    assert "task has no ordinal" in view.text
+    assert "file.rename_from_manifest" in view.text
+
+
 def test_editor_anchor_and_from_lab_banner(
     lab_client: tuple[TestClient, Ledger, Path],
 ) -> None:

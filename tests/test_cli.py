@@ -474,3 +474,52 @@ steps:
     with sqlite3.connect(db_path) as conn:
         after = conn.execute("SELECT COUNT(*) FROM pipelines").fetchone()[0]
     assert before == after
+
+
+def test_cli_dry_run_no_ordinal_failure_message_table_and_json(tmp_path: Path) -> None:
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name\ngoat.png\n", encoding="utf-8")
+    (samples / "input.png").write_bytes(b"\x89PNG\r\n")
+    playbook_file = tmp_path / "ordinal-less.yml"
+    playbook_file.write_text(
+        f"""version: 1
+name: ordinal-less
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - util.noop
+  - util.noop
+  - util.noop
+  - file.rename_from_manifest:
+      manifest: {manifest}
+""",
+        encoding="utf-8",
+    )
+    config_file = _write_config(tmp_path)
+
+    table = _invoke(
+        config_file,
+        "dry-run",
+        str(playbook_file),
+        "--sample",
+        str(samples),
+    )
+    assert table.exit_code == 1
+    assert "task has no ordinal" in table.stdout
+
+    payload = json.loads(
+        _invoke(
+            config_file,
+            "dry-run",
+            str(playbook_file),
+            "--sample",
+            str(samples),
+            "--json",
+        ).stdout
+    )
+    step_four = payload["tasks"][0]["steps"][3]
+    assert step_four["id"] == "file.rename_from_manifest"
+    assert "task has no ordinal" in step_four["message"]

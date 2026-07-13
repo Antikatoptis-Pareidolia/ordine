@@ -661,10 +661,10 @@ class DryRunSession:
                         last_step_id=seq[-1].id,
                         error=result.message,
                     )
+                last = result
                 if result.status == "ok":
                     branch_status = "ok"
                     branch_message = None
-                    last = result
                     if branch_name is not None:
                         self._ledger.set_current_branch(task.id, branch_name)
                         branch_results.append((branch_name, branch_status, branch_message))

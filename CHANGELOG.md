@@ -42,4 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Dry-run and lab runner-equivalent paths now report real step failure messages (not "no attempts executed") when the primary attempt fails before branch retries
+
+### Fixed
+
 - Startup rescan seeds the settle tracker instead of emitting partial files (Step 6 follow-up)
