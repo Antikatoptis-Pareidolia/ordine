@@ -16,6 +16,10 @@ def test_example_scaffold_runs_oneshot(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["example", str(demo)])
     assert result.exit_code == 0, result.output
+    assert result.stdout.count(f"cd {demo}") == 1
+    assert "ordine check png-cleanup.yml" in result.stdout
+    assert "ordine run png-cleanup.yml --oneshot" in result.stdout
+    assert "ordine serve" in result.stdout
     assert (demo / "png-cleanup.yml").is_file()
     assert len(list((demo / "samples").glob("img_*.png"))) == 6
 

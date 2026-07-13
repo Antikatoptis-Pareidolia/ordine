@@ -5,6 +5,7 @@ Owns key precedence (keyring > env > .env). Must never import adapters or cli.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from keyring.errors import KeyringError
 
 from ordine.core.config import DEFAULT_CONFIG_DIR
 from ordine.llm.errors import LLMError
+
+logger = logging.getLogger(__name__)
 
 SERVICE = "ordine"
 ENV_NAMES = {
@@ -57,8 +60,13 @@ def _resolve_key(provider: str) -> tuple[str | None, str | None]:
         if env_val:
             return env_val, "env var"
 
-    dotenv = _read_dotenv(DEFAULT_CONFIG_DIR / ".env")
+    dotenv_path = DEFAULT_CONFIG_DIR / ".env"
+    dotenv = _read_dotenv(dotenv_path)
     if env_name and env_name in dotenv:
+        logger.warning(
+            "using plaintext API key from %s; prefer the OS keyring",
+            dotenv_path,
+        )
         return dotenv[env_name], ".env file"
     return None, None
 

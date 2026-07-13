@@ -228,14 +228,19 @@ def check(
     if not isinstance(ctx.obj, AppContext):
         typer.echo("internal error: missing CLI context", err=True)
         raise typer.Exit(code=2)
-    _, registry, _ = _open(ctx.obj.config)
+    registry = StepRegistry.load()
     try:
         playbook, _ = _load_playbook_text(playbook_path)
     except (PlaybookSyntaxError, PlaybookValidationError, OSError) as exc:
+        message = (
+            f"playbook not found: {playbook_path}"
+            if isinstance(exc, FileNotFoundError)
+            else str(exc)
+        )
         if as_json:
-            output.emit_json({"valid": False, "problems": [{"path": "$", "message": str(exc)}]})
+            output.emit_json({"valid": False, "problems": [{"path": "$", "message": message}]})
         else:
-            typer.echo(str(exc), err=True)
+            typer.echo(message, err=True)
         raise typer.Exit(code=2) from exc
     problems = _check_playbook(playbook, registry)
     if as_json:
@@ -924,8 +929,8 @@ def example(
     typer.echo(f"Created demo at {target.resolve()}")
     typer.echo("")
     typer.echo("Next:")
+    typer.echo(f"  cd {target}")
     for command in next_commands:
-        typer.echo(f"  cd {target}")
         typer.echo(f"  {command}")
     raise typer.Exit(code=0)
 
@@ -959,7 +964,15 @@ def serve(
             err=True,
         )
     app = create_app(config)
-    uvicorn.run(app, host=bind_host, port=bind_port, log_level="info")
+    try:
+        uvicorn.run(app, host=bind_host, port=bind_port, log_level="info")
+    except SystemExit as exc:
+        if exc.code:
+            typer.echo(
+                f"Could not bind {bind_host}:{bind_port}; try ordine serve --port PORT.",
+                err=True,
+            )
+        raise typer.Exit(code=int(exc.code or 0)) from exc
 
 
 def main() -> None:

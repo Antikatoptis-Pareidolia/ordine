@@ -503,6 +503,64 @@ def test_rename_from_manifest_step_with_stub_naming(tmp_path: Path) -> None:
     assert result.output_path.read_bytes() == b"png"
 
 
+@pytest.mark.parametrize("unsafe_name", ["../x.png", "/tmp/x.png", "a/b.png"])
+def test_rename_from_manifest_rejects_unsafe_names(tmp_path: Path, unsafe_name: str) -> None:
+    manifest = tmp_path / "names.csv"
+    manifest.write_text(f"name\n{unsafe_name}\n", encoding="utf-8")
+    src = tmp_path / "in.png"
+    src.write_bytes(b"png")
+    workdir = TaskWorkdir.create(tmp_path, "demo", 1)
+    step_dir = workdir.step_dir(1, "file.rename_from_manifest")
+    ctx = StepContext(
+        task_id=1,
+        pipeline_name="demo",
+        source_ref=str(src),
+        ordinal=1,
+        input_path=src,
+        step_dir=step_dir,
+        logger=workdir.step_logger(step_dir),
+        naming=StubNaming(),
+    )
+
+    result = RenameFromManifestStep().run(
+        ctx, RenameFromManifestStep.Params(manifest=str(manifest))
+    )
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert result.message == f"unsafe output name from manifest/template: {unsafe_name}"
+
+
+def test_rename_from_manifest_rejects_symlink_escape(tmp_path: Path) -> None:
+    manifest = tmp_path / "names.csv"
+    manifest.write_text("name\nlink.png\n", encoding="utf-8")
+    src = tmp_path / "in.png"
+    src.write_bytes(b"png")
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"outside")
+    workdir = TaskWorkdir.create(tmp_path, "demo", 1)
+    step_dir = workdir.step_dir(1, "file.rename_from_manifest")
+    (step_dir / "link.png").symlink_to(outside)
+    ctx = StepContext(
+        task_id=1,
+        pipeline_name="demo",
+        source_ref=str(src),
+        ordinal=1,
+        input_path=src,
+        step_dir=step_dir,
+        logger=workdir.step_logger(step_dir),
+        naming=StubNaming(),
+    )
+
+    result = RenameFromManifestStep().run(
+        ctx, RenameFromManifestStep.Params(manifest=str(manifest))
+    )
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert outside.read_bytes() == b"outside"
+
+
 def test_rename_from_manifest_missing_manifest_returns_clean_fail(tmp_path: Path) -> None:
     src = tmp_path / "in.png"
     src.write_bytes(b"png")

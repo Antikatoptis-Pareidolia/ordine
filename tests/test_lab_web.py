@@ -269,6 +269,42 @@ steps:
     assert "file.rename_from_manifest" in view.text
 
 
+def test_lab_hostile_manifest_name_cannot_escape_sandbox(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "input_0001.txt").write_text("payload", encoding="utf-8")
+    outside = tmp_path / "escaped.txt"
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text(f"name\n{outside}\n", encoding="utf-8")
+    yaml_text = f"""version: 1
+name: hostile-manifest
+trigger:
+  type: manual
+  path: ~/in
+  ordinal_regex: 'input_(\\d+)\\.txt'
+steps:
+  - util.copy
+  - file.rename_from_manifest:
+      manifest: {manifest}
+"""
+    pipeline_id, _ = ledger.register_pipeline(loads_playbook(yaml_text), yaml_text)
+    sid = _start_lab(client, pipeline_id, samples)
+
+    response = client.post(
+        f"/lab/{sid}/run-all",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert not outside.exists()
+    view = client.get(f"/lab/{sid}")
+    assert "unsafe_name" in view.text or "unsafe output name" in view.text
+
+
 def test_editor_anchor_and_from_lab_banner(
     lab_client: tuple[TestClient, Ledger, Path],
 ) -> None:

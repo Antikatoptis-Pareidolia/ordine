@@ -23,6 +23,13 @@ from ordine.llm.steps import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _restore_image_budget():
+    reset_image_budget_for_tests()
+    yield
+    reset_image_budget_for_tests()
+
+
 def _ctx(tmp_path: Path, *, ordinal: int | None = 1) -> StepContext:
     workdir = TaskWorkdir.create(tmp_path, "gen", 1)
     step_dir = workdir.step_dir(1, "llm.generate_image")
@@ -84,6 +91,49 @@ def test_generate_image_filename_uses_name_stem(tmp_path: Path) -> None:
     assert result.status == "ok"
     assert result.output_path is not None
     assert result.output_path.name == "img_0001_goat.png"
+
+
+@pytest.mark.parametrize("unsafe_template", ["../x", "/tmp/x", "a/b"])
+def test_generate_image_rejects_unsafe_filename_templates(
+    tmp_path: Path, unsafe_template: str
+) -> None:
+    manifest = tmp_path / "assets.csv"
+    _manifest(manifest, [("goat.png", "a goat")])
+    step = GenerateImageStep()
+    params = step.Params(
+        manifest=str(manifest),
+        provider="mock",
+        size="128x128",
+        filename_template=unsafe_template,
+    )
+
+    result = step.run(_ctx(tmp_path), params)
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert result.message == f"unsafe output name from manifest/template: {unsafe_template}"
+
+
+def test_generate_image_rejects_symlink_escape(tmp_path: Path) -> None:
+    manifest = tmp_path / "assets.csv"
+    _manifest(manifest, [("goat.png", "a goat")])
+    ctx = _ctx(tmp_path)
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"outside")
+    (ctx.step_dir / "link.png").symlink_to(outside)
+    step = GenerateImageStep()
+    params = step.Params(
+        manifest=str(manifest),
+        provider="mock",
+        size="128x128",
+        filename_template="link",
+    )
+
+    result = step.run(ctx, params)
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert outside.read_bytes() == b"outside"
 
 
 def test_openai_provider_request_shape_and_decode(monkeypatch: pytest.MonkeyPatch) -> None:

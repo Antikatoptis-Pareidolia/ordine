@@ -21,6 +21,13 @@ from tests.test_ledger_crash import SimulatedCrash
 CHAIN_NAMES = [f"asset{i:02d}.png" for i in range(1, 21)]
 
 
+@pytest.fixture(autouse=True)
+def _restore_image_budget():
+    reset_image_budget_for_tests()
+    yield
+    reset_image_budget_for_tests()
+
+
 def _write_prompt_manifest(
     path: Path, names: list[str], *, prompts: dict[int, str] | None = None
 ) -> None:

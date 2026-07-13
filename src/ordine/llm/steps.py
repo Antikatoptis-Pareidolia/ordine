@@ -27,6 +27,7 @@ from ordine.core.config import DEFAULT_DATA_DIR, load_config
 from ordine.core.errors import ManifestError
 from ordine.core.manifest import load_manifest
 from ordine.core.steps import StepContext, StepResult
+from ordine.core.workdir import is_safe_output_name, safe_output_path
 from ordine.llm.adapters.openai import _OPENAI_DEFAULT_BASE
 from ordine.llm.keys import get_key
 
@@ -347,8 +348,17 @@ class GenerateImageStep:
             )
 
         name_stem = Path(row.name).stem
-        filename = f"{params.filename_template.format(ordinal=ctx.ordinal, name=name_stem)}.png"
-        output_path = ctx.step_dir / filename
+        rendered_name = params.filename_template.format(ordinal=ctx.ordinal, name=name_stem)
+        filename = f"{rendered_name}.png"
+        output_path = (
+            safe_output_path(ctx.step_dir, filename) if is_safe_output_name(rendered_name) else None
+        )
+        if output_path is None:
+            return StepResult(
+                status="fail",
+                flag_kind="unsafe_name",
+                message=f"unsafe output name from manifest/template: {rendered_name}",
+            )
         try:
             output_path.write_bytes(outcome.png_bytes)
         except OSError as exc:

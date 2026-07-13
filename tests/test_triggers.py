@@ -410,6 +410,9 @@ def test_startup_blind_window_file_caught_after_observer_before_rescan(
 
 @pytest.mark.integration
 def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
+    seed = 20260714
+    rng = random.Random(seed)
+    print(f"folder-watch stress seed={seed}")
     file_count = 100
     settle_seconds = 0.2
     poll_interval = settle_seconds / 4
@@ -441,7 +444,7 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
     written = threading.Event()
     stop_writer = threading.Event()
     order = list(range(1, file_count + 1))
-    random.shuffle(order)
+    rng.shuffle(order)
 
     def writer() -> None:
         for n in order:
@@ -450,7 +453,7 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
             name = f"img_{n:04d}.png"
             target = watch / name
             payload = f"payload-{n}".encode()
-            chunks = random.randint(1, 3)
+            chunks = rng.randint(1, 3)
             part_size = max(1, len(payload) // chunks)
             with target.open("wb") as handle:
                 for i in range(chunks):

@@ -15,6 +15,7 @@ from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field
 
 from ordine.core.steps import StepContext, StepResult
+from ordine.core.workdir import is_safe_output_name, safe_output_path
 from ordine.executors.headless.backends import (
     ImageBackendError,
     find_imagemagick,
@@ -61,7 +62,13 @@ def _require_input(ctx: StepContext) -> Path | StepResult:
 
 
 def _imagemagick_unavailable() -> StepResult:
-    return StepResult(status="fail", message="imagemagick not installed")
+    return StepResult(
+        status="fail",
+        message=(
+            "imagemagick not installed (apt package: imagemagick); "
+            "install it or use backend: pillow"
+        ),
+    )
 
 
 def _output_png_path(ctx: StepContext, input_path: Path) -> Path:
@@ -150,8 +157,8 @@ def _resolve_export_name(
     params: ExportParams,
     input_path: Path,
     fmt: str,
-) -> tuple[str, str | None]:
-    """Return (final basename, original name if extension was replaced else None)."""
+) -> tuple[str, str | None, str]:
+    """Return (final basename, replaced extension source, selected raw name)."""
     if params.filename is not None:
         name = params.filename
     elif (
@@ -166,15 +173,21 @@ def _resolve_export_name(
 
     suffix = f".{fmt}"
     if name.lower().endswith(suffix):
-        return name, None
+        return name, None, name
     original = name
     stem = Path(name).stem
     replaced = Path(name).suffix != "" and not name.lower().endswith(suffix)
-    return f"{stem}{suffix}", original if replaced else None
+    return f"{stem}{suffix}", original if replaced else None, name
 
 
 def _collision_path(dest_dir: Path, name: str, on_collision: str) -> Path | StepResult:
-    final = dest_dir / name
+    final = safe_output_path(dest_dir, name)
+    if final is None:
+        return StepResult(
+            status="fail",
+            flag_kind="unsafe_name",
+            message=f"unsafe output name from manifest/template: {name}",
+        )
     if not final.exists():
         return final
     if on_collision == "replace":
@@ -185,7 +198,14 @@ def _collision_path(dest_dir: Path, name: str, on_collision: str) -> Path | Step
     suffix = Path(name).suffix
     n = 2
     while True:
-        candidate = dest_dir / f"{stem}-{n}{suffix}"
+        candidate_name = f"{stem}-{n}{suffix}"
+        candidate = safe_output_path(dest_dir, candidate_name)
+        if candidate is None:
+            return StepResult(
+                status="fail",
+                flag_kind="unsafe_name",
+                message=f"unsafe output name from manifest/template: {candidate_name}",
+            )
         if not candidate.exists():
             return candidate
         n += 1
@@ -325,7 +345,15 @@ class ExportStep:
             return StepResult(status="fail", message=f"input not found: {input_path}")
 
         dest_dir = Path(params.dest).expanduser()
-        name, replaced_from = _resolve_export_name(ctx, params, input_path, params.format)
+        name, replaced_from, selected_name = _resolve_export_name(
+            ctx, params, input_path, params.format
+        )
+        if not is_safe_output_name(selected_name):
+            return StepResult(
+                status="fail",
+                flag_kind="unsafe_name",
+                message=f"unsafe output name from manifest/template: {selected_name}",
+            )
         if replaced_from is not None:
             ctx.logger.warning(
                 "export: replaced extension on %r with .%s", replaced_from, params.format

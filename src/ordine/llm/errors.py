@@ -1,14 +1,14 @@
 """LLM-specific exceptions.
 
-Owns LLM error types. Subclasses ConveyorError; must never import adapters or cli.
+Owns LLM error types. Subclasses OrdineError; must never import adapters or cli.
 """
 
 from __future__ import annotations
 
-from ordine.core.errors import ConveyorError
+from ordine.core.errors import OrdineError
 
 
-class LLMError(ConveyorError):
+class LLMError(OrdineError):
     """Base class for LLM connector errors."""
 
 
@@ -16,11 +16,12 @@ class LLMNotConfiguredError(LLMError):
     """Raised when no provider/model/key is available for a call."""
 
     def __init__(self, detail: str = "") -> None:
-        extra = f" {detail}" if detail else ""
         super().__init__(
-            "LLM is not configured. Open the web settings page (/settings) or set "
-            "[llm] provider/model in config.toml. API keys: ANTHROPIC_API_KEY, "
-            f"OPENAI_API_KEY, or ORDINE_LLM_API_KEY (openai_compatible).{extra}"
+            detail
+            or (
+                "LLM is not configured. Open the web settings page (/settings) or set "
+                "[llm] provider/model in config.toml."
+            )
         )
 
 

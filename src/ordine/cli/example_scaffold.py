@@ -87,7 +87,7 @@ def scaffold_example(target: Path) -> list[str]:
 
     return [
         "ordine check png-cleanup.yml",
-        f"ordine run {cleanup} --oneshot",
+        "ordine run png-cleanup.yml --oneshot",
         "ordine serve",
     ]
 

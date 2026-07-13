@@ -11,27 +11,43 @@ from urllib.parse import urlparse
 from starlette.requests import Request
 
 
-def _header_host(value: str | None) -> str | None:
+def _normalized_origin(value: str | None) -> tuple[str, str, int] | None:
     if not value:
         return None
     parsed = urlparse(value)
-    return parsed.hostname
+    if parsed.scheme not in {"http", "https"} or parsed.hostname is None:
+        return None
+    default_port = 443 if parsed.scheme == "https" else 80
+    try:
+        port = parsed.port or default_port
+    except ValueError:
+        return None
+    return parsed.scheme, parsed.hostname.lower(), port
 
 
-def post_is_allowed(request: Request, *, serve_host: str) -> bool:
-    """Return True when a POST passes HX-Request / Origin checks (§3.3)."""
-    origin_host = _header_host(request.headers.get("origin"))
-    referer_host = _header_host(request.headers.get("referer"))
-    foreign = False
-    for host in (origin_host, referer_host):
-        if host is not None and host not in ("127.0.0.1", "localhost", serve_host):
-            foreign = True
-            break
-    if foreign:
+def post_is_allowed(request: Request) -> bool:
+    """Validate same-origin POSTs; HX suffices when Origin is absent on localhost.
+
+    Browsers cannot attach the non-simple ``HX-Request`` header cross-origin without a
+    successful CORS preflight, and Ordine enables no CORS middleware. When browsers do send
+    Origin or Referer, the full normalized scheme/host/port must match the request itself.
+    """
+    own_origin = _normalized_origin(str(request.base_url))
+    supplied = [
+        value
+        for value in (
+            request.headers.get("origin"),
+            request.headers.get("referer"),
+        )
+        if value is not None
+    ]
+    if own_origin is None:
+        return False
+    if any(_normalized_origin(value) != own_origin for value in supplied):
         return False
     if request.headers.get("HX-Request") == "true":
         return True
-    return not (origin_host is None and referer_host is None)
+    return bool(supplied)
 
 
 def resolve_artifact(workdir: Path, rel_path: str) -> Path | None:

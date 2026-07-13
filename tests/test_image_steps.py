@@ -322,6 +322,45 @@ def test_export_reserved_name(tmp_path: Path) -> None:
     assert list(dest.glob(".tmp-*")) == []
 
 
+@pytest.mark.parametrize("unsafe_name", ["../x", "/tmp/x", "a/b"])
+def test_export_rejects_unsafe_output_names(tmp_path: Path, unsafe_name: str) -> None:
+    src = make_test_image(tmp_path / "in.png")
+    dest = tmp_path / "out"
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.export")
+
+    result = ExportStep().run(
+        ctx,
+        ExportStep.Params(dest=str(dest), format="png", filename=unsafe_name),
+    )
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert result.message == f"unsafe output name from manifest/template: {unsafe_name}"
+
+
+def test_export_rejects_reserved_name_symlink_escape(tmp_path: Path) -> None:
+    src = make_test_image(tmp_path / "in.png")
+    dest = tmp_path / "out"
+    dest.mkdir()
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"outside")
+    (dest / "link.png").symlink_to(outside)
+    naming = StubNaming({3: "link.png"})
+    ctx = _ctx(
+        tmp_path,
+        input_path=src,
+        ordinal=3,
+        naming=naming,
+        step_id="image.export",
+    )
+
+    result = ExportStep().run(ctx, ExportStep.Params(dest=str(dest), format="png"))
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert outside.read_bytes() == b"outside"
+
+
 def test_export_collision_suffix(tmp_path: Path) -> None:
     src = make_test_image(tmp_path / "in.png")
     dest = tmp_path / "out"

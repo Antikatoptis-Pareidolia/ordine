@@ -199,11 +199,13 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
 
 def load_config(explicit: Path | None = None) -> AppConfig:
     """Load config from explicit path, $ORDINE_CONFIG, default file, or built-in defaults."""
+    env = os.environ.get("ORDINE_CONFIG")
     path = explicit
     if path is None:
-        env = os.environ.get("ORDINE_CONFIG")
         path = Path(env).expanduser() if env else _config_dir() / "config.toml"
     if not path.exists():
+        if explicit is not None or env:
+            raise ConfigError(f"config file not found: {path}")
         return _default_config()
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))

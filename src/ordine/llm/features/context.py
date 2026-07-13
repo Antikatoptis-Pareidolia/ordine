@@ -19,7 +19,18 @@ from ordine.llm.types import ImagePart
 MAX_CONTEXT_CHARS = 30_000
 _TRUNCATED = "[...truncated]"
 _LOG_TAIL_LINES = 100
-_KEY_LIKE = re.compile(r"sk-[A-Za-z0-9]{8,}")
+_SECRET_PATTERNS = (
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}", re.IGNORECASE),
+    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE),
+    re.compile(
+        r"""\bapi[-_]?key\s*[:=]\s*(?:"[^"\n]+"|'[^'\n]+'|[^\s,;]+)""",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:anthropic|openai|ordine)[-_](?:api[-_])?key[-_:][A-Za-z0-9_-]{8,}",
+        re.IGNORECASE,
+    ),
+)
 
 
 def step_catalog(registry: StepRegistry) -> str:
@@ -38,7 +49,10 @@ def _basename_only(path: str) -> str:
 
 
 def _redact_secrets(text: str) -> str:
-    return _KEY_LIKE.sub("<redacted>", text)
+    redacted = text
+    for pattern in _SECRET_PATTERNS:
+        redacted = pattern.sub("<redacted>", redacted)
+    return redacted
 
 
 def _truncate_text(text: str, budget: int) -> str:
@@ -159,6 +173,6 @@ def failure_context(
 
     # Scrub accidental secrets from environment that must never reach prompts.
     for _key, value in os.environ.items():
-        if _KEY_LIKE.search(value):
+        if _redact_secrets(value) != value:
             text = text.replace(value, "<redacted>")
     return text, images

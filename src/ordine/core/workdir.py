@@ -12,6 +12,34 @@ from pathlib import Path
 _UNSAFE_FS_CHARS = re.compile(r"[^a-z0-9._-]+")
 
 
+def is_safe_output_name(name: str) -> bool:
+    """Return whether *name* is a non-empty, platform-neutral pure basename."""
+    return not (
+        not name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or Path(name).is_absolute()
+        or Path(name).name != name
+    )
+
+
+def safe_output_path(declared_dir: Path, name: str) -> Path | None:
+    """Return a contained output path for a pure basename, otherwise ``None``."""
+    if not is_safe_output_name(name):
+        return None
+    try:
+        base = declared_dir.expanduser().resolve()
+        target = (base / name).resolve()
+    except (OSError, RuntimeError):
+        return None
+    try:
+        target.relative_to(base)
+    except ValueError:
+        return None
+    return target
+
+
 def _sanitize_step_id(step_id: str) -> str:
     """Keep dots; replace anything outside [a-z0-9._-] with underscore."""
     return "".join(

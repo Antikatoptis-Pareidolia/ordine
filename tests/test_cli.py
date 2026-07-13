@@ -19,7 +19,7 @@ from tests.test_image_steps import make_test_image
 from tests.test_runner_e2e import ASSET_NAMES
 
 RUNNER = CliRunner()
-FIXTURE_PLAYBOOK = Path("tests/fixtures/playbooks/valid/v02_flagship.yml")
+FIXTURE_PLAYBOOK = Path(__file__).resolve().parent / "fixtures/playbooks/valid/v02_flagship.yml"
 
 
 def _write_config(tmp_path: Path) -> Path:
@@ -83,7 +83,9 @@ def test_init_creates_config_and_dirs(tmp_path: Path, monkeypatch: pytest.Monkey
     assert (tmp_path / "data" / "ordine" / "ordine.sqlite3").parent.exists()
 
 
-def test_init_second_time_exits_one(tmp_path: Path) -> None:
+def test_init_second_time_exits_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
     config_file = tmp_path / "config.toml"
     first = RUNNER.invoke(app, ["init", "--config", str(config_file)])
     assert first.exit_code == 0
@@ -96,6 +98,32 @@ def test_check_valid_playbook(tmp_path: Path) -> None:
     result = _invoke(config_file, "check", str(FIXTURE_PLAYBOOK))
     assert result.exit_code == 0
     assert result.stdout.strip() == "png-cleanup: valid (4 steps, trigger=folder_watch)"
+
+
+def test_check_is_static_and_normalizes_missing_path(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """[paths]
+db = "/proc/ordine-audit/ordine.sqlite3"
+workdir_root = "/proc/ordine-audit/workdirs"
+""",
+        encoding="utf-8",
+    )
+    valid = _invoke(config_file, "check", str(FIXTURE_PLAYBOOK))
+    assert valid.exit_code == 0
+
+    missing = tmp_path / "missing.yml"
+    result = _invoke(config_file, "check", str(missing))
+    assert result.exit_code == 2
+    assert result.stderr.strip() == f"playbook not found: {missing}"
+    assert "Errno" not in result.stderr
+
+
+def test_missing_explicit_config_is_actionable(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-config.toml"
+    result = RUNNER.invoke(app, ["--config", str(missing), "check", str(FIXTURE_PLAYBOOK)])
+    assert result.exit_code == 2
+    assert result.stderr.strip() == f"config file not found: {missing}"
 
 
 def _game_assets_yaml_with_corrupt(*, watch: Path, manifest: Path, output: Path) -> str:
@@ -529,3 +557,18 @@ steps:
     step_four = payload["tasks"][0]["steps"][3]
     assert step_four["id"] == "file.rename_from_manifest"
     assert "task has no ordinal" in step_four["message"]
+
+
+def test_serve_port_failure_suggests_alternate_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file = _write_config(tmp_path)
+
+    def fail_bind(*_args: object, **_kwargs: object) -> None:
+        raise SystemExit(1)
+
+    monkeypatch.setattr("uvicorn.run", fail_bind)
+    result = _invoke(config_file, "serve", "--port", "8484")
+
+    assert result.exit_code == 1
+    assert "try ordine serve --port PORT" in result.stderr

@@ -8,11 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-class ConveyorError(Exception):
+class OrdineError(Exception):
     """Base class for all Ordine errors."""
 
 
-class PlaybookError(ConveyorError):
+class PlaybookError(OrdineError):
     """Base class for playbook loading/validation errors."""
 
 
@@ -42,7 +42,7 @@ class PlaybookValidationError(PlaybookError):
         super().__init__(f"{source}: invalid playbook: {detail}")
 
 
-class LedgerError(ConveyorError):
+class LedgerError(OrdineError):
     """Base class for ledger errors."""
 
 
@@ -60,7 +60,7 @@ class SchemaVersionError(LedgerError):
     """Raised when the database schema version is unsupported."""
 
 
-class StepError(ConveyorError):
+class StepError(OrdineError):
     """Base class for step-domain errors."""
 
 
@@ -82,7 +82,7 @@ class StepParamError(StepError):
         super().__init__(f"step {step_id}: invalid params: {detail}")
 
 
-class UnknownEngineError(ConveyorError):
+class UnknownEngineError(OrdineError):
     """Raised when an engine name is not registered."""
 
     def __init__(self, engine_name: str) -> None:
@@ -90,7 +90,7 @@ class UnknownEngineError(ConveyorError):
         super().__init__(f"unknown engine: {engine_name}")
 
 
-class EngineMismatchError(ConveyorError):
+class EngineMismatchError(OrdineError):
     """Raised when a step does not support the requested engine."""
 
     def __init__(self, step_id: str, engine: str) -> None:
@@ -99,17 +99,17 @@ class EngineMismatchError(ConveyorError):
         super().__init__(f"step {step_id} does not support engine {engine}")
 
 
-class TriggerError(ConveyorError):
+class TriggerError(OrdineError):
     """Base class for trigger configuration and runtime errors."""
 
 
-class ManifestError(ConveyorError):
+class ManifestError(OrdineError):
     """Raised when a job manifest cannot be loaded or parsed."""
 
 
-class RunnerError(ConveyorError):
+class RunnerError(OrdineError):
     """Raised when the pipeline runner cannot start or execute."""
 
 
-class ConfigError(ConveyorError):
+class ConfigError(OrdineError):
     """Raised when application configuration is invalid or conflicts."""

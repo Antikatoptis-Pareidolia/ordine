@@ -67,7 +67,7 @@ def create_app(config: AppConfig) -> FastAPI:
         lab_sessions.close_all()
         services.shutdown()
 
-    app = FastAPI(title="Conveyor", lifespan=lifespan)
+    app = FastAPI(title="Ordine", lifespan=lifespan)
     app.state.config = config
     app.state.ledger = ledger
     app.state.registry = registry
@@ -82,7 +82,7 @@ def create_app(config: AppConfig) -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        if request.method == "POST" and not post_is_allowed(request, serve_host=config.web_host):
+        if request.method == "POST" and not post_is_allowed(request):
             return JSONResponse({"detail": "Forbidden"}, status_code=403)
         response = await call_next(request)
         return response

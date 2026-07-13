@@ -58,6 +58,19 @@ workdir_root = "{tmp_path / "work-env"}"
     assert config.db_path == tmp_path / "env.sqlite3"
 
 
+def test_missing_explicit_or_env_config_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    explicit = tmp_path / "missing-explicit.toml"
+    with pytest.raises(ConfigError, match=f"config file not found: {explicit}"):
+        load_config(explicit)
+
+    env_file = tmp_path / "missing-env.toml"
+    monkeypatch.setenv("ORDINE_CONFIG", str(env_file))
+    with pytest.raises(ConfigError, match=f"config file not found: {env_file}"):
+        load_config()
+
+
 def test_unknown_key_raises_config_error(tmp_path: Path) -> None:
     path = tmp_path / "bad.toml"
     path.write_text(

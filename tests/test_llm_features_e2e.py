@@ -26,7 +26,7 @@ from ordine.web.app import create_app
 from tests.test_image_steps import make_test_image
 
 FIXTURES = Path(__file__).parent / "fixtures" / "llm"
-POST_HEADERS = {"HX-Request": "true", "Origin": "http://127.0.0.1:8484"}
+POST_HEADERS = {"HX-Request": "true", "Origin": "http://testserver"}
 
 
 def _fixture(name: str) -> str:

@@ -108,13 +108,23 @@ def test_failure_context_truncates_and_redacts_secrets(
     step_dir = workdir / "01_image_white_to_alpha"
     step_dir.mkdir(parents=True)
     (step_dir / "log.txt").write_text(
-        "line\n" * 500 + "sk-abcdefghijklmnopqrstuvwxyz123456\n",
+        "line\n" * 500
+        + (
+            "sk-abcdefghijklmnopqrstuvwxyz123456\n"
+            "Authorization: Bearer abcdefghijklmnopqrstuvwxyz.123456\n"
+            "api_key='plain-assignment-secret'\n"
+            "anthropic-api-key:providerprefixsecret123\n"
+        ),
         encoding="utf-8",
     )
     ledger.set_workdir(task_id, workdir)
     text, images = failure_context(ledger, task_id, tmp_path / "work", include_image=False)
     assert len(text) <= MAX_CONTEXT_CHARS
     assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in text
+    assert "abcdefghijklmnopqrstuvwxyz.123456" not in text
+    assert "plain-assignment-secret" not in text
+    assert "providerprefixsecret123" not in text
+    assert text.count("<redacted>") >= 4
     assert images == []
 
 

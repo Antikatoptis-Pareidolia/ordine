@@ -12,11 +12,12 @@ from keyring.errors import KeyringError
 from ordine.core.config import AppConfig, load_config
 from ordine.llm import logging as llm_logging
 from ordine.llm.client import _LoggingClient, build_client
+from ordine.llm.errors import LLMNotConfiguredError
 from ordine.llm.keys import ENV_NAMES, SERVICE, clear_key, get_key, set_key
 from ordine.llm.types import ImagePart, LLMResponse, Message, TextPart, Usage
 from ordine.web.app import create_app
 
-POST_HEADERS = {"HX-Request": "true", "Origin": "http://127.0.0.1:8484"}
+POST_HEADERS = {"HX-Request": "true", "Origin": "http://testserver"}
 
 
 def _write_config(tmp_path: Path) -> Path:
@@ -42,7 +43,7 @@ session_token_cap = 200000
 
 
 def test_key_precedence_keyring_over_env_over_dotenv(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     store: dict[tuple[str, str], str] = {}
 
@@ -62,6 +63,11 @@ def test_key_precedence_keyring_over_env_over_dotenv(
     assert get_key("anthropic") == "from-env"
     set_key("anthropic", "from-keyring")
     assert get_key("anthropic") == "from-keyring"
+    store.clear()
+    monkeypatch.delenv(ENV_NAMES["anthropic"])
+    assert get_key("anthropic") == "from-dotenv"
+    assert "using plaintext API key" in caplog.text
+    assert "prefer the OS keyring" in caplog.text
 
 
 def test_openai_compatible_without_key_is_legal(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,6 +82,25 @@ def test_openai_compatible_without_key_is_legal(monkeypatch: pytest.MonkeyPatch)
         )
     )
     assert client.provider == "openai_compatible"
+
+
+def test_missing_key_message_is_specific_and_not_duplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("ordine.llm.client.get_key", lambda _provider: None)
+    config = AppConfig(
+        db_path=Path("/tmp/db.sqlite"),
+        workdir_root=Path("/tmp/work"),
+        llm_provider="openai",
+        llm_model="gpt-test",
+    )
+
+    with pytest.raises(LLMNotConfiguredError) as raised:
+        build_client(config)
+
+    message = str(raised.value)
+    assert message.count("LLM API key is missing") == 1
+    assert "LLM is not configured" not in message
 
 
 def test_keyring_error_includes_env_name(monkeypatch: pytest.MonkeyPatch) -> None:

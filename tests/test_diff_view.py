@@ -16,7 +16,7 @@ from ordine.web.diffing import side_by_side_rows, summarize_playbook_changes
 from tests.test_branch_regression import _parse_form_fields_from_html
 from tests.test_web import POST_HEADERS, _write_config
 
-FLAGSHIP = Path("tests/fixtures/playbooks/valid/v02_flagship.yml")
+FLAGSHIP = Path(__file__).resolve().parent / "fixtures/playbooks/valid/v02_flagship.yml"
 
 COMPACT_STEP_YAML = """\
 version: 1

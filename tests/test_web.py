@@ -19,7 +19,7 @@ from ordine.core.triggers import ManualScanService, ledger_sink
 from ordine.web.app import create_app
 from tests.test_runner_e2e import ASSET_NAMES, _game_assets_yaml, _seed_images, _write_manifest
 
-POST_HEADERS = {"HX-Request": "true", "Origin": "http://127.0.0.1:8484"}
+POST_HEADERS = {"HX-Request": "true", "Origin": "http://testserver"}
 
 
 def _write_config(tmp_path: Path) -> Path:
@@ -157,7 +157,8 @@ def test_dashboard_and_partials(web_client: TestClient) -> None:
 
 
 def test_register_valid_flagship_redirects(web_client: TestClient) -> None:
-    yaml_text = Path("tests/fixtures/playbooks/valid/v02_flagship.yml").read_text(encoding="utf-8")
+    fixture = Path(__file__).resolve().parent / "fixtures/playbooks/valid/v02_flagship.yml"
+    yaml_text = fixture.read_text(encoding="utf-8")
     response = web_client.post(
         "/pipelines",
         data={"yaml_text": yaml_text},
@@ -307,6 +308,27 @@ def test_post_forbidden_without_hx_or_foreign_origin(
         web_client.post(
             f"/tasks/{done_id}/retry",
             headers={"Origin": "http://evil.example"},
+        ).status_code
+        == 403
+    )
+    assert (
+        web_client.post(
+            f"/tasks/{done_id}/retry",
+            headers={"HX-Request": "true"},
+        ).status_code
+        != 403
+    )
+    assert (
+        web_client.post(
+            f"/tasks/{done_id}/retry",
+            headers={"HX-Request": "true", "Origin": "http://testserver:8484"},
+        ).status_code
+        == 403
+    )
+    assert (
+        web_client.post(
+            f"/tasks/{done_id}/retry",
+            headers={"HX-Request": "true", "Origin": "https://testserver"},
         ).status_code
         == 403
     )

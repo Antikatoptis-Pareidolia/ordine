@@ -10,10 +10,10 @@ import shutil
 import subprocess
 from functools import lru_cache
 
-from ordine.core.errors import ConveyorError
+from ordine.core.errors import OrdineError
 
 
-class ImageBackendError(ConveyorError):
+class ImageBackendError(OrdineError):
     """Raised when an ImageMagick subprocess fails or times out."""
 
 

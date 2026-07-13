@@ -18,7 +18,7 @@ from ordine.web.routes.editor import STARTER_YAML
 from tests.test_branch_regression import _parse_form_fields_from_html
 from tests.test_web import POST_HEADERS, _write_config
 
-FLAGSHIP = Path("tests/fixtures/playbooks/valid/v02_flagship.yml")
+FLAGSHIP = Path(__file__).resolve().parent / "fixtures/playbooks/valid/v02_flagship.yml"
 
 FLOW_STYLE_PASTE_YAML = """\
 version: 1
@@ -223,6 +223,8 @@ def test_tab_switch_refuses_invalid(editor_client: tuple[TestClient, Ledger]) ->
 def test_row_add_remove_reindexes(editor_client: tuple[TestClient, Ledger]) -> None:
     client, ledger = editor_client
     pipeline_id, v1 = _register_flagship(client, ledger, name="rows-test")
+    edit_page = client.get(f"/pipelines/{pipeline_id}/edit")
+    assert '{"allowEval":false,"allowScriptTags":false}' in edit_page.text
     form = _form_from_playbook(FLAGSHIP)
     form["name"] = "rows-test"
     form["base_version"] = v1
@@ -234,6 +236,7 @@ def test_row_add_remove_reindexes(editor_client: tuple[TestClient, Ledger]) -> N
     )
     assert added.status_code == 200
     assert "steps-4-id" in added.text or "steps-5-id" in added.text
+    assert "hx-post=" in added.text
 
     remove_form = dict(form)
     remove_form["row_action"] = "remove-step"

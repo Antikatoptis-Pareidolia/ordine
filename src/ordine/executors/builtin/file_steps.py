@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict
 from ordine.core.errors import ManifestError
 from ordine.core.manifest import load_manifest
 from ordine.core.steps import StepContext, StepResult
+from ordine.core.workdir import safe_output_path
 
 
 class RenameFromManifestParams(BaseModel):
@@ -88,7 +89,13 @@ class RenameFromManifestStep:
 
         row = rows[ctx.ordinal - 1]
         effective = ctx.naming.bind(ctx.ordinal, row.name)
-        output = ctx.step_dir / effective
+        output = safe_output_path(ctx.step_dir, effective)
+        if output is None:
+            return StepResult(
+                status="fail",
+                flag_kind="unsafe_name",
+                message=f"unsafe output name from manifest/template: {effective}",
+            )
         shutil.copy2(ctx.input_path, output)
         return StepResult(status="ok", output_path=output)
 
