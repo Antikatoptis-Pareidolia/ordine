@@ -201,6 +201,8 @@ async def lab_setup(request: Request, pipeline_id: int) -> HTMLResponse:
             "current_version": version_id,
             "versions": versions,
             "shell_warning": playbook_contains_shell_run(playbook),
+            "flash": request.query_params.get("flash"),
+            "flash_level": request.query_params.get("flash_level", "info"),
         },
     )
 

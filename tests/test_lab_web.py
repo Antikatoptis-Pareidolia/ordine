@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -169,6 +170,199 @@ steps:
     sid = _start_lab(client, pipeline_id, samples)
     blocked = client.get(f"/lab/{sid}/artifacts/../../samples/one.txt")
     assert blocked.status_code == 404
+
+
+def test_lab_nav_links_on_editor_and_versions(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, _tmp_path = lab_client
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: nav-links
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+""",
+    )
+    editor = client.get(f"/pipelines/{pipeline_id}/edit")
+    assert editor.status_code == 200
+    assert f'href="/pipelines/{pipeline_id}/lab"' in editor.text
+    assert "Dry-run lab" in editor.text
+
+    versions = client.get(f"/pipelines/{pipeline_id}/versions")
+    assert versions.status_code == 200
+    assert f'href="/pipelines/{pipeline_id}/lab"' in versions.text
+    assert "Dry-run lab" in versions.text
+
+
+def test_unknown_lab_session_returns_404(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, _, _ = lab_client
+    missing = "lab_missing_session"
+    assert client.get(f"/lab/{missing}").status_code == 404
+    assert (
+        client.post(
+            f"/lab/{missing}/tasks/0/next",
+            headers=POST_HEADERS,
+            follow_redirects=False,
+        ).status_code
+        == 404
+    )
+    assert client.get(f"/lab/{missing}/artifacts/foo.txt").status_code == 404
+
+
+def test_closed_lab_session_returns_404(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "a.txt").write_text("a", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: closed-session
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+""",
+    )
+    sid = _start_lab(client, pipeline_id, samples)
+    closed = client.post(
+        f"/lab/{sid}/close",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert closed.status_code == 303
+    assert client.get(f"/lab/{sid}").status_code == 404
+    assert (
+        client.post(
+            f"/lab/{sid}/tasks/0/next",
+            headers=POST_HEADERS,
+            follow_redirects=False,
+        ).status_code
+        == 404
+    )
+
+
+def test_illegal_lab_action_shows_flash(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "item.txt").write_text("payload", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(ledger, FIVE_STEP_YAML)
+    sid = _start_lab(client, pipeline_id, samples)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+
+    illegal = client.post(
+        f"/lab/{sid}/tasks/0/next",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert illegal.status_code == 303
+    assert "flash=" in illegal.headers["location"]
+    assert "paused" in illegal.headers["location"].lower()
+
+    session_page = client.get(illegal.headers["location"])
+    assert session_page.status_code == 200
+    assert "paused on failure" in session_page.text
+    assert "flash-error" in session_page.text
+
+
+def test_retry_when_not_paused_shows_flash(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "item.txt").write_text("payload", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(ledger, FIVE_STEP_YAML)
+    sid = _start_lab(client, pipeline_id, samples)
+
+    bad_retry = client.post(
+        f"/lab/{sid}/tasks/0/retry",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert bad_retry.status_code == 303
+    assert "retry is only available" in unquote(bad_retry.headers["location"])
+
+
+def test_lab_create_invalid_sample_shows_flash(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: bad-sample
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+""",
+    )
+    missing = tmp_path / "no-such-samples"
+    response = client.post(
+        f"/pipelines/{pipeline_id}/lab",
+        data={
+            "sample_dir": str(missing),
+            "glob": "*",
+            "max_samples": "5",
+        },
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/pipelines/{pipeline_id}/lab")
+    assert "flash=" in response.headers["location"]
+    setup = client.get(response.headers["location"])
+    assert setup.status_code == 200
+    assert "flash-error" in setup.text
+
+
+def test_lab_resume_requires_version_id(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "a.txt").write_text("a", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: resume-version
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+""",
+    )
+    sid = _start_lab(client, pipeline_id, samples)
+    missing_version = client.post(
+        f"/lab/{sid}/resume",
+        data={},
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert missing_version.status_code == 400
+
+
+def test_lab_artifact_serves_sandbox_file(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    sample = samples / "item.txt"
+    sample.write_text("payload", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: artifact-serve
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.copy
+""",
+    )
+    sid = _start_lab(client, pipeline_id, samples)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    session = client.get(f"/lab/{sid}")
+    assert session.status_code == 200
+    assert "/lab/" in session.text and "/artifacts/" in session.text
+
+    artifact_href = session.text.split(f"/lab/{sid}/artifacts/", 1)[1].split('"', 1)[0]
+    served = client.get(f"/lab/{sid}/artifacts/{artifact_href}")
+    assert served.status_code == 200
+    assert served.content
 
 
 def test_second_lab_session_closes_first(lab_client: tuple[TestClient, Ledger, Path]) -> None:

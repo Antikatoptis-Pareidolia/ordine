@@ -4,6 +4,7 @@
 <h1>Version history — {{ pipeline_name }}</h1>
 <p>
   <a href="/pipelines/{{ pipeline_id }}/edit">Edit current</a>
+  · <a href="/pipelines/{{ pipeline_id }}/lab">Dry-run lab</a>
   · current <code>{{ current_version }}</code>
   {% if running_version %}· running <code>{{ running_version }}</code>{% endif %}
 </p>

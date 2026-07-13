@@ -57,5 +57,3 @@ Runs `run_all()` in a temp sandbox, prints a table or JSON `report()`, then clos
 ## shell.run warning
 
 Playbooks containing `shell.run` show a loud warning on the lab setup page. Dry-run still executes those commands for real — only output paths are redirected, not command execution.
-
-![Lab session view](images/lab-session.png)

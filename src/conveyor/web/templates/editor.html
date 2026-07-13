@@ -25,7 +25,8 @@
 
 {% if current_version %}
 <p>Current version: <code>{{ current_version }}</code> · editing from <code>{{ base_version }}</code>
-  · <a href="/pipelines/{{ pipeline_id }}/versions">History</a></p>
+  · <a href="/pipelines/{{ pipeline_id }}/versions">History</a>
+  · <a href="/pipelines/{{ pipeline_id }}/lab">Dry-run lab</a></p>
 {% endif %}
 
 <form id="editor-form" method="post"
