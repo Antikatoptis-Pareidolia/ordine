@@ -2,7 +2,7 @@
 
 Watch folders or manifests, run ordered steps with exactly-once guarantees, recover from failures with branches, and optionally use LLMs to draft playbooks or diagnose flags — all on your machine.
 
-[![CI](https://github.com/OWNER/ordine/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/ordine/actions/workflows/ci.yml)
+[![CI](https://github.com/Antikatoptis-Pareidolia/ordine/actions/workflows/ci.yml/badge.svg)](https://github.com/Antikatoptis-Pareidolia/ordine/actions/workflows/ci.yml)
 
 **Privacy:** Ordine collects no telemetry, crash reports, or usage analytics — ever — without explicit opt-in. There is none today.
 

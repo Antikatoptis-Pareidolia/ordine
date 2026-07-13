@@ -69,6 +69,8 @@ fi
 DEB_OUT="${DIST_DIR}/ordine_${VERSION}_amd64.deb"
 fpm -s dir -t deb -n ordine -v "${VERSION}" -p "${DEB_OUT}" \
   -C "${STAGING_DIR}" \
+  --url "https://github.com/Antikatoptis-Pareidolia/ordine" \
+  --maintainer "Constantin Vlad" \
   --depends "python3 (>= 3.11)" \
   --deb-recommends imagemagick \
   --description "Ordine — self-healing task pipelines for your desktop." \

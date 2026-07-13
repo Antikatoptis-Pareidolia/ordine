@@ -59,4 +59,4 @@ Record OS version and any friction in the release issue.
 
 - [ ] GitHub Release notes reviewed
 - [ ] PyPI page shows correct version
-- [ ] Update README badge URL if org/repo renamed
+- [ ] README CI badge loads (Antikatoptis-Pareidolia/ordine)

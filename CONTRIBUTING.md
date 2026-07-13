@@ -6,7 +6,7 @@ Thank you for helping improve Ordine. This project follows explicit step plans a
 
 ```bash
 sudo apt install imagemagick
-git clone <repo> && cd ordine
+git clone https://github.com/Antikatoptis-Pareidolia/ordine.git && cd ordine
 uv venv && uv sync --locked --extra dev
 uv pip install -e tests/fixtures/ordine_test_plugin
 pre-commit install
