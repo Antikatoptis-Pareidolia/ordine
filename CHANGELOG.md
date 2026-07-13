@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Step 14 follow-up: manifest `build_trigger_service` rejects caller sinks; `manifest_sink` caches rows by mtime; trigger/chaining docs corrected
 - Chain example uses `on_collision: replace` for regeneration; `ordinal_regex` skips non-matching files with explicit warning
+- Mock image provider varies PNG bytes with prompt (sha256 fill + prompt text); deterministic for same ordinal/prompt/size
 - Step 13 follow-up: web wiring scope convention, full-stack draft MockTransport test, CI `llm_live` filter
 
 ### Fixed

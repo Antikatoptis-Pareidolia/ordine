@@ -46,11 +46,13 @@ def _manifest(path: Path, rows: list[tuple[str, str]]) -> None:
 
 
 def test_mock_provider_deterministic_bytes() -> None:
-    a = render_mock_image(size="256x256", prompt="goat", ordinal=7)
-    b = render_mock_image(size="256x256", prompt="different", ordinal=7)
-    assert a == b
-    assert a != render_mock_image(size="256x256", prompt="goat", ordinal=8)
-    image = Image.open(__import__("io").BytesIO(a))
+    same_prompt_a = render_mock_image(size="256x256", prompt="goat", ordinal=7)
+    same_prompt_b = render_mock_image(size="256x256", prompt="goat", ordinal=7)
+    assert same_prompt_a == same_prompt_b
+    different_prompt = render_mock_image(size="256x256", prompt="different", ordinal=7)
+    assert same_prompt_a != different_prompt
+    assert same_prompt_a != render_mock_image(size="256x256", prompt="goat", ordinal=8)
+    image = Image.open(__import__("io").BytesIO(same_prompt_a))
     assert image.size == (256, 256)
 
 

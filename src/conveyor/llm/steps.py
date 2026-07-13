@@ -7,6 +7,7 @@ Publishing to handoff folders is the caller's job — compose with file.move.
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -122,13 +123,16 @@ def _parse_size(size: str) -> tuple[int, int]:
 
 
 def render_mock_image(*, size: str, prompt: str, ordinal: int) -> bytes:
-    """Deterministic PNG keyed by ordinal (byte-stable across runs)."""
-    del prompt
+    """Deterministic PNG keyed by ordinal, prompt, and size."""
     width, height = _parse_size(size)
-    image = Image.new("RGB", (width, height), "white")
+    digest = hashlib.sha256(prompt.encode()).digest()
+    fill = (digest[0], digest[1], digest[2])
+    image = Image.new("RGB", (width, height), fill)
     draw = ImageDraw.Draw(image)
     draw.text((16, 16), f"ordinal={ordinal}", fill="black")
     draw.text((16, 48), "mock provider", fill="black")
+    prompt_line = prompt if len(prompt) <= 60 else f"{prompt[:57]}..."
+    draw.text((16, 80), prompt_line, fill="black")
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()

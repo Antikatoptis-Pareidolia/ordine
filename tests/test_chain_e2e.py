@@ -190,28 +190,9 @@ def test_chain_regeneration_replaces_same_filenames(
     ledger: Ledger,
     registry: StepRegistry,
     engines: EngineRegistry,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Edited manifest row reruns both legs with replace collisions, not suffix strays."""
-    import io
-
-    from conveyor.llm.steps import IMAGE_PROVIDERS, ImageGenerationOutcome, render_mock_image
-
-    def prompt_aware_mock(**kwargs: object) -> ImageGenerationOutcome:
-        size = str(kwargs["size"])
-        prompt = str(kwargs["prompt"])
-        ordinal = int(kwargs["ordinal"])
-        base = render_mock_image(size=size, prompt=prompt, ordinal=ordinal)
-        image = Image.open(io.BytesIO(base))
-        from PIL import ImageDraw
-
-        draw = ImageDraw.Draw(image)
-        draw.text((16, 80), prompt[:40], fill="blue")
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        return ImageGenerationOutcome(png_bytes=buffer.getvalue(), duration_s=0.0)
-
-    monkeypatch.setitem(IMAGE_PROVIDERS, "mock", prompt_aware_mock)
+    """Edited manifest prompt reruns both legs with replace collisions, not suffix strays."""
+    from conveyor.core.triggers import ManualScanService, ledger_sink
 
     reset_image_budget_for_tests(cap=500)
     names = CHAIN_NAMES[:8]
@@ -226,15 +207,19 @@ def test_chain_regeneration_replaces_same_filenames(
     assert _scan_manifest(ledger, gen_id, gen_pb) == 8
     gen_runner = _runner(ledger, registry, engines, gen_pb, gen_id, tmp_path / "work-gen", gen_ver)
     assert gen_runner.run_until_idle() == 8
-    _run_cleanup_leg(
-        ledger,
-        registry,
-        engines,
-        handoff=handoff,
-        manifest=manifest,
-        output=output,
-        workdir=tmp_path / "work-clean",
+
+    clean_id, clean_ver, clean_pb = _register(
+        ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output)
     )
+    ManualScanService(
+        clean_pb.trigger,
+        clean_pb.dedup,
+        ledger_sink(ledger, clean_id),
+    ).run()
+    clean_runner = _runner(
+        ledger, registry, engines, clean_pb, clean_id, tmp_path / "work-clean", clean_ver
+    )
+    assert clean_runner.run_until_idle() == 8
 
     first_handoff = _handoff_files(handoff)
     first_output = _output_files(output)
@@ -246,26 +231,27 @@ def test_chain_regeneration_replaces_same_filenames(
 
     assert _scan_manifest(ledger, gen_id, gen_pb) == 1
     assert gen_runner.run_until_idle() == 1
-    _run_cleanup_leg(
-        ledger,
-        registry,
-        engines,
-        handoff=handoff,
-        manifest=manifest,
-        output=output,
-        workdir=tmp_path / "work-clean-2",
-    )
 
     second_handoff = _handoff_files(handoff)
-    second_output = _output_files(output)
     assert set(second_handoff) == set(first_handoff)
-    assert set(second_output) == set(first_output)
-    assert not any("-2" in name for name in {*second_handoff, *second_output})
+    assert not any("-2" in name for name in second_handoff)
     assert second_handoff["img_0001.png"] != first_handoff["img_0001.png"]
-    assert second_output[names[0]] != first_output[names[0]]
     for index in range(2, 9):
         key = f"img_{index:04d}.png"
         assert second_handoff[key] == first_handoff[key]
+
+    ManualScanService(
+        clean_pb.trigger,
+        clean_pb.dedup,
+        ledger_sink(ledger, clean_id),
+    ).run()
+    assert clean_runner.run_until_idle() == 1
+
+    second_output = _output_files(output)
+    assert set(second_output) == set(first_output)
+    assert not any("-2" in name for name in second_output)
+    assert second_output[names[0]] != first_output[names[0]]
+    for index in range(2, 9):
         assert second_output[names[index - 1]] == first_output[names[index - 1]]
 
 
