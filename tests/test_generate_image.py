@@ -54,6 +54,7 @@ def test_mock_provider_deterministic_bytes() -> None:
     assert same_prompt_a != render_mock_image(size="256x256", prompt="goat", ordinal=8)
     image = Image.open(__import__("io").BytesIO(same_prompt_a))
     assert image.size == (256, 256)
+    assert image.getpixel((image.width - 1, image.height - 1)) == (255, 255, 255)
 
 
 def test_generate_image_mock_filename_template(tmp_path: Path) -> None:

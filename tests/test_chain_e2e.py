@@ -14,7 +14,7 @@ from conveyor.core.ledger import Ledger
 from conveyor.core.playbook import ManifestTrigger, loads_playbook
 from conveyor.core.registry import StepRegistry
 from conveyor.core.runner import PipelineRunner
-from conveyor.core.triggers import build_trigger_service, ledger_sink
+from conveyor.core.triggers import build_trigger_service
 from conveyor.llm.steps import reset_image_budget_for_tests
 from tests.test_ledger_crash import SimulatedCrash
 
@@ -161,6 +161,61 @@ def _output_files(output: Path) -> dict[str, bytes]:
     return {path.name: path.read_bytes() for path in sorted(output.glob("*.png"))}
 
 
+def _register_cleanup_leg(
+    ledger: Ledger,
+    *,
+    handoff: Path,
+    manifest: Path,
+    output: Path,
+) -> tuple[int, str, object]:
+    return _register(ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output))
+
+
+def _scan_cleanup(
+    ledger: Ledger,
+    registry: StepRegistry,
+    engines: EngineRegistry,
+    *,
+    clean_id: int,
+    clean_ver: str,
+    clean_pb: object,
+    workdir: Path,
+) -> PipelineRunner:
+    from conveyor.core.triggers import ManualScanService, ledger_sink
+
+    ManualScanService(
+        clean_pb.trigger,
+        clean_pb.dedup,
+        ledger_sink(ledger, clean_id),
+    ).run()
+    return _runner(ledger, registry, engines, clean_pb, clean_id, workdir, clean_ver)
+
+
+def _start_cleanup_leg(
+    ledger: Ledger,
+    registry: StepRegistry,
+    engines: EngineRegistry,
+    *,
+    handoff: Path,
+    manifest: Path,
+    output: Path,
+    workdir: Path,
+) -> tuple[int, str, object, PipelineRunner]:
+    clean_id, clean_ver, clean_pb = _register_cleanup_leg(
+        ledger, handoff=handoff, manifest=manifest, output=output
+    )
+    clean_runner = _scan_cleanup(
+        ledger,
+        registry,
+        engines,
+        clean_id=clean_id,
+        clean_ver=clean_ver,
+        clean_pb=clean_pb,
+        workdir=workdir,
+    )
+    return clean_id, clean_ver, clean_pb, clean_runner
+
+
 def _run_cleanup_leg(
     ledger: Ledger,
     registry: StepRegistry,
@@ -170,19 +225,17 @@ def _run_cleanup_leg(
     manifest: Path,
     output: Path,
     workdir: Path,
-) -> None:
-    from conveyor.core.triggers import ManualScanService
-
-    clean_id, clean_ver, clean_pb = _register(
-        ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output)
+) -> int:
+    _, _, _, clean_runner = _start_cleanup_leg(
+        ledger,
+        registry,
+        engines,
+        handoff=handoff,
+        manifest=manifest,
+        output=output,
+        workdir=workdir,
     )
-    ManualScanService(
-        clean_pb.trigger,
-        clean_pb.dedup,
-        ledger_sink(ledger, clean_id),
-    ).run()
-    clean_runner = _runner(ledger, registry, engines, clean_pb, clean_id, workdir, clean_ver)
-    clean_runner.run_until_idle()
+    return clean_runner.run_until_idle()
 
 
 def test_chain_regeneration_replaces_same_filenames(
@@ -192,8 +245,6 @@ def test_chain_regeneration_replaces_same_filenames(
     engines: EngineRegistry,
 ) -> None:
     """Edited manifest prompt reruns both legs with replace collisions, not suffix strays."""
-    from conveyor.core.triggers import ManualScanService, ledger_sink
-
     reset_image_budget_for_tests(cap=500)
     names = CHAIN_NAMES[:8]
     manifest = tmp_path / "assets.csv"
@@ -208,16 +259,14 @@ def test_chain_regeneration_replaces_same_filenames(
     gen_runner = _runner(ledger, registry, engines, gen_pb, gen_id, tmp_path / "work-gen", gen_ver)
     assert gen_runner.run_until_idle() == 8
 
-    clean_id, clean_ver, clean_pb = _register(
-        ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output)
-    )
-    ManualScanService(
-        clean_pb.trigger,
-        clean_pb.dedup,
-        ledger_sink(ledger, clean_id),
-    ).run()
-    clean_runner = _runner(
-        ledger, registry, engines, clean_pb, clean_id, tmp_path / "work-clean", clean_ver
+    clean_id, clean_ver, clean_pb, clean_runner = _start_cleanup_leg(
+        ledger,
+        registry,
+        engines,
+        handoff=handoff,
+        manifest=manifest,
+        output=output,
+        workdir=tmp_path / "work-clean",
     )
     assert clean_runner.run_until_idle() == 8
 
@@ -240,11 +289,15 @@ def test_chain_regeneration_replaces_same_filenames(
         key = f"img_{index:04d}.png"
         assert second_handoff[key] == first_handoff[key]
 
-    ManualScanService(
-        clean_pb.trigger,
-        clean_pb.dedup,
-        ledger_sink(ledger, clean_id),
-    ).run()
+    _scan_cleanup(
+        ledger,
+        registry,
+        engines,
+        clean_id=clean_id,
+        clean_ver=clean_ver,
+        clean_pb=clean_pb,
+        workdir=tmp_path / "work-clean",
+    )
     assert clean_runner.run_until_idle() == 1
 
     second_output = _output_files(output)
@@ -298,20 +351,18 @@ def test_chain_twenty_row_double_run_and_crash_recovery(
     second_bytes = _handoff_files(handoff)
     assert second_bytes == first_bytes
 
-    clean_id, clean_ver, clean_pb = _register(
-        ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output)
+    assert (
+        _run_cleanup_leg(
+            ledger,
+            registry,
+            engines,
+            handoff=handoff,
+            manifest=manifest,
+            output=output,
+            workdir=tmp_path / "work-clean",
+        )
+        == 20
     )
-    from conveyor.core.triggers import ManualScanService
-
-    ManualScanService(
-        clean_pb.trigger,
-        clean_pb.dedup,
-        ledger_sink(ledger, clean_id),
-    ).run()
-    clean_runner = _runner(
-        ledger, registry, engines, clean_pb, clean_id, tmp_path / "work-clean", clean_ver
-    )
-    assert clean_runner.run_until_idle() == 20
     exports = sorted(output.glob("*.png"))
     assert len(exports) == 20
     assert {p.name for p in exports} == set(CHAIN_NAMES)
@@ -339,18 +390,16 @@ def test_chain_poison_rows_do_not_shift_downstream_names(
     assert ledger.counts(gen_id)["done"] == 16
     assert (handoff / "img_0007.png").exists()
 
-    clean_id, clean_ver, clean_pb = _register(
-        ledger, _cleanup_yaml(watch=handoff, manifest=manifest, output=output)
+    assert (
+        _run_cleanup_leg(
+            ledger,
+            registry,
+            engines,
+            handoff=handoff,
+            manifest=manifest,
+            output=output,
+            workdir=tmp_path / "work-clean",
+        )
+        == 16
     )
-    from conveyor.core.triggers import ManualScanService
-
-    ManualScanService(
-        clean_pb.trigger,
-        clean_pb.dedup,
-        ledger_sink(ledger, clean_id),
-    ).run()
-    clean_runner = _runner(
-        ledger, registry, engines, clean_pb, clean_id, tmp_path / "work-clean", clean_ver
-    )
-    assert clean_runner.run_until_idle() == 16
     assert (output / CHAIN_NAMES[6]).exists()

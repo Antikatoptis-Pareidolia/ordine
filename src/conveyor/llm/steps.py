@@ -126,9 +126,11 @@ def render_mock_image(*, size: str, prompt: str, ordinal: int) -> bytes:
     """Deterministic PNG keyed by ordinal, prompt, and size."""
     width, height = _parse_size(size)
     digest = hashlib.sha256(prompt.encode()).digest()
-    fill = (digest[0], digest[1], digest[2])
-    image = Image.new("RGB", (width, height), fill)
+    accent = (digest[0], digest[1], digest[2])
+    image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
+    band_height = min(40, height)
+    draw.rectangle((0, 0, width, band_height), fill=accent)
     draw.text((16, 16), f"ordinal={ordinal}", fill="black")
     draw.text((16, 48), "mock provider", fill="black")
     prompt_line = prompt if len(prompt) <= 60 else f"{prompt[:57]}..."

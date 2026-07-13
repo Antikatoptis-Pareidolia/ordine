@@ -26,3 +26,4 @@ Every change in this repo MUST comply. If a task conflicts with these rules, sto
 18. Do not modify CI, lint, or typecheck configs to make a failing check pass; fix the code. Config changes require explicit instruction.
 19. Out-of-scope creep is a bug: implement only what the current step plan lists. If something seems missing, flag it; don't build it.
 20. When a step plan adds a web surface, the standard wiring files (`web/app.py` router includes, template additions, route-module extraction) are implicitly in scope; audits list them explicitly but they are not deviations.
+21. A test must never replace, wrap, or patch the subject whose behavior it asserts. Monkeypatching is reserved for true externals (network transports, clocks, filesystem boundaries, environment) or for counting wrappers that FULLY delegate to the real subject. If an assertion only holds because of the patch, the test is invalid.
