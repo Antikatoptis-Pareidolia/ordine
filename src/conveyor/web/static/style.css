@@ -164,6 +164,22 @@ body {
 .diff-side-by-side code {
   white-space: pre-wrap;
   word-break: break-word;
+  font-family: inherit;
+}
+
+.diff-side-by-side .diff-add,
+.diff-side-by-side .diff-del {
+  display: inline;
+}
+
+.diff-row-delete .diff-old,
+.diff-row-replace .diff-old {
+  background: #fef2f2;
+}
+
+.diff-row-add .diff-new,
+.diff-row-replace .diff-new {
+  background: #f0fdf4;
 }
 
 .diff-lineno-col,
@@ -174,11 +190,6 @@ body {
   background: #f8fafc;
   vertical-align: top;
 }
-
-.diff-row-add .diff-new { background: #f0fdf4; }
-.diff-row-delete .diff-old { background: #fef2f2; }
-.diff-row-replace .diff-old { background: #fef2f2; }
-.diff-row-replace .diff-new { background: #fffbeb; }
 
 .engine-mismatch { color: #b91c1c; }
 

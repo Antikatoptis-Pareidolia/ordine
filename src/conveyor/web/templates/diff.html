@@ -65,9 +65,25 @@
       {% for row in side_by_side_rows %}
       <tr class="diff-row-{{ row.kind }}">
         <td class="diff-lineno">{{ row.old_line_no or "" }}</td>
-        <td class="diff-old"><code>{{ row.old_text }}</code></td>
+        <td class="diff-old">
+          {% if row.old_text %}
+            {% if row.kind in ("delete", "replace") %}
+            <code class="diff-del">{{ row.old_text }}</code>
+            {% else %}
+            <code>{{ row.old_text }}</code>
+            {% endif %}
+          {% endif %}
+        </td>
         <td class="diff-lineno">{{ row.new_line_no or "" }}</td>
-        <td class="diff-new"><code>{{ row.new_text }}</code></td>
+        <td class="diff-new">
+          {% if row.new_text %}
+            {% if row.kind in ("add", "replace") %}
+            <code class="diff-add">{{ row.new_text }}</code>
+            {% else %}
+            <code>{{ row.new_text }}</code>
+            {% endif %}
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

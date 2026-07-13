@@ -258,7 +258,11 @@ def test_diff_shows_changed_line(editor_client: tuple[TestClient, Ledger]) -> No
     diff = client.get(f"/pipelines/{pipeline_id}/versions/{v2}/diff")
     assert diff.status_code == 200
     assert "fuzz" in diff.text
-    assert "diff-row-replace" in diff.text or "diff-row-add" in diff.text
+    assert (
+        '<code class="diff-del">' in diff.text
+        or '<code class="diff-add">' in diff.text
+        or "diff-row-replace" in diff.text
+    )
 
 
 def _manual_yaml(name: str, watch: Path) -> str:

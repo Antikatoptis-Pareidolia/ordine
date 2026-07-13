@@ -216,6 +216,7 @@ def test_diff_page_human_qa_scenario(diff_client: tuple[TestClient, Ledger]) -> 
     assert diff.text.count("change-item") == 1
     assert "diff-side-by-side" in diff.text
     assert "diff-row-add" in diff.text
+    assert '<code class="diff-add">' in diff.text
 
 
 def test_diff_metadata_only_shows_notice_and_no_raw_diff(
