@@ -402,14 +402,22 @@ steps:
         text=True,
     )
     try:
-        time.sleep(0.5)
         path = watch / "img_0001.png"
         make_test_image(path)
         path.write_bytes(path.read_bytes() + b"1")
         deadline = time.monotonic() + 15.0
         while time.monotonic() < deadline:
             status = _invoke(config_file, "status", "--json")
-            counts = json.loads(status.stdout)["pipelines"][0]["counts"]
+            try:
+                if status.exit_code != 0:
+                    raise ValueError("status not ready")
+                pipelines = json.loads(status.stdout)["pipelines"]
+                if not pipelines:
+                    raise ValueError("pipeline not registered")
+                counts = pipelines[0]["counts"]
+            except (ValueError, json.JSONDecodeError, KeyError, IndexError, TypeError):
+                time.sleep(0.2)
+                continue
             if counts.get("done", 0) >= 1:
                 break
             time.sleep(0.2)
