@@ -85,6 +85,7 @@ def _open(config: AppConfig) -> tuple[Ledger, StepRegistry, EngineRegistry]:
 
 
 def _load_playbook_text(path: Path) -> tuple[Playbook, str]:
+    path = path.expanduser()
     yaml_text = path.read_text(encoding="utf-8")
     playbook = load_playbook(path)
     return playbook, yaml_text
