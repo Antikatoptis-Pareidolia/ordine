@@ -18,9 +18,8 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from conveyor.cli import output as cli_output
-from conveyor.core.config import AppConfig, load_config, save_web_runner_settings
+from conveyor.core.config import AppConfig
 from conveyor.core.errors import (
-    ConfigError,
     FieldError,
     IllegalTransitionError,
     LedgerError,
@@ -397,98 +396,3 @@ async def flag_resolve(
     except LedgerError as exc:
         return _redirect("/flags", flash=str(exc), level="error")
     return _redirect("/flags", flash="Flag resolved")
-
-
-@router.get("/settings", response_class=HTMLResponse)
-async def settings_get(request: Request) -> HTMLResponse:
-    config = _config(request)
-    templates = _templates(request)
-    return templates.TemplateResponse(
-        request,
-        "settings.html",
-        {"request": request, "config": config, "error": None, **_flash(request)},
-    )
-
-
-@router.post("/settings")
-async def settings_post(
-    request: Request,
-    stale_after_minutes: Annotated[int, Form()],
-    reconcile_policy: Annotated[str, Form()],
-    web_host: Annotated[str, Form()],
-    web_port: Annotated[int, Form()],
-    autostart_pipelines: Annotated[str | None, Form()] = None,
-) -> HTMLResponse:
-    config = _config(request)
-    templates = _templates(request)
-    autostart = autostart_pipelines == "on"
-    if reconcile_policy not in ("retry", "fail"):
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {
-                "request": request,
-                "config": config,
-                "error": "reconcile_policy must be retry or fail",
-                **_flash(request),
-            },
-            status_code=200,
-        )
-    if stale_after_minutes < 1:
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {
-                "request": request,
-                "config": config,
-                "error": "stale_after_minutes must be at least 1",
-                **_flash(request),
-            },
-            status_code=200,
-        )
-    if config.config_file is None:
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {
-                "request": request,
-                "config": config,
-                "error": "No config file on disk; create one with conveyor init",
-                **_flash(request),
-            },
-            status_code=200,
-        )
-    try:
-        save_web_runner_settings(
-            config.config_file,
-            stale_after_minutes=stale_after_minutes,
-            reconcile_policy=reconcile_policy,
-            web_host=web_host,
-            web_port=web_port,
-            autostart_pipelines=autostart,
-        )
-    except ConfigError as exc:
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {
-                "request": request,
-                "config": config,
-                "error": str(exc),
-                **_flash(request),
-            },
-            status_code=200,
-        )
-    updated = load_config(config.config_file)
-    request.app.state.config = updated
-    return templates.TemplateResponse(
-        request,
-        "settings.html",
-        {
-            "request": request,
-            "config": updated,
-            "error": None,
-            "saved": True,
-            **_flash(request),
-        },
-    )

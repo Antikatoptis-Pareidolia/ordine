@@ -34,10 +34,35 @@
   </section>
   <section aria-labelledby="llm-heading">
     <h2 id="llm-heading">LLM</h2>
-    <p class="hint">Coming in Step 12.</p>
+    <label for="llm_provider">provider</label>
+    <select id="llm_provider" name="llm_provider">
+      <option value="none"{% if config.llm_provider == "none" %} selected{% endif %}>none</option>
+      <option value="anthropic"{% if config.llm_provider == "anthropic" %} selected{% endif %}>anthropic</option>
+      <option value="openai"{% if config.llm_provider == "openai" %} selected{% endif %}>openai</option>
+      <option value="openai_compatible"{% if config.llm_provider == "openai_compatible" %} selected{% endif %}>openai_compatible</option>
+    </select>
+    <label for="llm_model">model</label>
+    <input id="llm_model" name="llm_model" value="{{ config.llm_model }}" />
+    <label for="llm_base_url">base_url</label>
+    <input id="llm_base_url" name="llm_base_url" value="{{ config.llm_base_url }}" placeholder="http://localhost:11434/v1" />
+    <p class="hint">base_url is used for openai_compatible (e.g. Ollama at <code>http://localhost:11434/v1</code>).</p>
+    <label for="llm_max_tokens">max_tokens</label>
+    <input id="llm_max_tokens" name="llm_max_tokens" type="number" min="1" value="{{ config.llm_max_tokens }}" required />
+    <label for="llm_session_token_cap">session_token_cap</label>
+    <input id="llm_session_token_cap" name="llm_session_token_cap" type="number" min="1" value="{{ config.llm_session_token_cap }}" required />
+    <p>key present: {% if llm_key_present %}yes{% else %}no{% endif %}</p>
+    <p class="hint">Keys are stored in the system keyring. Fallback env vars: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>CONVEYOR_LLM_API_KEY</code>.</p>
   </section>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if saved %}<p class="flash flash-info">Settings saved.</p>{% endif %}
   <button type="submit">Save</button>
+</form>
+
+<form action="/settings/llm-key" method="post">
+  <input type="hidden" name="llm_provider" value="{{ config.llm_provider }}" />
+  <label for="api_key">API key (never shown after save)</label>
+  <input id="api_key" name="api_key" type="password" autocomplete="off" />
+  <button type="submit" name="action" value="set">Set key</button>
+  <button type="submit" name="action" value="clear">Clear key</button>
 </form>
 {% endblock %}

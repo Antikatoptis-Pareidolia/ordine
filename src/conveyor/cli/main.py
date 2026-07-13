@@ -34,10 +34,15 @@ from conveyor.core.playbook import FolderWatchTrigger, ManualTrigger, Playbook, 
 from conveyor.core.registry import StepRegistry
 from conveyor.core.runner import PipelineRunner, PipelineService
 from conveyor.core.triggers import ManualScanService, ledger_sink
+from conveyor.llm.client import build_client
+from conveyor.llm.errors import LLMAuthError, LLMError, LLMNotConfiguredError
+from conveyor.llm.types import Message
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+llm_app = typer.Typer(no_args_is_help=True)
+app.add_typer(llm_app, name="llm")
 
 
 @dataclass
@@ -664,6 +669,53 @@ def dry_run(
         step["status"] in ("fail", "skip") for task in report["tasks"] for step in task["steps"]
     ) or any(task["status"] in ("failed", "skipped") for task in report["tasks"])
     raise typer.Exit(code=1 if any_bad else 0)
+
+
+@llm_app.command("check")
+def llm_check(
+    ctx: typer.Context,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
+) -> None:
+    """Smoke-test the configured LLM provider with a minimal completion."""
+    assert isinstance(ctx.obj, AppContext)
+    config = ctx.obj.config
+    try:
+        client = build_client(config)
+        response = client.complete(
+            [Message(role="user", content="Reply with the single word: ok")],
+            purpose="llm_check",
+            max_tokens=8,
+        )
+    except LLMNotConfiguredError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    except LLMAuthError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    except LLMError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    payload = {
+        "provider": client.provider,
+        "model": response.model,
+        "duration_s": response.duration_s,
+        "usage": {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        },
+        "text": response.text,
+    }
+    if as_json:
+        output.emit_json(payload)
+    else:
+        typer.echo(
+            f"provider={client.provider} model={response.model} "
+            f"latency={response.duration_s:.2f}s "
+            f"tokens={response.usage.input_tokens}+{response.usage.output_tokens} "
+            f"text={response.text!r}"
+        )
+    raise typer.Exit(code=0)
 
 
 @app.command()

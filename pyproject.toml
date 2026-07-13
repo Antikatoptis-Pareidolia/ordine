@@ -17,6 +17,8 @@ dependencies = [
   "jinja2>=3.1",  # HTML templates
   "python-multipart>=0.0.9",  # HTML form parsing
   "tomli-w>=1.0",  # atomic settings write-back
+  "httpx>=0.27",  # raw REST LLM adapters (symmetric, mockable; no provider SDKs)
+  "keyring>=25",  # secure API key storage with env/.env fallback
 ]
 
 [project.optional-dependencies]

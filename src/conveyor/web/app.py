@@ -24,6 +24,7 @@ from conveyor.web.routes import dashboard as dashboard_routes
 from conveyor.web.routes import editor as editor_routes
 from conveyor.web.routes import lab as lab_routes
 from conveyor.web.routes import router as core_router
+from conveyor.web.routes import settings as settings_routes
 from conveyor.web.routes.lab import LabSessionStore
 from conveyor.web.security import post_is_allowed
 from conveyor.web.services import ServiceManager
@@ -75,5 +76,6 @@ def create_app(config: AppConfig) -> FastAPI:
     app.include_router(dashboard_routes.router)
     app.include_router(editor_routes.router)
     app.include_router(lab_routes.router)
+    app.include_router(settings_routes.router)
     app.include_router(core_router)
     return app

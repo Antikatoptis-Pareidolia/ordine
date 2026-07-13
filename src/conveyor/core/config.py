@@ -35,6 +35,7 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
     "runner": frozenset({"stale_after_minutes", "reconcile_policy"}),
     "log": frozenset({"level"}),
     "web": frozenset({"host", "port", "autostart_pipelines"}),
+    "llm": frozenset({"provider", "model", "base_url", "max_tokens", "session_token_cap"}),
 }
 
 
@@ -50,6 +51,11 @@ class AppConfig:
     web_host: str = "127.0.0.1"
     web_port: int = 8484
     autostart_pipelines: bool = False
+    llm_provider: str = "none"
+    llm_model: str = ""
+    llm_base_url: str = ""
+    llm_max_tokens: int = 1024
+    llm_session_token_cap: int = 200_000
     config_file: Path | None = None
 
 
@@ -85,10 +91,12 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     runner = raw.get("runner", {})
     log = raw.get("log", {})
     web = raw.get("web", {})
+    llm = raw.get("llm", {})
     assert isinstance(paths, dict)
     assert isinstance(runner, dict)
     assert isinstance(log, dict)
     assert isinstance(web, dict)
+    assert isinstance(llm, dict)
 
     db_path = Path(str(paths.get("db", defaults.db_path))).expanduser()
     workdir_root = Path(str(paths.get("workdir_root", defaults.workdir_root))).expanduser()
@@ -117,6 +125,26 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     if not isinstance(autostart, bool):
         raise ConfigError("web.autostart_pipelines must be a boolean")
 
+    llm_provider = llm.get("provider", defaults.llm_provider)
+    if not isinstance(llm_provider, str):
+        raise ConfigError("llm.provider must be a string")
+
+    llm_model = llm.get("model", defaults.llm_model)
+    if not isinstance(llm_model, str):
+        raise ConfigError("llm.model must be a string")
+
+    llm_base_url = llm.get("base_url", defaults.llm_base_url)
+    if not isinstance(llm_base_url, str):
+        raise ConfigError("llm.base_url must be a string")
+
+    llm_max_tokens = llm.get("max_tokens", defaults.llm_max_tokens)
+    if not isinstance(llm_max_tokens, int):
+        raise ConfigError("llm.max_tokens must be an integer")
+
+    llm_session_token_cap = llm.get("session_token_cap", defaults.llm_session_token_cap)
+    if not isinstance(llm_session_token_cap, int):
+        raise ConfigError("llm.session_token_cap must be an integer")
+
     return AppConfig(
         db_path=db_path,
         workdir_root=workdir_root,
@@ -126,6 +154,11 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         web_host=web_host,
         web_port=web_port,
         autostart_pipelines=autostart,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_base_url=llm_base_url,
+        llm_max_tokens=llm_max_tokens,
+        llm_session_token_cap=llm_session_token_cap,
         config_file=config_file,
     )
 
@@ -182,6 +215,37 @@ def save_web_runner_settings(
     tmp.replace(expanded)
 
 
+def save_llm_settings(
+    path: Path,
+    *,
+    llm_provider: str,
+    llm_model: str,
+    llm_base_url: str,
+    llm_max_tokens: int,
+    llm_session_token_cap: int,
+) -> None:
+    """Atomically update the [llm] section in the config TOML."""
+    import tomli_w
+
+    expanded = path.expanduser()
+    if not expanded.exists():
+        raise ConfigError(f"config file not found: {expanded}")
+    raw = tomllib.loads(expanded.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ConfigError("config root must be a table")
+    _validate_keys(raw)
+    llm = dict(raw.get("llm", {}))
+    llm["provider"] = llm_provider
+    llm["model"] = llm_model
+    llm["base_url"] = llm_base_url
+    llm["max_tokens"] = llm_max_tokens
+    llm["session_token_cap"] = llm_session_token_cap
+    raw["llm"] = llm
+    tmp = expanded.with_suffix(".toml.tmp")
+    tmp.write_text(tomli_w.dumps(raw), encoding="utf-8")
+    tmp.replace(expanded)
+
+
 def write_default_config(path: Path) -> None:
     """Write a commented default config template; refuse to overwrite an existing file."""
     expanded = path.expanduser()
@@ -206,5 +270,12 @@ level = "INFO"
 host = "127.0.0.1"
 port = 8484
 autostart_pipelines = false
+
+[llm]
+provider = "none"
+model = ""
+base_url = ""
+max_tokens = 1024
+session_token_cap = 200000
 """
     expanded.write_text(template, encoding="utf-8")
