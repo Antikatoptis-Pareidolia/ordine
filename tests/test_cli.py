@@ -426,8 +426,14 @@ steps:
             stdout, stderr = proc.communicate(timeout=5)
         except subprocess.TimeoutExpired as exc:
             proc.kill()
-            raise AssertionError("process did not exit within 5s after SIGINT") from exc
-        assert proc.returncode == 0, (stdout, stderr)
+            stdout, stderr = proc.communicate()
+            raise AssertionError(
+                f"process did not exit within 5s after SIGINT\nstdout:\n{stdout}\nstderr:\n{stderr}"
+            ) from exc
+        if proc.returncode != 0:
+            raise AssertionError(
+                f"unexpected exit code {proc.returncode}\nstdout:\n{stdout}\nstderr:\n{stderr}"
+            )
     finally:
         if proc.poll() is None:
             proc.kill()

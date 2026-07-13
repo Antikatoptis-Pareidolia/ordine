@@ -11,31 +11,47 @@ VENV_ROOT="/opt/conveyor"
 VENV_BIN="${VENV_ROOT}/bin"
 VENV_PYTHON="${VENV_BIN}/python3"
 VENV_CONVEYOR="${VENV_BIN}/conveyor"
+STAGED_ROOT="${STAGING_DIR}${VENV_ROOT}"
+STAGED_BIN="${STAGING_DIR}${VENV_BIN}"
+STAGED_PYTHON="${STAGING_DIR}${VENV_PYTHON}"
+STAGED_CONVEYOR="${STAGING_DIR}${VENV_CONVEYOR}"
 
 rm -rf "${STAGING_DIR}"
-mkdir -p "${DIST_DIR}" "${STAGING_DIR}${VENV_ROOT}" "${STAGING_DIR}/usr/bin"
+mkdir -p "${DIST_DIR}" "${STAGED_ROOT}" "${STAGING_DIR}/usr/bin"
 mkdir -p "${STAGING_DIR}/usr/lib/systemd/user"
 
-python3 -m venv "${STAGING_DIR}${VENV_ROOT}"
+# --copies embeds a real python3 binary (no symlinks to the build machine). Deb size grows by one
+# interpreter copy; avoids ELOOP if python3 were rewritten to a self-referential symlink.
+python3 -m venv --copies "${STAGED_ROOT}"
 
 echo "Installing conveyor ${VERSION} into staging venv..."
-"${STAGING_DIR}${VENV_BIN}/pip" install --upgrade pip
+"${STAGED_BIN}/pip" install --upgrade pip
 # Install from repo root (not a pre-built wheel) so paths with spaces stay robust.
-"${STAGING_DIR}${VENV_BIN}/pip" install "${REPO_ROOT}"
+"${STAGED_BIN}/pip" install "${REPO_ROOT}"
 
-if [[ ! -f "${STAGING_DIR}${VENV_CONVEYOR}" ]]; then
+if [[ ! -f "${STAGED_CONVEYOR}" ]]; then
   echo "missing venv entry point: ${VENV_CONVEYOR}" >&2
   exit 1
 fi
 
-# Rewrite shebangs in /opt/conveyor/bin to the installed venv python.
+# Rewrite entry-script shebangs to the installed venv python (leave python3/python as venv copies).
 while IFS= read -r -d '' script; do
   if grep -q '^#!' <<<"$(head -n 1 "${script}")"; then
     sed -i "1s|^#!.*python3.*|#!${VENV_PYTHON}|" "${script}"
   fi
-done < <(find "${STAGING_DIR}${VENV_BIN}" -maxdepth 1 -type f -print0)
+done < <(find "${STAGED_BIN}" -maxdepth 1 -type f -print0)
 
-ln -sf "${VENV_PYTHON}" "${STAGING_DIR}${VENV_BIN}/python3"
+if [[ ! -f "${STAGED_PYTHON}" ]] || [[ -L "${STAGED_PYTHON}" ]]; then
+  echo "staged ${VENV_PYTHON} must be a regular file (venv --copies)" >&2
+  exit 1
+fi
+"${STAGED_PYTHON}" --version
+conveyor_shebang="$(head -n 1 "${STAGED_CONVEYOR}")"
+if [[ "${conveyor_shebang}" != "#!${VENV_PYTHON}" ]]; then
+  echo "unexpected conveyor shebang: ${conveyor_shebang} (want #!${VENV_PYTHON})" >&2
+  exit 1
+fi
+
 # Absolute target: ../opt/... from /usr/bin resolves to /usr/opt/... (wrong).
 ln -sf "${VENV_CONVEYOR}" "${STAGING_DIR}/usr/bin/conveyor"
 cp "${REPO_ROOT}/packaging/conveyor.service" "${STAGING_DIR}/usr/lib/systemd/user/conveyor.service"
