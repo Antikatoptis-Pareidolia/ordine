@@ -1,5 +1,5 @@
 <fieldset class="branch-step-row">
-  <legend>Branch step {{ step_idx }}</legend>
+  <legend>Branch step {{ step_idx + 1 }} ({{ error_prefix }}.branches.{{ branch_idx }}.steps.{{ step_idx }})</legend>
   <p>
     <label for="{{ branch_key }}-steps-{{ step_idx }}-id">Step id</label>
     <select id="{{ branch_key }}-steps-{{ step_idx }}-id" name="{{ branch_key }}-steps-{{ step_idx }}-id">

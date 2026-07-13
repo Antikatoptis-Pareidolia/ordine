@@ -14,9 +14,23 @@ from conveyor.core.playbook import dump_playbook, load_playbook, loads_playbook
 from conveyor.web.app import create_app
 from conveyor.web.forms import playbook_to_form
 from conveyor.web.routes.editor import STARTER_YAML
+from tests.test_branch_regression import _parse_form_fields_from_html
 from tests.test_web import POST_HEADERS, _write_config
 
 FLAGSHIP = Path("tests/fixtures/playbooks/valid/v02_flagship.yml")
+
+FLOW_STYLE_PASTE_YAML = """\
+version: 1
+name: semantic-diff-paste
+trigger:
+  type: folder_watch
+  path: ~/input
+  glob: '*.png'
+  settle_seconds: 2
+steps:
+  - image.white_to_alpha: {fuzz: 8}
+  - image.trim
+"""
 
 
 @pytest.fixture
@@ -291,3 +305,82 @@ def test_new_pipeline_starter(editor_client: tuple[TestClient, Ledger]) -> None:
     starter["tab"] = "form"
     to_yaml = client.post("/pipelines/new/edit/to-yaml", data=starter, headers=POST_HEADERS)
     assert "Comments in YAML are not preserved" in to_yaml.text
+
+
+def test_semantic_diff_shows_only_meaningful_changes(
+    editor_client: tuple[TestClient, Ledger],
+) -> None:
+    client, ledger = editor_client
+    registered = client.post(
+        "/pipelines",
+        data={"yaml_text": FLOW_STYLE_PASTE_YAML},
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert registered.status_code == 303
+    pipeline_id = ledger.find_pipeline_id("semantic-diff-paste")
+    assert pipeline_id is not None
+    v1, _ = ledger.get_current_playbook(pipeline_id)
+
+    edit_page = client.get(f"/pipelines/{pipeline_id}/edit")
+    base_form = _parse_form_fields_from_html(edit_page.text)
+    add_branch = client.post(
+        f"/pipelines/{pipeline_id}/edit/rows",
+        data={
+            **base_form,
+            "row_action": "add-pipeline-onfail-branch",
+            "onfail_prefix": "onfail",
+            "branches_target_id": "pipeline-onfail-branches",
+        },
+        headers=POST_HEADERS,
+    )
+    form = {**base_form, **_parse_form_fields_from_html(add_branch.text)}
+    form["onfail-branches-1-name"] = "rescue-trim"
+    form["onfail-branches-1-retries"] = "0"
+    form["onfail-branches-1-steps-0-id"] = "image.trim"
+    form["onfail-branches-1-steps-0-params"] = ""
+    form["onfail-enabled"] = "on"
+    form["tab"] = "form"
+    form["base_version"] = v1
+    client.post(
+        f"/pipelines/{pipeline_id}/versions",
+        data=form,
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    v2, _ = ledger.get_current_playbook(pipeline_id)
+    diff = client.get(f"/pipelines/{pipeline_id}/versions/{v2}/diff")
+    assert diff.status_code == 200
+    assert "(formatting normalized)" in diff.text
+    assert "rescue-trim" in diff.text
+    assert "diff-add" in diff.text
+    for needle in ("settle_seconds", "glob:", "{fuzz", "'*.png'"):
+        assert needle not in diff.text
+
+
+def test_diff_metadata_only_version(editor_client: tuple[TestClient, Ledger]) -> None:
+    client, ledger = editor_client
+    yaml_text = FLAGSHIP.read_text(encoding="utf-8").replace("name: png-cleanup", "name: meta-only")
+    playbook = loads_playbook(yaml_text)
+    pipeline_id, v1 = ledger.register_pipeline(playbook, yaml_text, note="first note")
+    _, v2 = ledger.register_pipeline(playbook, yaml_text, note="second note")
+    assert v1 != v2
+    diff = client.get(f"/pipelines/{pipeline_id}/versions/{v2}/diff")
+    assert diff.status_code == 200
+    assert "no content changes (metadata-only version)" in diff.text
+    assert "(formatting normalized)" in diff.text
+
+
+def test_editor_form_labeling_and_empty_note(editor_client: tuple[TestClient, Ledger]) -> None:
+    client, ledger = editor_client
+    yaml_text = FLAGSHIP.read_text(encoding="utf-8").replace(
+        "name: png-cleanup", "name: form-labels"
+    )
+    playbook = loads_playbook(yaml_text)
+    pipeline_id, _ = ledger.register_pipeline(playbook, yaml_text, note="do not prefill")
+    edit = client.get(f"/pipelines/{pipeline_id}/edit")
+    assert edit.status_code == 200
+    assert "Step 1 (steps.0)" in edit.text
+    assert "Settle seconds (folder_watch only)" in edit.text
+    assert "Poll seconds (manifest only)" in edit.text
+    assert 'id="note" name="note" value=""' in edit.text

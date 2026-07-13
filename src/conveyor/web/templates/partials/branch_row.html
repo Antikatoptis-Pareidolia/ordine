@@ -1,5 +1,5 @@
 <fieldset class="branch-row">
-  <legend>Branch {{ branch_idx }}</legend>
+  <legend>Branch {{ branch_idx + 1 }} ({{ error_prefix }}.branches.{{ branch_idx }})</legend>
   <p>
     <label for="{{ branch_key }}-name">Name</label>
     <input id="{{ branch_key }}-name" name="{{ branch_key }}-name"

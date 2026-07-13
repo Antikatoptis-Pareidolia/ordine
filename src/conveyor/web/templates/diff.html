@@ -4,8 +4,12 @@
 <h1>Diff — {{ pipeline_name }}</h1>
 <p>
   <code>{{ against_id or '(empty)' }}</code> → <code>{{ version_id }}</code>
+  {% if formatting_normalized %}<span class="hint">(formatting normalized)</span>{% endif %}
   · <a href="/pipelines/{{ pipeline_id }}/versions">Back to history</a>
 </p>
+{% if metadata_only %}
+<p class="flash flash-info" role="status">no content changes (metadata-only version)</p>
+{% else %}
 <pre class="diff">
 {% for line in diff_lines %}
 {% if line.startswith('+') and not line.startswith('+++') %}<span class="diff-add">{{ line }}</span>
@@ -14,4 +18,5 @@
 {% endif %}
 {% endfor %}
 </pre>
+{% endif %}
 {% endblock %}

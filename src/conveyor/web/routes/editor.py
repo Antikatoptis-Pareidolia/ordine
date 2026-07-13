@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette import status
 
-from conveyor.core.errors import FieldError
+from conveyor.core.errors import FieldError, PlaybookSyntaxError, PlaybookValidationError
 from conveyor.core.ledger import Ledger, VersionInfo
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
@@ -172,6 +172,43 @@ def _flash(request: Request) -> dict[str, str | None]:
     }
 
 
+def _canonical_yaml_for_diff(yaml_text: str) -> tuple[str, bool]:
+    """Parse and re-dump YAML for semantic comparison; fall back to raw text on parse failure."""
+    if not yaml_text.strip():
+        return "", True
+    try:
+        return dump_playbook(loads_playbook(yaml_text, source="<diff>")), True
+    except (PlaybookSyntaxError, PlaybookValidationError):
+        return yaml_text, False
+
+
+def _unified_diff_lines(
+    against_yaml: str,
+    version_yaml: str,
+    *,
+    against_id: str | None,
+    version_id: str,
+) -> tuple[list[str], bool, bool]:
+    """Return (diff lines, formatting_normalized, metadata_only)."""
+    left_text, left_ok = _canonical_yaml_for_diff(against_yaml)
+    right_text, right_ok = _canonical_yaml_for_diff(version_yaml)
+    formatting_normalized = left_ok and right_ok
+    left_lines = left_text.splitlines()
+    right_lines = right_text.splitlines()
+    if left_lines == right_lines:
+        return [], formatting_normalized, True
+    diff_lines = list(
+        difflib.unified_diff(
+            left_lines,
+            right_lines,
+            fromfile=against_id or "(empty)",
+            tofile=version_id,
+            lineterm="",
+        )
+    )
+    return diff_lines, formatting_normalized, False
+
+
 def _redirect(path: str, *, flash: str | None = None, level: str = "info") -> RedirectResponse:
     if flash:
         separator = "&" if "?" in path else "?"
@@ -266,6 +303,7 @@ def _load_editor_from_version(
     playbook = loads_playbook(yaml_text)
     form_fields = playbook_to_form(playbook)
     form_fields["base_version"] = version_public_id
+    form_fields["note"] = ""
     current_version, _ = ledger.get_current_playbook(pipeline_id)
     return _editor_context(
         request,
@@ -318,6 +356,7 @@ async def editor_new(request: Request) -> HTMLResponse:
     playbook = loads_playbook(STARTER_YAML, source="<starter>")
     form_fields = playbook_to_form(playbook)
     form_fields["base_version"] = ""
+    form_fields["note"] = ""
     yaml_text = dump_playbook(playbook)
     templates = _templates(request)
     return templates.TemplateResponse(
@@ -718,14 +757,11 @@ async def version_diff(
     against_id = against or version_row.parent_public_id
     against_yaml = "" if against_id is None else ledger.get_version_yaml(pipeline_id, against_id)
     version_yaml = ledger.get_version_yaml(pipeline_id, version_id)
-    diff_lines = list(
-        difflib.unified_diff(
-            against_yaml.splitlines(),
-            version_yaml.splitlines(),
-            fromfile=against_id or "(empty)",
-            tofile=version_id,
-            lineterm="",
-        )
+    diff_lines, formatting_normalized, metadata_only = _unified_diff_lines(
+        against_yaml,
+        version_yaml,
+        against_id=against_id,
+        version_id=version_id,
     )
     templates = _templates(request)
     return templates.TemplateResponse(
@@ -738,6 +774,8 @@ async def version_diff(
             "version_id": version_id,
             "against_id": against_id,
             "diff_lines": diff_lines,
+            "formatting_normalized": formatting_normalized,
+            "metadata_only": metadata_only,
             **_flash(request),
         },
     )

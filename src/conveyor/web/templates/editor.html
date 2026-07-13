@@ -89,24 +89,24 @@
         {% if errors_by_path.get('trigger.path') %}<span class="error">{{ errors_by_path['trigger.path'] }}</span>{% endif %}
       </p>
       <p>
-        <label for="trigger-glob">Glob</label>
+        <label for="trigger-glob">Glob (folder_watch / manual)</label>
         <input id="trigger-glob" name="trigger-glob" value="{{ form_fields.get('trigger-glob', '*') }}" />
       </p>
       <p>
-        <label for="trigger-settle_seconds">Settle seconds</label>
+        <label for="trigger-settle_seconds">Settle seconds (folder_watch only)</label>
         <input id="trigger-settle_seconds" name="trigger-settle_seconds" value="{{ form_fields.get('trigger-settle_seconds', '2') }}" />
       </p>
       <p>
-        <label for="trigger-poll_seconds">Poll seconds (manifest)</label>
+        <label for="trigger-poll_seconds">Poll seconds (manifest only)</label>
         <input id="trigger-poll_seconds" name="trigger-poll_seconds" value="{{ form_fields.get('trigger-poll_seconds', '30') }}" />
       </p>
       <p>
-        <label for="trigger-ordinal_regex">Ordinal regex</label>
+        <label for="trigger-ordinal_regex">Ordinal regex (folder_watch / manual)</label>
         <input id="trigger-ordinal_regex" name="trigger-ordinal_regex" value="{{ form_fields.get('trigger-ordinal_regex', '') }}" />
       </p>
       <p>
         <label><input type="checkbox" name="trigger-arrival_order_ordinals" value="on"
-          {% if form_fields.get('trigger-arrival_order_ordinals') == 'on' %}checked{% endif %} /> Arrival order ordinals</label>
+          {% if form_fields.get('trigger-arrival_order_ordinals') == 'on' %}checked{% endif %} /> Arrival order ordinals (folder_watch / manual)</label>
       </p>
     </fieldset>
 

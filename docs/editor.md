@@ -27,6 +27,28 @@ Params stay YAML textareas — introspecting each step's `Params` model into typ
 
 PyYAML `safe_load` discards comments. The YAML tab states this beside the textarea. Do not expect comment preservation through form round-trips; `dump_playbook` re-serializes from the parsed model.
 
+## Default omission on save (normalization, not loss)
+
+`dump_playbook` omits fields equal to their schema defaults when writing YAML. Examples:
+
+- `settle_seconds: 2` on a `folder_watch` trigger disappears after a form-tab save because `2` is the default.
+- Empty `on_failure`, default `dedup`, and default `engine` are likewise omitted.
+
+The **stored** `yaml_text` on each version row reflects whatever serialization path created that version (paste vs form save). Semantically identical playbooks may look different in raw YAML; that is expected normalization, not data loss. Recovery branches, steps, and params are preserved (see `tests/test_branch_regression.py`).
+
+The **Version note** field is always empty when the editor loads; it is never pre-filled from a prior version's note.
+
+## Semantic diffs
+
+`GET .../versions/{pv}/diff` compares versions by **meaning**, not raw text:
+
+1. Each side is parsed with `loads_playbook` and re-serialized with `dump_playbook` before `difflib.unified_diff`.
+2. The diff view is labeled **(formatting normalized)** when both sides parse successfully.
+3. If a side fails to parse (should not happen for stored versions), that side falls back to raw `yaml_text`.
+4. When canonical content is identical (e.g. metadata-only version rows with the same playbook), the view shows **no content changes (metadata-only version)** instead of an empty diff.
+
+Stored `yaml_text` rows are never rewritten by the diff view — normalization applies only at display time.
+
 ## Version tree semantics
 
 Every save creates an **immutable** `playbook_versions` row. There is no in-place edit and no version deletion.
@@ -58,7 +80,7 @@ pv_0001
 | `POST .../edit/rows` | Add/remove step rows (HTMX) |
 | `POST /pipelines/{id}/versions` | Save new version |
 | `GET /pipelines/{id}/versions` | History tree |
-| `GET .../versions/{pv}/diff?against={pv2}` | Unified diff (`difflib`) |
+| `GET .../versions/{pv}/diff?against={pv2}` | Unified semantic diff (`difflib` on canonical YAML) |
 | `POST .../versions/{pv}/make-current` | Point pipeline at version |
 | `POST .../versions/{pv}/revert` | Revert via new version |
 

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pipeline editor with form ⟷ YAML conversion, immutable version history, diffs, revert, and branch-from-version (Step 10)
 - `dump_playbook()` in core with round-trip guarantee; `docs/editor.md`
 - Form-tab recovery branch editing (step-level and pipeline-level) with HTMX add/remove fragments (Step 10 follow-up)
+- Semantic version diffs, metadata-only diff notice, and editor form labeling polish (Step 10 follow-up 2)
 
 ### Fixed
 
