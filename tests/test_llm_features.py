@@ -6,13 +6,17 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+from conveyor.core.config import AppConfig
 from conveyor.core.db import create_engine_for, init_db
 from conveyor.core.ledger import Ledger
 from conveyor.core.playbook import Playbook, RecoveryBranch, loads_playbook
 from conveyor.core.registry import StepRegistry
+from conveyor.llm.adapters.openai import OpenAIClient
+from conveyor.llm.client import TokenBudget, _BudgetClient, _LoggingClient, build_client
 from conveyor.llm.errors import LLMResponseError
 from conveyor.llm.features.branches import suggest_branch
 from conveyor.llm.features.context import MAX_CONTEXT_CHARS, failure_context, step_catalog
@@ -120,6 +124,56 @@ def test_draft_clean_yaml_valid(registry: StepRegistry) -> None:
     assert result.playbook is not None
     assert not result.problems
     assert result.repaired is False
+
+
+def test_draft_full_stack_mock_transport_logs_and_charges_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, registry: StepRegistry
+) -> None:
+    """Feature call through real build_client stack: budget, logging, MockTransport HTTP."""
+    yaml_fixture = _fixture("flagship_draft.yaml.txt")
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "model": "gpt-test",
+                "choices": [{"message": {"role": "assistant", "content": yaml_fixture}}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 50},
+            },
+        )
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    config = AppConfig(
+        db_path=data_dir / "conveyor.sqlite3",
+        workdir_root=tmp_path / "work",
+        llm_provider="openai",
+        llm_model="gpt-test",
+        llm_max_tokens=4096,
+        llm_session_token_cap=50_000,
+    )
+    monkeypatch.setattr("conveyor.llm.client.get_key", lambda _provider: "test-key")
+
+    budget = TokenBudget(50_000)
+    client = build_client(config, budget=budget)
+    assert isinstance(client, _BudgetClient)
+    logging_client = client.inner
+    assert isinstance(logging_client, _LoggingClient)
+    adapter = logging_client.inner
+    assert isinstance(adapter, OpenAIClient)
+    adapter._client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    result = draft_playbook(client, registry, "make flagship pipeline")
+    assert result.playbook is not None
+    assert not result.problems
+    assert budget.used == 150
+
+    log_files = list((data_dir / "llm_log").glob("*.jsonl"))
+    assert len(log_files) == 1
+    records = [
+        json.loads(line) for line in log_files[0].read_text(encoding="utf-8").splitlines() if line
+    ]
+    assert any(record["purpose"] == "draft_playbook" for record in records)
 
 
 def test_draft_strips_fences(registry: StepRegistry) -> None:

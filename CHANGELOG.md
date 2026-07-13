@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider-agnostic LLM connector: raw REST adapters (Anthropic/OpenAI/compatible), keyring keys, JSONL audit log, token budget, settings UI, and `conveyor llm check` (Step 12)
 - AI drafting, failure diagnosis, and learned recovery branches with explicit approval only (Step 13)
 
+### Changed
+
+- Step 13 follow-up: web wiring scope convention, full-stack draft MockTransport test, CI `llm_live` filter
+
 ### Fixed
 
 - Startup rescan seeds the settle tracker instead of emitting partial files (Step 6 follow-up)
