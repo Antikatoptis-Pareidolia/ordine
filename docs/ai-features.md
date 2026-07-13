@@ -29,7 +29,7 @@ Context is capped at 30,000 characters; oldest log sections drop first.
 - Draft robustness: one repair round-trip, then problems surface in the YAML tab — never raised for model badness.
 - `apply_branch` runs **only** from explicit Approve; Step 10’s restart-to-apply badge handles runner refresh.
 - Diagnosis persists as `{task_workdir}/_diagnosis/flag_{flag_id}.json` (no DB migration).
-- All calls logged to `$DATA_DIR/llm_log/` with a `purpose` tag (`draft_playbook`, `diagnose_failure`, `suggest_branch`, etc.).
+- All calls logged to `$DATA_DIR/llm_log/` with a `purpose` tag (`draft_playbook`, `diagnose_failure`, `repair_diagnose`, `suggest_branch`, etc.).
 
 ## Prompt versioning
 

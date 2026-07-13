@@ -1,0 +1,65 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq ruby-dev build-essential
+      - name: Install fpm
+        run: sudo gem install fpm
+
+      - name: Sync dev environment
+        run: |
+          uv sync --locked --extra dev
+          uv pip install -e tests/fixtures/conveyor_test_plugin
+
+      - name: Lint and typecheck
+        run: uv run ruff check . && uv run ruff format --check . && uv run mypy
+
+      - name: Test
+        run: uv run pytest -m "not llm_live"
+
+      - name: Assert tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(uv run python -c 'import conveyor; print(conveyor.__version__)')"
+          test "${TAG}" = "${PKG}"
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Build deb
+        run: bash scripts/build_deb.sh
+
+      - name: Extract changelog section
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          uv run python scripts/extract_changelog.py "${TAG}" CHANGELOG.md > release-notes.md
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes-file release-notes.md \
+            dist/*.whl dist/*.tar.gz dist/*.deb

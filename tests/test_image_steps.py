@@ -112,8 +112,8 @@ def make_transparent_image(path: Path) -> Path:
 def _pixel_agreement(a: Image.Image, b: Image.Image) -> tuple[float, int]:
     if a.size != b.size:
         raise ValueError("size mismatch")
-    pa = list(a.convert("RGBA").getdata())
-    pb = list(b.convert("RGBA").getdata())
+    pa = list(a.convert("RGBA").get_flattened_data())
+    pb = list(b.convert("RGBA").get_flattened_data())
     agree = 0
     max_rgb_diff = 0
     for (r1, g1, b1, a1), (r2, g2, b2, a2) in zip(pa, pb, strict=True):

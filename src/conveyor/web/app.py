@@ -51,6 +51,16 @@ def create_app(config: AppConfig) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        if config.retention_on_serve_start:
+            from conveyor.core.retention import run_configured_cleanup
+
+            report = run_configured_cleanup(ledger, config)
+            logger.info(
+                "retention on serve start: deleted=%s bytes_freed=%s kept=%s",
+                report.deleted,
+                report.bytes_freed,
+                report.kept_reasons,
+            )
         pipeline_ids = [summary.id for summary in ledger.list_pipelines()]
         services.autostart_if_configured(pipeline_ids)
         yield

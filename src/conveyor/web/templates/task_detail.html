@@ -7,7 +7,7 @@
   ordinal {{ task.ordinal if task.ordinal is not none else "-" }}
 </p>
 <p>Source: <code>{{ task.source_ref }}</code></p>
-<p>Workdir: <code>{{ task.workdir or "-" }}</code></p>
+<p>Workdir: <code>{{ workdir_display }}</code></p>
 {% if task.error %}
 <p class="error">error: {{ task.error }}</p>
 {% endif %}

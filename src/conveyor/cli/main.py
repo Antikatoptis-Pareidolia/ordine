@@ -17,6 +17,7 @@ from typing import Annotated, Any, cast
 import typer
 
 from conveyor.cli import output
+from conveyor.cli.example_scaffold import scaffold_example
 from conveyor.core.config import AppConfig, load_config, write_default_config
 from conveyor.core.db import create_engine_for, init_db
 from conveyor.core.dryrun import DryRunSession
@@ -38,6 +39,7 @@ from conveyor.core.playbook import (
     load_playbook,
 )
 from conveyor.core.registry import StepRegistry
+from conveyor.core.retention import run_configured_cleanup
 from conveyor.core.runner import PipelineRunner, PipelineService
 from conveyor.core.triggers import (
     ManifestTriggerService,
@@ -827,6 +829,73 @@ def diagnose_cmd(
 
 
 @app.command()
+def cleanup(
+    ctx: typer.Context,
+    days: Annotated[int | None, typer.Option("--days", help="Age threshold in days")] = None,
+    include_failed: Annotated[
+        bool,
+        typer.Option("--include-failed", help="Also delete failed task workdirs (keeps flagged)"),
+    ] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Report without deleting")] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
+) -> None:
+    """Delete old terminal task workdirs (exports and the DB are untouched)."""
+    assert isinstance(ctx.obj, AppContext)
+    config = ctx.obj.config
+    ledger, _, _ = _open(config)
+    report = run_configured_cleanup(
+        ledger,
+        config,
+        days=days,
+        include_failed=include_failed,
+        dry_run=dry_run,
+    )
+    payload = {
+        "scanned": report.scanned,
+        "deleted": report.deleted,
+        "bytes_freed": report.bytes_freed,
+        "kept_reasons": report.kept_reasons,
+        "dry_run": dry_run,
+    }
+    if as_json:
+        output.emit_json(payload)
+    else:
+        typer.echo(f"scanned: {report.scanned}")
+        typer.echo(f"deleted: {report.deleted}")
+        typer.echo(f"bytes_freed: {report.bytes_freed}")
+        if report.kept_reasons:
+            typer.echo("kept:")
+            for reason, count in sorted(report.kept_reasons.items()):
+                typer.echo(f"  {reason}: {count}")
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def example(
+    ctx: typer.Context,
+    directory: Annotated[
+        Path | None,
+        typer.Argument(help="Target directory (default: ~/conveyor-demo)"),
+    ] = None,
+) -> None:
+    """Scaffold a self-contained demo with sample images and playbooks."""
+    assert isinstance(ctx.obj, AppContext)
+    target = (directory or Path("~/conveyor-demo")).expanduser()
+    try:
+        next_commands = scaffold_example(target)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Created demo at {target.resolve()}")
+    typer.echo("")
+    typer.echo("Next:")
+    for command in next_commands:
+        typer.echo(f"  cd {target}")
+        typer.echo(f"  {command}")
+    raise typer.Exit(code=0)
+
+
+@app.command()
 def serve(
     ctx: typer.Context,
     host: Annotated[str | None, typer.Option("--host", help="Bind host")] = None,
@@ -845,6 +914,11 @@ def serve(
         typer.echo(
             "WARNING: binding to a non-local host without authentication — "
             "anyone on the network can control pipelines.",
+            err=True,
+        )
+    if config.retention_on_serve_start:
+        typer.echo(
+            "NOTE: retention cleanup runs at web startup when retention.on_serve_start is true.",
             err=True,
         )
     app = create_app(config)

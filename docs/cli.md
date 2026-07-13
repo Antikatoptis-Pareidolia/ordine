@@ -30,6 +30,18 @@ Create the config file (default or `--config` path), database parent directory, 
 
 Exit codes: `0` success; `1` if the config file already exists.
 
+### `conveyor example [DIR]`
+
+Scaffold a self-contained quickstart at `DIR` (default `~/conveyor-demo`): six mock PNGs in `samples/`, `assets.csv`, `png-cleanup.yml`, and a `chain/` variant with `provider: mock`. Refuses non-empty directories.
+
+Prints exact next commands (`check`, `run --oneshot`, `serve`). Covered by CI in `tests/test_example_cmd.py`.
+
+### `conveyor cleanup [--days N] [--include-failed] [--dry-run] [--json]`
+
+Delete terminal task workdirs older than the retention cutoff. Default keeps `flagged` and `failed` workdirs; `--include-failed` also deletes failed. Never touches export destinations or deletes tasks from the ledger (only sets `workdir` NULL via `clear_workdir`).
+
+Config defaults live under `[retention]` in config.toml.
+
 ### `conveyor check PLAYBOOK [--json]`
 
 Load and statically validate a playbook (`load_playbook` + `StepRegistry.check_playbook`).

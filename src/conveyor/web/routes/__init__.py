@@ -31,6 +31,7 @@ from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
 from conveyor.llm.client import build_client
 from conveyor.llm.errors import LLMNotConfiguredError
+from conveyor.web.flag_hints import hint_for_kind
 from conveyor.web.forms import validate_editor_content
 from conveyor.web.routes.dashboard import pipeline_cards
 from conveyor.web.routes.tasks import diagnosis_for_task
@@ -310,6 +311,14 @@ async def task_detail(request: Request, task_id: int) -> HTMLResponse:
         llm_configured = True
     except LLMNotConfiguredError:
         llm_configured = False
+    from conveyor.core.ledger import TERMINAL_TASK_STATUSES
+
+    if task.workdir:
+        workdir_display = task.workdir
+    elif task.status in TERMINAL_TASK_STATUSES and task.started_at is not None:
+        workdir_display = "workdir cleaned"
+    else:
+        workdir_display = "-"
     return templates.TemplateResponse(
         request,
         "task_detail.html",
@@ -325,6 +334,7 @@ async def task_detail(request: Request, task_id: int) -> HTMLResponse:
             "last_output_rel": last_output_rel,
             "can_retry": can_retry(task),
             "can_cancel": can_cancel(task),
+            "workdir_display": workdir_display,
             "diagnosis": diagnosis,
             "llm_configured": llm_configured,
             **_flash(request),
@@ -386,6 +396,7 @@ async def flags_inbox(request: Request) -> HTMLResponse:
             "flag": flag,
             "pipeline_name": pipelines.get(flag.pipeline_id, str(flag.pipeline_id)),
             "age": cli_output.format_age(flag.created_at),
+            "hint": hint_for_kind(flag.kind),
         }
         for flag in flags
     ]

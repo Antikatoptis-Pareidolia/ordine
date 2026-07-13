@@ -46,6 +46,7 @@ VALID_TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 _TERMINAL_FINISHED: frozenset[str] = frozenset({"done", "skipped", "failed", "flagged"})
+TERMINAL_TASK_STATUSES = _TERMINAL_FINISHED
 
 
 @dataclass(frozen=True)
@@ -467,6 +468,19 @@ class Ledger:
             task = self._get_task_row(session, task_id)
             task.workdir = str(workdir.expanduser())
             task.updated_at = _utcnow()
+
+    def clear_workdir(self, task_id: int) -> None:
+        """Clear the persisted workdir path after on-disk cleanup (transition-independent)."""
+        with self._session() as session:
+            task = self._get_task_row(session, task_id)
+            task.workdir = None
+            task.updated_at = _utcnow()
+
+    def list_retention_candidates(self) -> list[TaskView]:
+        """Return tasks that still record a workdir path."""
+        with self._session() as session:
+            query = select(Task).where(Task.workdir.isnot(None)).order_by(Task.id)
+            return [_task_view(row) for row in session.scalars(query).all()]
 
     def set_current_branch(self, task_id: int, branch_name: str | None) -> None:
         """Record which recovery branch last succeeded for a task."""

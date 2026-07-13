@@ -103,7 +103,7 @@ def diagnose(
                 Message(role="assistant", content=raw),
                 Message(role="user", content=prompts.DIAGNOSE_REPAIR_SUFFIX.format(raw=raw)),
             ],
-            purpose="diagnose_failure",
+            purpose="repair_diagnose",
         )
         raw = repair.text
         try:

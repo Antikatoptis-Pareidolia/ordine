@@ -50,3 +50,20 @@ All `create` / `step_dir` calls are idempotent (`mkdir(parents=True, exist_ok=Tr
 
 Steps receive `ctx.input_path` (current artifact, read-only) and return `StepResult.output_path`.
 `None` output means passthrough — the next step sees the same input path.
+
+## Retention cleanup
+
+Terminal task workdirs can grow without bound. `conveyor cleanup` (and optional serve-start retention) deletes on-disk directories only — **never** export destinations or ledger rows beyond clearing `tasks.workdir`.
+
+| Config (`[retention]`) | Default | Meaning |
+|---|---|---|
+| `days` | `30` | Delete workdirs for tasks finished longer ago |
+| `keep_failed` | `true` | Keep `failed` and `flagged` workdirs as evidence |
+| `on_serve_start` | `false` | Run cleanup once when `conveyor serve` starts |
+
+```bash
+conveyor cleanup --dry-run --json
+conveyor cleanup --days 7 --include-failed
+```
+
+After cleanup, task detail shows **workdir cleaned** when the path was cleared. Implementation: `conveyor.core.retention.cleanup_workdirs` + `Ledger.clear_workdir`.

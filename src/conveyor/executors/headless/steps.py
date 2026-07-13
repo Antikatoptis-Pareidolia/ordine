@@ -9,7 +9,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, cast
 
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field
@@ -72,7 +72,7 @@ def _white_to_alpha_pillow(input_path: Path, output_path: Path, fuzz: float) -> 
     threshold = round(255 * (1 - fuzz / 100))
     with Image.open(input_path) as img:
         rgba = img.convert("RGBA")
-        pixels = list(rgba.getdata())
+        pixels = cast(tuple[tuple[int, int, int, int], ...], rgba.get_flattened_data())
         new_pixels = [
             (r, g, b, 0 if r >= threshold and g >= threshold and b >= threshold else a)
             for r, g, b, a in pixels

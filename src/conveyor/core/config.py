@@ -38,6 +38,7 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
     "llm": frozenset(
         {"provider", "model", "base_url", "max_tokens", "session_token_cap", "session_image_cap"}
     ),
+    "retention": frozenset({"days", "keep_failed", "on_serve_start"}),
 }
 
 
@@ -59,6 +60,9 @@ class AppConfig:
     llm_max_tokens: int = 1024
     llm_session_token_cap: int = 200_000
     llm_session_image_cap: int = 200
+    retention_days: int = 30
+    retention_keep_failed: bool = True
+    retention_on_serve_start: bool = False
     config_file: Path | None = None
 
 
@@ -95,11 +99,13 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     log = raw.get("log", {})
     web = raw.get("web", {})
     llm = raw.get("llm", {})
+    retention = raw.get("retention", {})
     assert isinstance(paths, dict)
     assert isinstance(runner, dict)
     assert isinstance(log, dict)
     assert isinstance(web, dict)
     assert isinstance(llm, dict)
+    assert isinstance(retention, dict)
 
     db_path = Path(str(paths.get("db", defaults.db_path))).expanduser()
     workdir_root = Path(str(paths.get("workdir_root", defaults.workdir_root))).expanduser()
@@ -152,6 +158,18 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     if not isinstance(llm_session_image_cap, int):
         raise ConfigError("llm.session_image_cap must be an integer")
 
+    retention_days = retention.get("days", defaults.retention_days)
+    if not isinstance(retention_days, int) or retention_days < 0:
+        raise ConfigError("retention.days must be a non-negative integer")
+
+    retention_keep_failed = retention.get("keep_failed", defaults.retention_keep_failed)
+    if not isinstance(retention_keep_failed, bool):
+        raise ConfigError("retention.keep_failed must be a boolean")
+
+    retention_on_serve_start = retention.get("on_serve_start", defaults.retention_on_serve_start)
+    if not isinstance(retention_on_serve_start, bool):
+        raise ConfigError("retention.on_serve_start must be a boolean")
+
     return AppConfig(
         db_path=db_path,
         workdir_root=workdir_root,
@@ -167,6 +185,9 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         llm_max_tokens=llm_max_tokens,
         llm_session_token_cap=llm_session_token_cap,
         llm_session_image_cap=llm_session_image_cap,
+        retention_days=retention_days,
+        retention_keep_failed=retention_keep_failed,
+        retention_on_serve_start=retention_on_serve_start,
         config_file=config_file,
     )
 
@@ -286,5 +307,10 @@ base_url = ""
 max_tokens = 1024
 session_token_cap = 200000
 session_image_cap = 200
+
+[retention]
+days = 30
+keep_failed = true
+on_serve_start = false
 """
     expanded.write_text(template, encoding="utf-8")

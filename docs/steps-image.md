@@ -122,7 +122,7 @@ When output format matches input, bytes are copied verbatim (no re-encode). Conv
 - ICC/color-profile handling
 - EXIF preservation policies
 - GIMP Script-Fu engine
-- Pillow `getdata()` → `get_flattened_data()` migration (currently used in the white-to-alpha Pillow backend)
+- Pillow white-to-alpha backend uses `get_flattened_data()` (migrated from deprecated `getdata()` in Step 15)
 
 ## Manual smoke test
 

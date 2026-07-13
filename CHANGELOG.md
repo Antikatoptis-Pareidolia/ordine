@@ -33,8 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manifest trigger (`ManifestTriggerService`) with row ordinals, mrow dedup keys, and reservation-at-creation sink (Step 14)
 - `llm.generate_image` step with mock and OpenAI image providers, `ImageBudget`, and `session_image_cap` config (Step 14)
 - Chained example under `examples/chain/` and `docs/chaining.md` (Step 14)
+- Workdir retention cleanup (`conveyor cleanup`, `[retention]` config, `Ledger.clear_workdir`) (Step 15)
+- `conveyor example` quickstart scaffolder with CI-guaranteed oneshot test (Step 15)
+- Release tooling: `scripts/bump_version.py`, `scripts/build_deb.sh`, `release.yml`, deb-smoke CI, version sync test (Step 15)
+- Docs index, install/security/release guides, community files, `demo/demo.tape`, naming checklist (Step 15)
 
 ### Changed
+
+- Pillow white-to-alpha uses `get_flattened_data()`; diagnosis repair calls use `repair_diagnose` purpose tag (Step 15)
+- Flags inbox shows one-line hints per known flag kind (Step 15)
 
 - Step 14 follow-up: manifest `build_trigger_service` rejects caller sinks; `manifest_sink` caches rows by mtime; trigger/chaining docs corrected
 - Chain example uses `on_collision: replace` for regeneration; `ordinal_regex` skips non-matching files with explicit warning

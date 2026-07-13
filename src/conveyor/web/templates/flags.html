@@ -13,7 +13,10 @@
       <td>level {{ flag.level }}</td>
       <td>{{ row.pipeline_name }}</td>
       <td>{% if flag.task_id %}<a href="/tasks/{{ flag.task_id }}">{{ flag.task_id }}</a>{% else %}-{% endif %}</td>
-      <td>{{ flag.kind }}</td>
+      <td>
+        {{ flag.kind }}
+        {% if row.hint %}<br /><span class="hint">{{ row.hint }}</span>{% endif %}
+      </td>
       <td>{{ row.age }}</td>
       <td>{{ flag.message }}</td>
       <td>

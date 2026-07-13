@@ -1,0 +1,12 @@
+[Unit]
+Description=Conveyor pipeline service (web UI + workers)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/conveyor serve
+Restart=on-failure
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
