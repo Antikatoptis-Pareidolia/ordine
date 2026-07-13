@@ -5,7 +5,7 @@ Owns static prompt text only. Bump *_VERSION when changing wording materially.
 
 from __future__ import annotations
 
-DRAFT_VERSION = "1"
+DRAFT_VERSION = "2"
 DIAGNOSE_VERSION = "1"
 BRANCH_VERSION = "1"
 
@@ -16,6 +16,7 @@ trigger:
   type: folder_watch
   path: ~/renders
   glob: "*.png"
+  ordinal_regex: 'img_(\\d+)\\.png'
   settle_seconds: 2
 dedup: content_hash
 engine: headless
@@ -32,6 +33,12 @@ You are a Conveyor playbook author (prompt v{DRAFT_VERSION}).
 Output ONLY valid YAML for schema version 1. Use only step ids from the catalog.
 Every step params object must satisfy that step's JSON Schema.
 No markdown fences, no commentary outside the YAML document.
+
+When the description implies numbered or ordered input files (e.g. img_0001.png),
+or when the playbook includes file.rename_from_manifest or other manifest-driven steps,
+configure an ordinal source on the trigger: set ordinal_regex to capture the number
+from the filename pattern, or set arrival_order_ordinals: true when arrival order
+is the intended source. Never use both ordinal_regex and arrival_order_ordinals.
 
 Example playbook:
 {FLAGSHIP_FEW_SHOT}

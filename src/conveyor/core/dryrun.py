@@ -26,7 +26,7 @@ from conveyor.core.playbook import FailurePolicy, Playbook, RecoveryBranch, Step
 from conveyor.core.registry import StepRegistry
 from conveyor.core.runner import execute_step_sequence, failure_policy_groups
 from conveyor.core.steps import StepResult
-from conveyor.core.triggers import extract_ordinal
+from conveyor.core.triggers import ordinal_for_trigger
 from conveyor.core.workdir import TaskWorkdir
 
 logger = logging.getLogger(__name__)
@@ -192,6 +192,60 @@ def playbook_contains_shell_run(playbook: Playbook) -> bool:
     return False
 
 
+def _playbook_step_ids(playbook: Playbook) -> list[str]:
+    ids: list[str] = []
+
+    def walk_policy(policy: FailurePolicy | None) -> None:
+        if policy is None:
+            return
+        for branch in policy.branches:
+            for branch_step in branch.steps:
+                ids.append(branch_step.id)
+                walk_policy(branch_step.on_failure)
+
+    for step in playbook.steps:
+        ids.append(step.id)
+        walk_policy(step.on_failure)
+    walk_policy(playbook.on_failure)
+    return ids
+
+
+def ordinal_dependent_step_ids(playbook: Playbook) -> list[str]:
+    """Step ids that require a task ordinal (manifest rename, future llm.* steps)."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for step_id in _playbook_step_ids(playbook):
+        if step_id != "file.rename_from_manifest" and not step_id.startswith("llm."):
+            continue
+        if step_id not in seen:
+            seen.add(step_id)
+            ordered.append(step_id)
+    return ordered
+
+
+def trigger_has_ordinal_source(playbook: Playbook) -> bool:
+    """Return True when the trigger can supply task ordinals."""
+    trigger = playbook.trigger
+    return getattr(trigger, "ordinal_regex", None) is not None or getattr(
+        trigger, "arrival_order_ordinals", False
+    )
+
+
+def lab_ordinal_warnings(playbook: Playbook) -> list[str]:
+    """Warnings for lab setup when ordinals will be None but steps need them."""
+    if trigger_has_ordinal_source(playbook):
+        return []
+    dependent = ordinal_dependent_step_ids(playbook)
+    if not dependent:
+        return []
+    steps_list = ", ".join(dependent)
+    return [
+        "These steps will fail: no ordinal source configured on the trigger "
+        f"({steps_list}). Set ordinal_regex from the filename pattern or enable "
+        "arrival_order_ordinals."
+    ]
+
+
 class DryRunSession:
     """One rehearsal of one playbook version on copied sample files. Not thread-safe."""
 
@@ -299,13 +353,9 @@ class DryRunSession:
             note="dry-run session",
         )
 
-        ordinal_regex = getattr(playbook.trigger, "ordinal_regex", None)
         tasks: list[_TaskRuntime] = []
         for index, sample_path in enumerate(copied):
-            if ordinal_regex is not None:
-                ordinal = extract_ordinal(sample_path.name, ordinal_regex)
-            else:
-                ordinal = index + 1
+            ordinal = ordinal_for_trigger(sample_path.name, playbook.trigger, arrival_index=index)
             task_id = ledger.create_task(
                 pipeline_id,
                 str(sample_path),

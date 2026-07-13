@@ -126,6 +126,16 @@ def test_draft_clean_yaml_valid(registry: StepRegistry) -> None:
     assert result.repaired is False
 
 
+def test_draft_numbered_files_fixture_includes_ordinal_regex(registry: StepRegistry) -> None:
+    description = "watch ~/in for img_0001.png style files, rename from assets.csv, export to ~/out"
+    client = CannedLLMClient([_fixture("ordinal_draft_with_regex.yaml.txt")])
+    result = draft_playbook(client, registry, description)
+    assert result.playbook is not None
+    assert not result.problems
+    trigger = result.playbook.trigger
+    assert getattr(trigger, "ordinal_regex", None) is not None
+
+
 def test_draft_full_stack_mock_transport_logs_and_charges_budget(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, registry: StepRegistry
 ) -> None:

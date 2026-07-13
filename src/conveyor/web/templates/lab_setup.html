@@ -12,6 +12,12 @@
 </p>
 {% endif %}
 
+{% if ordinal_warnings %}
+{% for warning in ordinal_warnings %}
+<p class="flash flash-error" role="alert">{{ warning }}</p>
+{% endfor %}
+{% endif %}
+
 {% if output_redirections %}
 <section class="card">
   <h2>Output redirections</h2>

@@ -78,6 +78,16 @@ def extract_ordinal(filename: str, ordinal_regex: str | None) -> int | None:
     return int(group)
 
 
+def ordinal_for_trigger(filename: str, trigger: Trigger, *, arrival_index: int) -> int | None:
+    """Resolve task ordinal the same way production triggers and the dry-run lab do."""
+    ordinal_regex = getattr(trigger, "ordinal_regex", None)
+    if ordinal_regex is not None:
+        return extract_ordinal(filename, ordinal_regex)
+    if getattr(trigger, "arrival_order_ordinals", False):
+        return arrival_index + 1
+    return None
+
+
 def _poll_interval(settle_seconds: float) -> float:
     half = settle_seconds / 2
     return min(0.5, half if half > 0 else 0.05)

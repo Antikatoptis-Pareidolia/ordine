@@ -37,4 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Lab dry-run ordinals now mirror production trigger semantics (no false pass for ordinal-dependent playbooks)
+- Drafting prompts instruct models to configure ordinal sources when manifest/numbered files are implied
+
+### Fixed
+
 - Startup rescan seeds the settle tracker instead of emitting partial files (Step 6 follow-up)

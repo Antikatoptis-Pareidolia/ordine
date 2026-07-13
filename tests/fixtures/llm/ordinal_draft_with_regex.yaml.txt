@@ -1,16 +1,14 @@
 version: 1
-name: png-cleanup
+name: numbered-ingest
 trigger:
   type: folder_watch
   path: ~/in
   glob: "*.png"
   ordinal_regex: 'img_(\d+)\.png'
-  settle_seconds: 2
-dedup: content_hash
+  settle_seconds: 1
 engine: headless
 steps:
   - image.validate
-  - image.white_to_alpha: { fuzz: 8 }
-  - image.trim: {}
+  - file.rename_from_manifest: { manifest: ~/assets.csv }
   - image.export: { dest: ~/out, format: png }
-on_failure: { retries: 1, then: mark_failed }
+on_failure: { retries: 0, then: mark_failed }

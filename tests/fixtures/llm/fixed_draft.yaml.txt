@@ -4,6 +4,7 @@ trigger:
   type: folder_watch
   path: ~/in
   glob: "*.png"
+  ordinal_regex: 'img_(\d+)\.png'
   settle_seconds: 2
 engine: headless
 steps:

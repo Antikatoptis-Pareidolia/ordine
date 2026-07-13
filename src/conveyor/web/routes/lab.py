@@ -20,6 +20,7 @@ from starlette import status
 
 from conveyor.core.dryrun import (
     DryRunSession,
+    lab_ordinal_warnings,
     playbook_contains_shell_run,
     redirect_output_dirs,
 )
@@ -224,6 +225,7 @@ async def lab_setup(request: Request, pipeline_id: int) -> HTMLResponse:
             "current_version_note": current_row.note if current_row else None,
             "versions": versions,
             "shell_warning": playbook_contains_shell_run(playbook),
+            "ordinal_warnings": lab_ordinal_warnings(playbook),
             "output_redirections": output_redirections,
             "flash": request.query_params.get("flash"),
             "flash_level": request.query_params.get("flash_level", "info"),

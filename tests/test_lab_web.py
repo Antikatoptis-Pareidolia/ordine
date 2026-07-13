@@ -211,6 +211,29 @@ steps:
     assert "→" in setup.text
 
 
+def test_lab_setup_warns_when_no_ordinal_and_rename_step(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, tmp_path = lab_client
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name\ngoat.png\n", encoding="utf-8")
+    yaml_text = f"""version: 1
+name: lab-ordinal-warning
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - util.noop
+  - file.rename_from_manifest:
+      manifest: {manifest}
+"""
+    pipeline_id, _ = ledger.register_pipeline(loads_playbook(yaml_text), yaml_text)
+    setup = client.get(f"/pipelines/{pipeline_id}/lab")
+    assert setup.status_code == 200
+    assert "no ordinal source configured on the trigger" in setup.text
+    assert "file.rename_from_manifest" in setup.text
+
+
 def test_editor_anchor_and_from_lab_banner(
     lab_client: tuple[TestClient, Ledger, Path],
 ) -> None:

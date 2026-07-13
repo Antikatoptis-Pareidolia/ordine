@@ -330,6 +330,101 @@ steps:
     session.close()
 
 
+def test_ordinals_none_without_source(
+    tmp_path: Path, registry: StepRegistry, engines: EngineRegistry
+) -> None:
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    sample = samples / "file.txt"
+    sample.write_text("x", encoding="utf-8")
+    yaml_text = """version: 1
+name: no-ordinal
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+"""
+    session, _ = _session(
+        tmp_path,
+        registry,
+        engines,
+        yaml_text=yaml_text,
+        samples=[sample],
+    )
+    assert session.tasks()[0].ordinal is None
+    session.close()
+
+
+def test_ordinals_from_arrival_order_opt_in(
+    tmp_path: Path, registry: StepRegistry, engines: EngineRegistry
+) -> None:
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    first = samples / "a.txt"
+    second = samples / "b.txt"
+    first.write_text("a", encoding="utf-8")
+    second.write_text("b", encoding="utf-8")
+    yaml_text = """version: 1
+name: arrival-ordinal
+trigger:
+  type: manual
+  path: ~/in
+  arrival_order_ordinals: true
+steps:
+  - util.noop
+"""
+    session, _ = _session(
+        tmp_path,
+        registry,
+        engines,
+        yaml_text=yaml_text,
+        samples=[first, second],
+    )
+    assert session.tasks()[0].ordinal == 1
+    assert session.tasks()[1].ordinal == 2
+    session.close()
+
+
+def test_no_ordinal_rename_fails_at_step_four(
+    tmp_path: Path,
+    engines: EngineRegistry,
+) -> None:
+    registry = StepRegistry.load()
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name\ngoat.png\n", encoding="utf-8")
+    sample = samples / "input.png"
+    sample.write_bytes(b"\x89PNG\r\n")
+    yaml_text = f"""version: 1
+name: ordinal-fidelity
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - util.noop
+  - util.noop
+  - util.noop
+  - file.rename_from_manifest:
+      manifest: {manifest}
+"""
+    session, _ = _session(
+        tmp_path,
+        registry,
+        engines,
+        yaml_text=yaml_text,
+        samples=[sample],
+    )
+    for _ in range(3):
+        assert session.run_next_step(0).status == "ok"
+    failed = session.run_next_step(0)
+    assert failed.status == "fail"
+    assert failed.step_id == "file.rename_from_manifest"
+    assert failed.seq == 4
+    assert failed.message is not None
+    assert "no ordinal" in failed.message.lower()
+    session.close()
+
+
 def test_resume_replays_prefix_and_continues(
     tmp_path: Path, registry: StepRegistry, engines: EngineRegistry
 ) -> None:

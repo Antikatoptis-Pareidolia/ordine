@@ -22,6 +22,8 @@ Artifact caching across resumed sessions is **not** implemented in v1 — `resum
 | **Run branches** | Execute declared recovery branches with runner-equivalent retries |
 | **Run to end / Run all** | Runner-equivalent (primary retries + auto-branches); stops on exhaustion |
 
+**Ordinal fidelity:** lab task ordinals mirror production trigger semantics — `ordinal_regex` when set, arrival `1..n` only when `arrival_order_ordinals: true`, otherwise `None`. The lab setup page warns when ordinals will be `None` but the playbook includes `file.rename_from_manifest` or `llm.*` steps that require them.
+
 Do not expect lab step-through to mirror production retry behavior — that difference is intentional.
 
 ## Checkpoint walkthrough (step 3 of 5)
