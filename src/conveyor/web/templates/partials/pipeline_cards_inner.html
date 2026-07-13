@@ -3,11 +3,13 @@
   <h3>{{ card.name }}</h3>
   <p>
     current {{ card.current_version_label or card.current_version or "-" }}
-    {% if card.running_version %}
+    {% if card.service_status == "running" and card.running_version %}
     · running {{ card.running_version_label or card.running_version }}
     {% if card.version_drift %}
     <span class="chip chip-warning">restart to apply</span>
     {% endif %}
+    {% elif card.service_status == "paused" and card.running_version %}
+    · last ran {{ card.running_version_label or card.running_version }}
     {% endif %}
     · service <span class="chip chip-{{ card.service_status }}">{{ card.service_status }}</span>
   </p>
@@ -29,12 +31,16 @@
   <p class="error">{{ card.start_error }}</p>
   {% endif %}
   <p class="actions">
-    {% if card.service_status == "running" %}
-    <form action="/pipelines/{{ card.id }}/pause" method="post" style="display:inline">
+    {% if card.action_pending == "pausing" %}
+    <button type="button" disabled>pausing…</button>
+    {% elif card.action_pending == "starting" %}
+    <button type="button" disabled>starting…</button>
+    {% elif card.service_status == "running" %}
+    <form action="/pipelines/{{ card.id }}/pause" method="post" style="display:inline" class="pipeline-action-form" onsubmit="const b=this.querySelector('button'); b.disabled=true; b.textContent='pausing…';">
       <button type="submit">Pause</button>
     </form>
     {% else %}
-    <form action="/pipelines/{{ card.id }}/start" method="post" style="display:inline">
+    <form action="/pipelines/{{ card.id }}/start" method="post" style="display:inline" class="pipeline-action-form" onsubmit="const b=this.querySelector('button'); b.disabled=true; b.textContent='starting…';">
       <button type="submit">Start</button>
     </form>
     {% endif %}

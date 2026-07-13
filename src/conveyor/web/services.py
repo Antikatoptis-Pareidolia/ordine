@@ -22,6 +22,7 @@ from conveyor.core.runner import PipelineRunner, PipelineService
 logger = logging.getLogger(__name__)
 
 RuntimeStatus = Literal["running", "paused"]
+ActionPending = Literal["starting", "pausing"]
 
 
 @dataclass
@@ -33,6 +34,7 @@ class PipelineRuntime:
     running_version: str | None = None
     start_problems: list[FieldError] = field(default_factory=list)
     start_error: str | None = None
+    action_pending: ActionPending | None = None
     _service: PipelineService | None = field(default=None, repr=False)
 
 
@@ -75,6 +77,7 @@ class ServiceManager:
             )
             if runtime.status == "running" and runtime._service is not None:
                 return
+            runtime.action_pending = "starting"
             runtime.start_problems = []
             runtime.start_error = None
             try:
@@ -82,18 +85,21 @@ class ServiceManager:
             except Exception as exc:
                 runtime.start_error = str(exc)
                 runtime.status = "paused"
+                runtime.action_pending = None
                 return
             try:
                 playbook = loads_playbook(yaml_text, source=f"pipeline:{pipeline_id}")
             except (PlaybookSyntaxError, PlaybookValidationError) as exc:
                 runtime.start_error = str(exc)
                 runtime.status = "paused"
+                runtime.action_pending = None
                 return
             problems = self._registry.check_playbook(playbook)
             if problems:
                 runtime.start_problems = problems
                 runtime.status = "paused"
                 runtime.running_version = version_id
+                runtime.action_pending = None
                 return
             if runtime._service is not None:
                 runtime._service.stop()
@@ -124,13 +130,25 @@ class ServiceManager:
         """Gracefully stop the pipeline service (in-flight task may finish)."""
         with self._lock:
             runtime = self._runtimes.get(pipeline_id)
-            if runtime is None or runtime._service is None:
-                if runtime is not None:
-                    runtime.status = "paused"
+            if runtime is None:
+                return
+            runtime.action_pending = "pausing"
+            if runtime._service is None:
+                runtime.status = "paused"
                 return
             runtime._service.stop()
             runtime._service = None
             runtime.status = "paused"
+
+    def action_pending_label(self, pipeline_id: int) -> ActionPending | None:
+        """Return a pending action label until runtime status confirms the transition."""
+        with self._lock:
+            runtime = self.runtime(pipeline_id)
+            if (runtime.action_pending == "starting" and runtime.status == "running") or (
+                runtime.action_pending == "pausing" and runtime.status == "paused"
+            ):
+                runtime.action_pending = None
+            return runtime.action_pending
 
     def shutdown(self) -> None:
         """Stop every running pipeline service."""

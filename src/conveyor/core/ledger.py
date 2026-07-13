@@ -555,11 +555,15 @@ class Ledger:
             attempts = session.scalars(
                 select(BranchAttempt).where(BranchAttempt.task_id == task_id)
             ).all()
-            by_branch: dict[str | None, list[BranchAttempt]] = {}
+            by_group: dict[str, list[BranchAttempt]] = {}
             for attempt in attempts:
-                by_branch.setdefault(attempt.branch_name, []).append(attempt)
+                if attempt.branch_name is not None:
+                    key = f"branch:{attempt.branch_name}"
+                else:
+                    key = f"primary:{attempt.last_step_id or ''}"
+                by_group.setdefault(key, []).append(attempt)
             exhausted = 0
-            for group in by_branch.values():
+            for group in by_group.values():
                 if group and not any(a.ok for a in group):
                     exhausted += 1
             return exhausted

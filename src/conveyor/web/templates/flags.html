@@ -10,7 +10,7 @@
     {% for row in rows %}
     {% set flag = row.flag %}
     <tr>
-      <td>L{{ flag.level }}</td>
+      <td>level {{ flag.level }}</td>
       <td>{{ row.pipeline_name }}</td>
       <td>{% if flag.task_id %}<a href="/tasks/{{ flag.task_id }}">{{ flag.task_id }}</a>{% else %}-{% endif %}</td>
       <td>{{ flag.kind }}</td>

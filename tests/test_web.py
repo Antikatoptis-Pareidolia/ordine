@@ -200,6 +200,35 @@ def test_task_detail_and_flags_order(
     flags = web_client.get("/flags")
     assert flags.status_code == 200
     assert "Flags inbox" in flags.text
+    assert "level " in flags.text
+    assert "L0" not in flags.text
+
+
+def test_dashboard_max_flag_level_and_paused_last_ran(
+    web_client: TestClient, seeded_ids: tuple[int, int, int, int]
+) -> None:
+    ledger = web_client.app.state.ledger
+    _pipeline_id, _done_id, flagged_id, _pending = seeded_ids
+    flagged_pipe = ledger.get_task(flagged_id).pipeline_id
+    dashboard = web_client.get("/")
+    assert dashboard.status_code == 200
+    assert "(max " in dashboard.text
+    open_flags = ledger.open_flags(pipeline_id=flagged_pipe)
+    if open_flags:
+        assert max(flag.level for flag in open_flags) >= 1
+
+    web_client.post(
+        f"/pipelines/{_pipeline_id}/start",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    web_client.post(
+        f"/pipelines/{_pipeline_id}/pause",
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    paused = web_client.get("/")
+    assert "last ran" in paused.text
 
 
 def test_retry_flagged_and_illegal_done(

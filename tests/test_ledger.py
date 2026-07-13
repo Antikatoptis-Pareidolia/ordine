@@ -153,6 +153,23 @@ def test_rule_4_escalation(ledger: Ledger) -> None:
     assert ledger.next_flag_level(task_id) == 2
 
 
+def test_exhausted_primary_groups_by_last_step_id(ledger: Ledger) -> None:
+    """Earlier successful primary attempts must not mask later primary exhaustion."""
+    pipeline_id, _ = _register(ledger)
+    task_id = ledger.create_task(pipeline_id, "/a.png", "k1")
+    assert task_id is not None
+
+    ok1 = ledger.start_attempt(task_id, None, 1)
+    ledger.finish_attempt(ok1, ok=True, last_step_id="util.noop", error=None)
+    ok2 = ledger.start_attempt(task_id, None, 1)
+    ledger.finish_attempt(ok2, ok=True, last_step_id="util.copy", error=None)
+    fail3 = ledger.start_attempt(task_id, None, 1)
+    ledger.finish_attempt(fail3, ok=False, last_step_id="util.fail", error="boom")
+
+    assert ledger.exhausted_branches(task_id) == 1
+    assert ledger.next_flag_level(task_id) == 1
+
+
 def test_rule_5_reserve_name_idempotent(ledger: Ledger) -> None:
     pipeline_id, _ = _register(ledger)
     first = ledger.reserve_name(pipeline_id, 7, "goat.png", task_id=None)

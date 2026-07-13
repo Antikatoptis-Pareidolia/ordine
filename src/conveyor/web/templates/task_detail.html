@@ -60,7 +60,7 @@
   <h2 id="attempts-heading">Branch attempts</h2>
   <ul>
     {% for attempt in attempts %}
-    <li>#{{ attempt.attempt_no }} branch={{ attempt.branch_name or "-" }} ok={{ attempt.ok }} last={{ attempt.last_step_id or "-" }}</li>
+    <li>{{ attempt.branch_name or "primary" }} attempt {{ attempt.attempt_no }} — {{ "ok" if attempt.ok else "failed" }} at {{ attempt.last_step_id or "?" }}{% if attempt.error %}: {{ attempt.error }}{% endif %}</li>
     {% endfor %}
   </ul>
 </section>
@@ -71,7 +71,7 @@
   <h2 id="flags-heading">Flags</h2>
   <ul>
     {% for flag in flags %}
-    <li>L{{ flag.level }} {{ flag.kind }}: {{ flag.message }}</li>
+    <li>level {{ flag.level }} {{ flag.kind }}: {{ flag.message }}</li>
     {% endfor %}
   </ul>
 </section>

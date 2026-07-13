@@ -219,6 +219,31 @@ def test_branch_success_feeds_next_primary(
     assert {f.level for f in flags} == {1, 2}
 
 
+def test_multi_step_primary_exhaustion_raises_flag_level_one(
+    tmp_path: Path, ledger: Ledger, registry: StepRegistry, engines: EngineRegistry
+) -> None:
+    """Primary exhaustion on step N must not be masked by earlier ok primary attempts."""
+    yaml_text = _playbook_yaml(
+        steps="""  - util.noop
+  - util.noop
+  - id: util.fail
+    params: {times: -1}
+""",
+        on_failure="on_failure:\n  retries: 0\n  then: mark_failed",
+    )
+    pipeline_id, _, playbook = _register(ledger, yaml_text)
+    task_id = ledger.create_task(pipeline_id, str(tmp_path / "f.txt"), "k1")
+    assert task_id is not None
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    runner = _runner(ledger, registry, engines, playbook, pipeline_id, tmp_path / "work")
+    assert runner.run_until_idle() == 1
+    assert ledger.get_task(task_id).status == "flagged"
+    flags = ledger.open_flags(pipeline_id)
+    assert len(flags) == 1
+    assert flags[0].level == 1
+    assert ledger.next_flag_level(task_id) == 1
+
+
 def test_all_exhausted_mark_failed_becomes_flagged(
     tmp_path: Path, ledger: Ledger, registry: StepRegistry, engines: EngineRegistry
 ) -> None:

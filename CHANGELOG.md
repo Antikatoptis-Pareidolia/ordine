@@ -39,10 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Lab dry-run ordinals now mirror production trigger semantics (no false pass for ordinal-dependent playbooks)
 - Drafting prompts instruct models to configure ordinal sources when manifest/numbered files are implied
-
-### Fixed
-
 - Dry-run and lab runner-equivalent paths now report real step failure messages (not "no attempts executed") when the primary attempt fails before branch retries
+- Flag escalation groups primary attempts by failing step (`last_step_id`) so multi-step tasks raise level 1+ flags correctly
+- Dashboard start/pause shows pending disabled state; paused pipelines display "last ran" version wording
 
 ### Fixed
 

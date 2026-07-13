@@ -47,6 +47,7 @@ def pipeline_cards(request: Request) -> list[dict[str, Any]]:
         flags = ledger.list_open_flags(pipeline_id=summary.id)
         max_level = max((flag.level for flag in flags), default=0)
         runtime = services.runtime(summary.id)
+        action_pending = services.action_pending_label(summary.id)
         running_version = runtime.running_version
         current_version = summary.current_version
         version_rows = {row.public_id: row for row in ledger.list_versions(summary.id)}
@@ -75,6 +76,7 @@ def pipeline_cards(request: Request) -> list[dict[str, Any]]:
                     running_version and current_version and running_version != current_version
                 ),
                 "service_status": runtime.status,
+                "action_pending": action_pending,
                 "counts": counts,
                 "open_flags": len(flags),
                 "max_flag_level": max_level,
