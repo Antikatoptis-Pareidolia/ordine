@@ -1,0 +1,19 @@
+# expected: recovery branch name used by more than one step
+version: 1
+name: cross-step-dup
+trigger:
+  type: manual
+  path: ~/input
+steps:
+  - id: util.noop
+    on_failure:
+      branches:
+        - name: shared-fix
+          steps:
+            - util.copy
+  - id: util.fail
+    on_failure:
+      branches:
+        - name: shared-fix
+          steps:
+            - util.noop

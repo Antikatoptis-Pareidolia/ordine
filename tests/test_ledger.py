@@ -136,21 +136,24 @@ def test_rule_4_escalation(ledger: Ledger) -> None:
     assert task_id is not None
     ledger.claim_next(pipeline_id)
 
+    step_id = "image.trim"
+    branch_names = ["b1", "b2"]
+
     primary = ledger.start_attempt(task_id, None, 1)
-    ledger.finish_attempt(primary, ok=False, last_step_id=None, error="primary failed")
-    assert ledger.next_flag_level(task_id) == 1
+    ledger.finish_attempt(primary, ok=False, last_step_id=step_id, error="primary failed")
+    assert ledger.next_flag_level(task_id, step_id=step_id, branch_names=branch_names) == 1
 
     b1 = ledger.start_attempt(task_id, "b1", 1)
-    ledger.finish_attempt(b1, ok=False, last_step_id=None, error="b1 failed")
-    assert ledger.next_flag_level(task_id) == 2
+    ledger.finish_attempt(b1, ok=False, last_step_id=step_id, error="b1 failed")
+    assert ledger.next_flag_level(task_id, step_id=step_id, branch_names=branch_names) == 2
 
     b2 = ledger.start_attempt(task_id, "b2", 1)
-    ledger.finish_attempt(b2, ok=False, last_step_id=None, error="b2 failed")
-    assert ledger.next_flag_level(task_id) == 3
+    ledger.finish_attempt(b2, ok=False, last_step_id=step_id, error="b2 failed")
+    assert ledger.next_flag_level(task_id, step_id=step_id, branch_names=branch_names) == 3
 
     b2_ok = ledger.start_attempt(task_id, "b2", 2)
-    ledger.finish_attempt(b2_ok, ok=True, last_step_id="image.trim", error=None)
-    assert ledger.next_flag_level(task_id) == 2
+    ledger.finish_attempt(b2_ok, ok=True, last_step_id=step_id, error=None)
+    assert ledger.next_flag_level(task_id, step_id=step_id, branch_names=branch_names) == 2
 
 
 def test_exhausted_primary_groups_by_last_step_id(ledger: Ledger) -> None:
@@ -166,8 +169,19 @@ def test_exhausted_primary_groups_by_last_step_id(ledger: Ledger) -> None:
     fail3 = ledger.start_attempt(task_id, None, 1)
     ledger.finish_attempt(fail3, ok=False, last_step_id="util.fail", error="boom")
 
-    assert ledger.exhausted_branches(task_id) == 1
-    assert ledger.next_flag_level(task_id) == 1
+    assert ledger.exhausted_branches(task_id, step_id="util.fail", branch_names=[]) == 1
+    assert ledger.next_flag_level(task_id, step_id="util.fail", branch_names=[]) == 1
+
+
+def test_unfinished_attempt_rows_ignored(ledger: Ledger) -> None:
+    """Open attempt rows without finished_at must not count toward exhaustion."""
+    pipeline_id, _ = _register(ledger)
+    task_id = ledger.create_task(pipeline_id, "/a.png", "open")
+    assert task_id is not None
+
+    ledger.start_attempt(task_id, None, 1)
+    assert ledger.exhausted_branches(task_id, step_id="image.trim", branch_names=[]) == 0
+    assert ledger.next_flag_level(task_id, step_id="image.trim", branch_names=[]) == 0
 
 
 def test_rule_5_reserve_name_idempotent(ledger: Ledger) -> None:

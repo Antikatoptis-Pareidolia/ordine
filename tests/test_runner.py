@@ -241,7 +241,48 @@ def test_multi_step_primary_exhaustion_raises_flag_level_one(
     flags = ledger.open_flags(pipeline_id)
     assert len(flags) == 1
     assert flags[0].level == 1
-    assert ledger.next_flag_level(task_id) == 1
+    assert ledger.next_flag_level(task_id, step_id="util.fail", branch_names=[]) == 1
+
+
+def test_ladder_scoped_escalation_not_inflated_by_earlier_step(
+    tmp_path: Path, ledger: Ledger, registry: StepRegistry, engines: EngineRegistry
+) -> None:
+    """Earlier step exhaustion + branch heal must not bump later step's first flag level."""
+    yaml_text = _playbook_yaml(
+        steps="""  - id: util.fail
+    params: {message: step-x, times: -1}
+    on_failure:
+      retries: 0
+      branches:
+        - name: fix-x
+          retries: 0
+          steps: [util.noop]
+  - id: util.fail
+    params: {message: step-y, times: -1}
+    on_failure:
+      retries: 0
+      branches:
+        - name: fix-y
+          retries: 0
+          steps:
+            - id: util.fail
+              params: {times: -1}
+""",
+        on_failure="on_failure:\n  retries: 0\n  then: mark_failed",
+    )
+    pipeline_id, _, playbook = _register(ledger, yaml_text)
+    src = tmp_path / "in.txt"
+    src.write_text("payload", encoding="utf-8")
+    task_id = ledger.create_task(pipeline_id, str(src), "k1")
+    assert task_id is not None
+
+    runner = _runner(ledger, registry, engines, playbook, pipeline_id, tmp_path / "work")
+    assert runner.run_until_idle() == 1
+
+    flags = sorted(ledger.open_flags(pipeline_id), key=lambda f: f.id)
+    assert len(flags) == 3
+    assert [f.level for f in flags] == [1, 1, 2]
+    assert ledger.get_task(task_id).status == "flagged"
 
 
 def test_all_exhausted_mark_failed_becomes_flagged(
@@ -428,7 +469,7 @@ def test_semantics_user_retries_flagged_task(
     first_attempts = len(_branch_attempts(engine, task_id))
 
     ledger.transition(task_id, "pending")
-    assert ledger.next_flag_level(task_id) >= 1
+    assert ledger.next_flag_level(task_id, step_id="util.fail", branch_names=[]) >= 1
     assert runner.run_until_idle() == 1
     assert ledger.get_task(task_id).status == "done"
     assert len(_branch_attempts(engine, task_id)) > first_attempts

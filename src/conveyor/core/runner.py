@@ -243,6 +243,8 @@ class PipelineRunner:
         step_input: Path | None,
     ) -> StepResult:
         groups = failure_policy_groups(step, self._playbook)
+        policy = step.on_failure if step.on_failure is not None else self._playbook.on_failure
+        branch_names = [branch.name for branch in policy.branches]
         last = StepResult(status="fail", message="no attempts executed")
         last_step_id = step.id
         for branch_no, (branch_name, retries, seq) in enumerate(groups):
@@ -276,7 +278,9 @@ class PipelineRunner:
                     return last
                 if last.status == "skip":
                     return last
-            level = self._ledger.next_flag_level(task.id)
+            level = self._ledger.next_flag_level(
+                task.id, step_id=step.id, branch_names=branch_names
+            )
             self._ledger.raise_flag(
                 self._pipeline_id,
                 task_id=task.id,

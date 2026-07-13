@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drafting prompts instruct models to configure ordinal sources when manifest/numbered files are implied
 - Dry-run and lab runner-equivalent paths now report real step failure messages (not "no attempts executed") when the primary attempt fails before branch retries
 - Flag escalation groups primary attempts by failing step (`last_step_id`) so multi-step tasks raise level 1+ flags correctly
+- Ladder-scoped flag escalation counts only the failing step's primary and branch groups; unfinished attempt rows are ignored
+- Recovery branch names must be unique across the entire playbook (not only within one `on_failure` block)
 - Dashboard start/pause shows pending disabled state; paused pipelines display "last ran" version wording
 
 ### Fixed

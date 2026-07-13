@@ -53,8 +53,16 @@ def _effective_policy(step: StepSpec, playbook: Playbook) -> FailurePolicy:
     return step.on_failure if step.on_failure is not None else playbook.on_failure
 
 
-def _unique_branch_name(policy: FailurePolicy, desired: str) -> str:
-    names = {branch.name for branch in policy.branches}
+def _all_playbook_branch_names(playbook: Playbook) -> set[str]:
+    names = {branch.name for branch in playbook.on_failure.branches}
+    for step in playbook.steps:
+        if step.on_failure is not None:
+            names.update(branch.name for branch in step.on_failure.branches)
+    return names
+
+
+def _unique_branch_name(playbook: Playbook, desired: str) -> str:
+    names = _all_playbook_branch_names(playbook)
     if desired not in names:
         return desired
     candidate = f"{desired}-2"
@@ -76,7 +84,7 @@ def _graft_branch(playbook: Playbook, *, step_index: int, branch: RecoveryBranch
             then=effective.then,
         )
     assert step.on_failure is not None
-    unique_name = _unique_branch_name(step.on_failure, branch.name)
+    unique_name = _unique_branch_name(modified, branch.name)
     grafted = branch.model_copy(update={"name": unique_name})
     step.on_failure.branches.append(grafted)
     return modified

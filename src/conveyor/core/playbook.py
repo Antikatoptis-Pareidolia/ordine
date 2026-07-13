@@ -235,6 +235,23 @@ class Playbook(BaseModel):
             return value
         return _normalize_steps_list(value, path_prefix="steps")
 
+    @model_validator(mode="after")
+    def check_playbook_wide_branch_names(self) -> Self:
+        seen: set[str] = set()
+        policies: list[tuple[FailurePolicy, str]] = [(self.on_failure, "playbook")]
+        for index, step in enumerate(self.steps):
+            if step.on_failure is not None:
+                policies.append((step.on_failure, f"steps.{index}"))
+        for policy, _location in policies:
+            for branch in policy.branches:
+                if branch.name in seen:
+                    raise ValueError(
+                        f"recovery branch name {branch.name!r} is used by more than one step; "
+                        "branch names must be unique across the playbook"
+                    )
+                seen.add(branch.name)
+        return self
+
 
 FailurePolicy.model_rebuild()
 StepSpec.model_rebuild()

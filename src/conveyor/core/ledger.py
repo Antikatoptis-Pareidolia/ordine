@@ -549,28 +549,36 @@ class Ledger:
             attempt.error = error
             attempt.finished_at = _utcnow()
 
-    def exhausted_branches(self, task_id: int) -> int:
-        """Count branch groups with attempts but no successful completion."""
+    def _attempt_group_key(self, attempt: BranchAttempt) -> str:
+        if attempt.branch_name is not None:
+            return f"branch:{attempt.branch_name}"
+        return f"primary:{attempt.last_step_id or ''}"
+
+    def exhausted_branches(self, task_id: int, *, step_id: str, branch_names: list[str]) -> int:
+        """Count exhausted groups on the failing step's escalation ladder only."""
+        allowed = {f"primary:{step_id}", *(f"branch:{name}" for name in branch_names)}
         with self._session() as session:
             attempts = session.scalars(
                 select(BranchAttempt).where(BranchAttempt.task_id == task_id)
             ).all()
             by_group: dict[str, list[BranchAttempt]] = {}
             for attempt in attempts:
-                if attempt.branch_name is not None:
-                    key = f"branch:{attempt.branch_name}"
-                else:
-                    key = f"primary:{attempt.last_step_id or ''}"
+                key = self._attempt_group_key(attempt)
                 by_group.setdefault(key, []).append(attempt)
             exhausted = 0
-            for group in by_group.values():
-                if group and not any(a.ok for a in group):
-                    exhausted += 1
+            for key, group in by_group.items():
+                if key not in allowed:
+                    continue
+                if not any(a.finished_at is not None for a in group):
+                    continue
+                if any(a.ok for a in group):
+                    continue
+                exhausted += 1
             return exhausted
 
-    def next_flag_level(self, task_id: int) -> int:
-        """Return the flag escalation level for a task."""
-        return self.exhausted_branches(task_id)
+    def next_flag_level(self, task_id: int, *, step_id: str, branch_names: list[str]) -> int:
+        """Return the flag escalation level for a task on one step's ladder."""
+        return self.exhausted_branches(task_id, step_id=step_id, branch_names=branch_names)
 
     def raise_flag(
         self,

@@ -300,6 +300,34 @@ def test_branch_name_collision_suffix(registry: StepRegistry) -> None:
     assert "ai-fix-2" in names
 
 
+def test_branch_name_collision_suffix_playbook_wide(registry: StepRegistry) -> None:
+    """Suffix must avoid names on other steps, not only the graft target."""
+    playbook = Playbook.model_validate(
+        {
+            "version": 1,
+            "name": "b",
+            "trigger": {"type": "manual", "path": "~/in"},
+            "steps": [
+                {
+                    "id": "util.noop",
+                    "on_failure": {
+                        "branches": [{"name": "ai-fix", "steps": [{"id": "util.copy"}]}]
+                    },
+                },
+                {"id": "util.fail"},
+            ],
+        }
+    )
+    branch = RecoveryBranch.model_validate({"name": "ai-fix", "steps": [{"id": "util.noop"}]})
+    from conveyor.llm.features import branches as branches_mod
+
+    modified = branches_mod._graft_branch(playbook, step_index=1, branch=branch)
+    step_policy = modified.steps[1].on_failure
+    assert step_policy is not None
+    names = [b.name for b in step_policy.branches]
+    assert "ai-fix-2" in names
+
+
 def test_branch_step_without_on_failure_gains_policy(registry: StepRegistry) -> None:
     playbook = loads_playbook(
         """version: 1

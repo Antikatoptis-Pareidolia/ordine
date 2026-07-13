@@ -65,6 +65,10 @@ INVALID_EXPECTATIONS: dict[str, dict[str, object]] = {
         "exc": PlaybookValidationError,
         "message_contains": "capture group",
     },
+    "i12_cross_step_branch_dup.yml": {
+        "exc": PlaybookValidationError,
+        "message_contains": "branch names must be unique across the playbook",
+    },
 }
 
 
