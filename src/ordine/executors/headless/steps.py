@@ -198,7 +198,8 @@ class ValidateStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, ValidateParams)
+        if not isinstance(params, ValidateParams):
+            raise TypeError(f"expected ValidateParams, got {type(params)!r}")
         if (
             ctx.input_path is None
             or not ctx.input_path.exists()
@@ -237,7 +238,8 @@ class WhiteToAlphaStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, WhiteToAlphaParams)
+        if not isinstance(params, WhiteToAlphaParams):
+            raise TypeError(f"expected WhiteToAlphaParams, got {type(params)!r}")
         input_or_err = _require_input(ctx)
         if isinstance(input_or_err, StepResult):
             return input_or_err
@@ -273,7 +275,8 @@ class TrimStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, TrimParams)
+        if not isinstance(params, TrimParams):
+            raise TypeError(f"expected TrimParams, got {type(params)!r}")
         input_or_err = _require_input(ctx)
         if isinstance(input_or_err, StepResult):
             return input_or_err
@@ -312,7 +315,8 @@ class ExportStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset({"dest"})
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, ExportParams)
+        if not isinstance(params, ExportParams):
+            raise TypeError(f"expected ExportParams, got {type(params)!r}")
         input_or_err = _require_input(ctx)
         if isinstance(input_or_err, StepResult):
             return input_or_err

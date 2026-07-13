@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
@@ -101,3 +102,29 @@ def test_shutdown_stops_all(svc_env) -> None:
     manager.shutdown()
     assert manager.status(pipeline_id) == "paused"
     assert time.monotonic() - started < 5.0
+
+
+def test_pause_does_not_block_status(svc_env) -> None:
+    manager, _ledger, pipeline_id, _watch = svc_env
+    runtime = manager.runtime(pipeline_id)
+
+    allow_stop = threading.Event()
+
+    class SlowStopService:
+        def stop(self) -> None:
+            allow_stop.wait(timeout=2.0)
+
+    runtime._service = SlowStopService()  # type: ignore[assignment]
+    runtime.status = "running"
+
+    pause_thread = threading.Thread(target=lambda: manager.pause(pipeline_id), daemon=True)
+    pause_thread.start()
+
+    start = time.monotonic()
+    # status() should remain responsive even while pause is waiting on stop().
+    assert manager.status(pipeline_id) in ("running", "paused")
+    assert time.monotonic() - start < 0.1
+
+    allow_stop.set()
+    pause_thread.join(timeout=2.0)
+    assert manager.status(pipeline_id) == "paused"

@@ -42,7 +42,8 @@ class FailStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, FailParams)
+        if not isinstance(params, FailParams):
+            raise TypeError(f"expected FailParams, got {type(params)!r}")
         if params.times < 0:
             return StepResult(status="fail", message=params.message)
         counter_path = ctx.step_dir.parent / f".{self.id}.counter"

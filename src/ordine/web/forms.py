@@ -12,12 +12,16 @@ from typing import Any, Literal
 
 import yaml  # type: ignore[import-untyped]
 
-from ordine.core.errors import FieldError
-from ordine.core.playbook import FailurePolicy, Playbook, StepSpec, dump_playbook
-
-
-def _is_default_failure_policy(policy: FailurePolicy) -> bool:
-    return policy.retries == 0 and not policy.branches and policy.then == "mark_failed"
+from ordine.core.errors import FieldError, PlaybookSyntaxError, PlaybookValidationError
+from ordine.core.playbook import (
+    FailurePolicy,
+    Playbook,
+    StepSpec,
+    dump_playbook,
+    is_default_failure_policy,
+    loads_playbook,
+)
+from ordine.core.registry import StepRegistry
 
 
 class FormConversionError(Exception):
@@ -213,7 +217,7 @@ def _params_to_text(params: dict[str, Any]) -> str:
 
 
 def _failure_to_form(prefix: str, policy: FailurePolicy) -> dict[str, str]:
-    if _is_default_failure_policy(policy):
+    if is_default_failure_policy(policy):
         return {}
     result: dict[str, str] = {
         f"{prefix}-enabled": "on",
@@ -292,18 +296,13 @@ def playbook_to_yaml(playbook: Playbook) -> str:
 
 
 def validate_editor_content(
-    registry: object,
+    registry: StepRegistry,
     *,
     tab: Literal["form", "yaml"],
     form: Mapping[str, str] | None = None,
     yaml_text: str | None = None,
 ) -> tuple[Playbook | None, str, list[FieldError]]:
     """Validate editor form or YAML tab content without persisting a version."""
-    from ordine.core.errors import PlaybookSyntaxError, PlaybookValidationError
-    from ordine.core.playbook import loads_playbook
-    from ordine.core.registry import StepRegistry
-
-    assert isinstance(registry, StepRegistry)
     errors: list[FieldError] = []
     text = yaml_text or ""
     try:

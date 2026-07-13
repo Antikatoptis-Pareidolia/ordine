@@ -57,7 +57,8 @@ class RenameFromManifestStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, RenameFromManifestParams)
+        if not isinstance(params, RenameFromManifestParams):
+            raise TypeError(f"expected RenameFromManifestParams, got {type(params)!r}")
         if ctx.ordinal is None:
             return StepResult(
                 status="fail",
@@ -99,7 +100,8 @@ class MoveStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset({"dest"})
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, MoveParams)
+        if not isinstance(params, MoveParams):
+            raise TypeError(f"expected MoveParams, got {type(params)!r}")
         if ctx.input_path is None:
             return StepResult(status="fail", message="move requires an input artifact")
         if not ctx.input_path.exists():

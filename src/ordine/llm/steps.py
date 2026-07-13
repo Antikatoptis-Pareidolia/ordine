@@ -297,7 +297,8 @@ class GenerateImageStep:
     OUTPUT_DIR_PARAMS: ClassVar[frozenset[str]] = frozenset()
 
     def run(self, ctx: StepContext, params: BaseModel) -> StepResult:
-        assert isinstance(params, GenerateImageParams)
+        if not isinstance(params, GenerateImageParams):
+            raise TypeError(f"expected GenerateImageParams, got {type(params)!r}")
         if ctx.ordinal is None:
             return StepResult(
                 status="fail",

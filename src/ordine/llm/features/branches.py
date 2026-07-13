@@ -83,7 +83,8 @@ def _graft_branch(playbook: Playbook, *, step_index: int, branch: RecoveryBranch
             branches=list(effective.branches),
             then=effective.then,
         )
-    assert step.on_failure is not None
+    if step.on_failure is None:
+        raise RuntimeError("internal error: on_failure policy missing after initialization")
     unique_name = _unique_branch_name(modified, branch.name)
     grafted = branch.model_copy(update={"name": unique_name})
     step.on_failure.branches.append(grafted)

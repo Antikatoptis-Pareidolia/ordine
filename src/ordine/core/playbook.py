@@ -299,7 +299,7 @@ def load_playbook(path: Path) -> Playbook:
     return loads_playbook(text, source=str(expanded))
 
 
-def _is_default_failure_policy(policy: FailurePolicy) -> bool:
+def is_default_failure_policy(policy: FailurePolicy) -> bool:
     return policy.retries == 0 and not policy.branches and policy.then == "mark_failed"
 
 
@@ -328,7 +328,8 @@ def _dump_step_spec(step: StepSpec) -> str | dict[str, Any]:
     if not has_params and not has_on_failure:
         return step.id
     if has_on_failure:
-        assert step.on_failure is not None
+        if step.on_failure is None:
+            raise RuntimeError("internal error: step on_failure is unexpectedly None")
         long_form: dict[str, Any] = {"id": step.id}
         if has_params:
             long_form["params"] = step.params
@@ -386,7 +387,7 @@ def _playbook_to_dump_dict(playbook: Playbook) -> dict[str, Any]:
     if playbook.engine != "headless":
         data["engine"] = playbook.engine
     data["steps"] = [_dump_step_spec(step) for step in playbook.steps]
-    if not _is_default_failure_policy(playbook.on_failure):
+    if not is_default_failure_policy(playbook.on_failure):
         data["on_failure"] = _dump_failure_policy_dict(playbook.on_failure)
     if playbook.meta is not None:
         data["meta"] = playbook.meta.model_dump(exclude_none=True)

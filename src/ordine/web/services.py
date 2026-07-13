@@ -75,56 +75,83 @@ class ServiceManager:
             runtime = self._runtimes.setdefault(
                 pipeline_id, PipelineRuntime(pipeline_id=pipeline_id)
             )
+            if runtime.action_pending == "starting":
+                return
             if runtime.status == "running" and runtime._service is not None:
                 return
             runtime.action_pending = "starting"
             runtime.start_problems = []
             runtime.start_error = None
-            try:
-                version_id, yaml_text = self._ledger.get_current_playbook(pipeline_id)
-            except Exception as exc:
+            old_service = runtime._service
+
+        if old_service is not None:
+            old_service.stop()
+
+        try:
+            version_id, yaml_text = self._ledger.get_current_playbook(pipeline_id)
+        except Exception as exc:
+            with self._lock:
+                runtime = self.runtime(pipeline_id)
                 runtime.start_error = str(exc)
                 runtime.status = "paused"
                 runtime.action_pending = None
-                return
-            try:
-                playbook = loads_playbook(yaml_text, source=f"pipeline:{pipeline_id}")
-            except (PlaybookSyntaxError, PlaybookValidationError) as exc:
+            return
+        try:
+            playbook = loads_playbook(yaml_text, source=f"pipeline:{pipeline_id}")
+        except (PlaybookSyntaxError, PlaybookValidationError) as exc:
+            with self._lock:
+                runtime = self.runtime(pipeline_id)
                 runtime.start_error = str(exc)
                 runtime.status = "paused"
                 runtime.action_pending = None
-                return
-            problems = self._registry.check_playbook(playbook)
-            if problems:
+            return
+
+        problems = self._registry.check_playbook(playbook)
+        if problems:
+            with self._lock:
+                runtime = self.runtime(pipeline_id)
                 runtime.start_problems = problems
                 runtime.status = "paused"
                 runtime.running_version = version_id
                 runtime.action_pending = None
-                return
-            if runtime._service is not None:
-                runtime._service.stop()
-            stale_after = timedelta(minutes=self._config.stale_after_minutes)
-            runner = PipelineRunner(
-                ledger=self._ledger,
-                registry=self._registry,
-                engines=self._engines,
-                playbook=playbook,
-                pipeline_id=pipeline_id,
-                workdir_root=self._config.workdir_root,
-                playbook_version=version_id,
-            )
-            service = PipelineService(
-                ledger=self._ledger,
-                runner=runner,
-                playbook=playbook,
-                pipeline_id=pipeline_id,
-                stale_after=stale_after,
-                reconcile_policy=self._config.reconcile_policy,
-            )
-            service.start()
-            runtime._service = service
-            runtime.status = "running"
-            runtime.running_version = version_id
+            return
+
+        stale_after = timedelta(minutes=self._config.stale_after_minutes)
+        runner = PipelineRunner(
+            ledger=self._ledger,
+            registry=self._registry,
+            engines=self._engines,
+            playbook=playbook,
+            pipeline_id=pipeline_id,
+            workdir_root=self._config.workdir_root,
+            playbook_version=version_id,
+        )
+        service = PipelineService(
+            ledger=self._ledger,
+            runner=runner,
+            playbook=playbook,
+            pipeline_id=pipeline_id,
+            stale_after=stale_after,
+            reconcile_policy=self._config.reconcile_policy,
+        )
+        service.start()
+        with self._lock:
+            runtime = self.runtime(pipeline_id)
+            # If a pause raced while we were starting, honor it immediately.
+            if runtime.action_pending == "pausing":
+                pending_service = service
+                runtime._service = None
+                runtime.status = "paused"
+                runtime.running_version = version_id
+                runtime.action_pending = None
+            else:
+                pending_service = None
+                runtime._service = service
+                runtime.status = "running"
+                runtime.running_version = version_id
+                runtime.action_pending = None
+        if pending_service is not None:
+            pending_service.stop()
 
     def pause(self, pipeline_id: int) -> None:
         """Gracefully stop the pipeline service (in-flight task may finish)."""
@@ -133,12 +160,17 @@ class ServiceManager:
             if runtime is None:
                 return
             runtime.action_pending = "pausing"
-            if runtime._service is None:
-                runtime.status = "paused"
-                return
-            runtime._service.stop()
+            service = runtime._service
             runtime._service = None
+            if service is None:
+                runtime.status = "paused"
+                runtime.action_pending = None
+                return
+        service.stop()
+        with self._lock:
+            runtime = self.runtime(pipeline_id)
             runtime.status = "paused"
+            runtime.action_pending = None
 
     def action_pending_label(self, pipeline_id: int) -> ActionPending | None:
         """Return a pending action label until runtime status confirms the transition."""

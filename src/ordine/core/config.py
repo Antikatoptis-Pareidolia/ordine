@@ -13,14 +13,6 @@ from typing import Literal
 
 from ordine.core.errors import ConfigError
 
-DEFAULT_CONFIG_DIR = (
-    Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "ordine"
-)
-DEFAULT_DATA_DIR = (
-    Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "ordine"
-)
-DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.toml"
-
 
 def _config_dir() -> Path:
     return Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "ordine"
@@ -28,6 +20,13 @@ def _config_dir() -> Path:
 
 def _data_dir() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "ordine"
+
+
+# Single source of truth is the helper functions; constants are thin aliases for callers that import
+# them (public surface).
+DEFAULT_CONFIG_DIR = _config_dir()
+DEFAULT_DATA_DIR = _data_dir()
+DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.toml"
 
 
 _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {

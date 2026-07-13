@@ -564,7 +564,8 @@ class DryRunSession:
         branch_results: list[tuple[str, str, str | None]] = []
         last = StepResult(status="fail", message=runtime.paused_message or "primary failed")
         for branch_no, (branch_name, retries, seq) in enumerate(groups, start=1):
-            assert branch_name is not None
+            if branch_name is None:
+                raise RuntimeError("internal error: branch_name is unexpectedly None")
             branch_status = "fail"
             branch_message: str | None = None
             for attempt_no in range(1, retries + 2):
