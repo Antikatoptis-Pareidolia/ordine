@@ -277,6 +277,32 @@ steps:
     assert "Dry-run lab" in versions.text
 
 
+def test_lab_terminal_task_hides_step_controls(lab_client: tuple[TestClient, Ledger, Path]) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "a.txt").write_text("a", encoding="utf-8")
+    pipeline_id, _ = _register_pipeline(
+        ledger,
+        """version: 1
+name: terminal-controls
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.noop
+""",
+    )
+    sid = _start_lab(client, pipeline_id, samples)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    done = client.get(f"/lab/{sid}")
+    assert done.status_code == 200
+    assert "(done)" in done.text
+    assert '<button type="submit">Next step</button>' not in done.text
+    assert '<button type="submit">Retry</button>' not in done.text
+    assert '<button type="submit">Run branches</button>' not in done.text
+    assert '<button type="submit">Run to end</button>' not in done.text
+    assert '<button type="submit">Run all</button>' in done.text
+
+
 def test_unknown_lab_session_returns_404(lab_client: tuple[TestClient, Ledger, Path]) -> None:
     client, _, _ = lab_client
     missing = "lab_missing_session"

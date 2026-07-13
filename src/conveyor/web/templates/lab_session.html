@@ -43,6 +43,7 @@
 
 <section class="card">
   <h2>Controls</h2>
+  {% if not task_terminal %}
   <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/next" method="post" style="display:inline">
     <button type="submit">Next step</button>
   </form>
@@ -55,6 +56,7 @@
   <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/to-end" method="post" style="display:inline">
     <button type="submit">Run to end</button>
   </form>
+  {% endif %}
   <form action="/lab/{{ sid }}/run-all" method="post" style="display:inline">
     <button type="submit">Run all</button>
   </form>

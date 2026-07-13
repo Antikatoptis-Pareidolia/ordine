@@ -17,6 +17,7 @@ Flat indexed names in `web/forms.py`:
 | `steps-{i}-onfail-branches-{j}-steps-{k}-id`, `-params` | Branch steps (no nested on_failure) |
 | `onfail-*` | Pipeline-level failure policy (same shape) |
 | `base_version` | Version the editor was opened from (hidden) |
+| `from_lab` | Lab session id when fixing from a dry-run failure (hidden); suppresses auto-promotion to current on save |
 | `note` | Optional version note on save |
 
 Index gaps from row removal are tolerated; order follows ascending index.
@@ -78,6 +79,7 @@ pv_0001
 
 - **Save:** `register_pipeline(..., parent_public_id=base_version, make_current=(base_version == current))`
 - **Branch-from:** open an old version (`?version=pv_XXXX`); save with `base_version != current` → new version whose parent is the base, current unchanged, banner with **Make current**
+- **Lab fix-from-here:** when the hidden `from_lab` field is present, `make_current` is forced **false** even if `base_version == current` — rehearse the fix in the lab, then promote from **History** (or the save banner's **Make current**) when ready
 - **Revert:** new version copying target yaml, parent = current, note `revert to {pv}`, `make_current=True`
 - **Make current:** `set_current_version`; if pipeline is running, flash "restart to apply"
 

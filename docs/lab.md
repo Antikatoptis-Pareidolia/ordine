@@ -29,9 +29,15 @@ Do not expect lab step-through to mirror production retry behavior — that diff
 1. Start a lab session from **Versions → Lab** (or `/pipelines/{id}/lab`).
 2. **Next step** through steps 1–2 (ok), then step 3 fails and the timeline pauses.
 3. Click **Fix from here** → editor opens at `?version={session version}&anchor=steps-2&from_lab={sid}`.
-4. Edit step 3, save as a branch-from version (current unchanged per Step 10 semantics).
+4. Edit step 3, save as a branch-from version. Saves that carry `from_lab` are **never** auto-promoted to current — rehearse the fix in the lab first, then promote deliberately from **History** when ready.
 5. Click **Resume lab** on the editor banner → `POST /lab/{sid}/resume` replays steps 1–2 as `replayed`, continues on the new version.
 6. Complete the run; the new version retains the intact prefix from steps 1–2.
+
+## Rehearse, then promote
+
+Lab-driven saves (`from_lab` in the editor) always create a new version **without** changing which version is current. This is intentional: you finish the rehearsal loop (fix → resume → green) before deciding to promote.
+
+When the rehearsed version is ready for production, open **History** (`/pipelines/{id}/versions`) and use **Make current** on that version. The editor save banner also offers **Make current** after a branch-from save, but lab fix-from-here saves skip auto-promotion even when you were editing the current version.
 
 ## Routes
 

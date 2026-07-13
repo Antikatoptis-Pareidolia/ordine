@@ -166,6 +166,9 @@ def _session_context(
     artifact = None
     if current_step is not None:
         artifact = current_step.output_artifact or current_step.input_artifact
+    task_summaries = session.tasks()
+    task_status = task_summaries[task_ix].status if task_ix < len(task_summaries) else "pending"
+    task_terminal = task_status in ("done", "skipped", "failed")
     return {
         "request": request,
         "sid": record.sid,
@@ -173,8 +176,10 @@ def _session_context(
         "pipeline_name": _pipeline_name(request, record.pipeline_id),
         "version_id": session.version_public_id,
         "version_note": _version_note(request, record.pipeline_id, session.version_public_id),
-        "tasks": session.tasks(),
+        "tasks": task_summaries,
         "task_ix": task_ix,
+        "task_status": task_status,
+        "task_terminal": task_terminal,
         "steps": steps,
         "failed_ix": failed_ix,
         "fix_anchor": fix_anchor,
