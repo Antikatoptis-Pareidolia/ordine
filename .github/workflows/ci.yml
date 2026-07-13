@@ -94,20 +94,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build tooling
+        shell: bash
         run: |
+          set -euo pipefail
           apt-get update
-          apt-get install -y python3 python3-venv python3-pip imagemagick ruby-dev build-essential git curl ca-certificates
+          apt-get install -y bash python3 python3-venv python3-pip imagemagick ruby-dev build-essential git curl ca-certificates
           gem install fpm
           curl -LsSf https://astral.sh/uv/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build deb
+        shell: bash
         run: |
+          set -euo pipefail
           export PATH="$HOME/.local/bin:$PATH"
           fpm --version
           uv sync --locked
           bash scripts/build_deb.sh
       - name: Install deb and run quickstart
+        shell: bash
         run: |
           set -euo pipefail
           apt-get install -y "./dist/conveyor_"*.deb
