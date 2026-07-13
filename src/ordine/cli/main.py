@@ -137,7 +137,10 @@ def _scan_playbook(ledger: Ledger, pipeline_id: int, playbook: Playbook) -> int:
             ledger=ledger,
             pipeline_id=pipeline_id,
         )
-        assert isinstance(service, ManifestTriggerService)
+        if not isinstance(service, ManifestTriggerService):
+            raise RuntimeError(
+                f"internal error: manifest trigger returned unexpected service {type(service)!r}"
+            )
         return service.run()
     manual = _manual_trigger(playbook)
     arrival = manual.arrival_order_ordinals
@@ -197,7 +200,9 @@ def init(
     """Create config file, database, and workdir directories."""
     from ordine.core.config import DEFAULT_CONFIG_FILE
 
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config_file = config_path.expanduser() if config_path is not None else DEFAULT_CONFIG_FILE
     try:
         write_default_config(config_file)
@@ -220,7 +225,9 @@ def check(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Validate a playbook file."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     _, registry, _ = _open(ctx.obj.config)
     try:
         playbook, _ = _load_playbook_text(playbook_path)
@@ -255,7 +262,9 @@ def run(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON summary to stdout")] = False,
 ) -> None:
     """Run a playbook pipeline."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     ledger, registry, engines = _open(config)
     try:
@@ -334,7 +343,9 @@ def status(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Show pipeline summaries and task counts."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     summaries: list[tuple[PipelineSummary, dict[TaskStatus, int], int, int]] = []
     for summary in ledger.list_pipelines():
@@ -381,7 +392,9 @@ def tasks_cmd(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """List tasks for a pipeline."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     pipeline_id = ledger.find_pipeline_id(pipeline_name)
     if pipeline_id is None:
@@ -443,7 +456,9 @@ def task_cmd(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Show one task with branch attempts and flags."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     try:
         task = ledger.get_task(task_id)
@@ -518,7 +533,9 @@ def retry(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Re-queue a failed or flagged task."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     try:
         ledger.transition(task_id, "pending")
@@ -543,7 +560,9 @@ def flags(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """List open flags."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     pipeline_id: int | None = None
     if pipeline_name is not None:
@@ -592,7 +611,9 @@ def resolve_flag_cmd(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Resolve an open flag."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     ledger, _, _ = _open(ctx.obj.config)
     try:
         ledger.resolve_flag(flag_id, note)
@@ -611,7 +632,9 @@ def steps(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """List registered step plugins."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     _, registry, _ = _open(ctx.obj.config)
     payload = [
         {"id": step_id, "engines": sorted(engines), "origin": origin}
@@ -640,7 +663,9 @@ def dry_run(
     """Run a sandboxed dry-run rehearsal; never touches the production ledger."""
     import tempfile
 
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     try:
         playbook, yaml_text = _load_playbook_text(playbook_path)
     except (PlaybookSyntaxError, PlaybookValidationError, OSError) as exc:
@@ -701,7 +726,9 @@ def llm_check(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Smoke-test the configured LLM provider with a minimal completion."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     try:
         client = build_client(config)
@@ -752,7 +779,9 @@ def draft_cmd(
     out: Annotated[Path | None, typer.Option("--out", help="Write YAML to file")] = None,
 ) -> None:
     """Draft a playbook from natural language (stdout or --out; never saves)."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     registry = StepRegistry.load()
     try:
@@ -791,7 +820,9 @@ def diagnose_cmd(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Diagnose a flagged or failed task using LLM context."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     ledger, _, _ = _open(config)
     try:
@@ -840,7 +871,9 @@ def cleanup(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
 ) -> None:
     """Delete old terminal task workdirs (exports and the DB are untouched)."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     ledger, _, _ = _open(config)
     report = run_configured_cleanup(
@@ -879,7 +912,9 @@ def example(
     ] = None,
 ) -> None:
     """Scaffold a self-contained demo with sample images and playbooks."""
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     target = (directory or Path("~/ordine-demo")).expanduser()
     try:
         next_commands = scaffold_example(target)
@@ -906,7 +941,9 @@ def serve(
 
     from ordine.web.app import create_app
 
-    assert isinstance(ctx.obj, AppContext)
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
     config = ctx.obj.config
     bind_host = host if host is not None else config.web_host
     bind_port = port if port is not None else config.web_port

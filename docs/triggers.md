@@ -14,7 +14,7 @@ triggers only insert them.
 
 Each trigger produces `TaskCandidate` records handed to a **sink**. The usual sink is `ledger_sink`,
 which calls `Ledger.create_task` (or `Ledger.create_task_arrival` for arrival-order ordinals).
-Duplicate dedup keys are dropped silently at DEBUG level.
+Duplicate dedup keys are not emitted unless DEBUG logging is enabled.
 
 ## Settle detection (`folder_watch`)
 

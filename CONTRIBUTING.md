@@ -31,7 +31,7 @@ All changes must comply with [CONVENTIONS.md](CONVENTIONS.md). Highlights:
 
 ## Plans & audit workflow
 
-Features are scoped by step plans in `Plans/conveyor-step-NN-plan.md` in the parent repo. **Out-of-scope creep is a bug** — if something seems missing, open an issue instead of improvising.
+Features are scoped by step plans in `Plans/ordine-step-NN-plan.md` in the parent repo. **Out-of-scope creep is a bug** — if something seems missing, open an issue instead of improvising.
 
 When a step completes:
 

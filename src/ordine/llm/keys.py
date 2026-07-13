@@ -39,7 +39,7 @@ def _read_dotenv(path: Path) -> dict[str, str]:
 
 def _keyring_error_message(provider: str) -> str:
     env_name = ENV_NAMES.get(provider, "ORDINE_LLM_API_KEY")
-    return f"keyring unavailable; use env var {env_name}"
+    return f"keyring unavailable; use env var {env_name} or ~/.config/ordine/.env"
 
 
 def _resolve_key(provider: str) -> tuple[str | None, str | None]:

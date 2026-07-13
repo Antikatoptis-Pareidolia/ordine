@@ -100,12 +100,18 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     web = raw.get("web", {})
     llm = raw.get("llm", {})
     retention = raw.get("retention", {})
-    assert isinstance(paths, dict)
-    assert isinstance(runner, dict)
-    assert isinstance(log, dict)
-    assert isinstance(web, dict)
-    assert isinstance(llm, dict)
-    assert isinstance(retention, dict)
+    if not isinstance(paths, dict):
+        raise ConfigError("paths section must be a table")
+    if not isinstance(runner, dict):
+        raise ConfigError("runner section must be a table")
+    if not isinstance(log, dict):
+        raise ConfigError("log section must be a table")
+    if not isinstance(web, dict):
+        raise ConfigError("web section must be a table")
+    if not isinstance(llm, dict):
+        raise ConfigError("llm section must be a table")
+    if not isinstance(retention, dict):
+        raise ConfigError("retention section must be a table")
 
     db_path = Path(str(paths.get("db", defaults.db_path))).expanduser()
     workdir_root = Path(str(paths.get("workdir_root", defaults.workdir_root))).expanduser()

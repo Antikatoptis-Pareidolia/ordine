@@ -5,6 +5,7 @@ Owns build_client and process-wide token budgeting. May read config and keys; no
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ from ordine.llm.adapters.openai import OpenAIClient
 from ordine.llm.errors import LLMBudgetError, LLMNotConfiguredError
 from ordine.llm.keys import get_key
 from ordine.llm.types import LLMClient, LLMResponse, Message, Usage
+
+logger = logging.getLogger(__name__)
 
 
 class TokenBudget:
@@ -130,9 +133,7 @@ class _LoggingClient:
                 response=response,
             )
         except OSError as exc:
-            import sys
-
-            print(f"llm audit log write failed: {exc}", file=sys.stderr)
+            logger.warning("llm audit log write failed: %s", exc)
         return response
 
 
@@ -144,15 +145,23 @@ def build_client(config: AppConfig, *, budget: TokenBudget | None = None) -> LLM
     """Build a configured LLM client with logging and budget decorators."""
     provider = (config.llm_provider or "").strip().lower()
     if provider in ("", "none"):
-        raise LLMNotConfiguredError("provider is none or empty")
+        raise LLMNotConfiguredError(
+            "LLM provider is not configured. Set [llm].provider in config, or use the Settings page."
+        )
 
     model = config.llm_model.strip()
     if not model:
-        raise LLMNotConfiguredError("model is empty")
+        raise LLMNotConfiguredError(
+            "LLM model is not configured. Set [llm].model in config, or use the Settings page."
+        )
 
     api_key = get_key(provider)
     if provider in ("anthropic", "openai") and not api_key:
-        raise LLMNotConfiguredError(f"no API key for provider {provider}")
+        raise LLMNotConfiguredError(
+            "LLM API key is missing. Set it in the Settings page, or via env var "
+            "ANTHROPIC_API_KEY / OPENAI_API_KEY (provider-specific) or ORDINE_LLM_API_KEY "
+            "(openai_compatible), or in ~/.config/ordine/.env."
+        )
 
     bearer = api_key or "none"
     token_budget = budget or TokenBudget(config.llm_session_token_cap)
@@ -165,7 +174,9 @@ def build_client(config: AppConfig, *, budget: TokenBudget | None = None) -> LLM
     elif provider == "openai_compatible":
         base_url = config.llm_base_url.strip()
         if not base_url:
-            raise LLMNotConfiguredError("openai_compatible requires base_url")
+            raise LLMNotConfiguredError(
+                "openai_compatible requires [llm].base_url. Set it in config, or use the Settings page."
+            )
         adapter = OpenAIClient(
             model,
             bearer,
@@ -173,7 +184,10 @@ def build_client(config: AppConfig, *, budget: TokenBudget | None = None) -> LLM
             provider="openai_compatible",
         )
     else:
-        raise LLMNotConfiguredError(f"unknown provider {provider!r}")
+        raise LLMNotConfiguredError(
+            f"unknown LLM provider {provider!r}. Set [llm].provider to 'anthropic', 'openai', "
+            "or 'openai_compatible' (or configure via the Settings page)."
+        )
 
     logged = _LoggingClient(inner=adapter, data_dir=data_dir)
     return _BudgetClient(

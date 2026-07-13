@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -82,7 +81,7 @@ def log_call(
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
             handle.flush()
     except OSError as exc:
-        print(f"llm audit log write failed: {exc}", file=sys.stderr)
+        logger.warning("llm audit log write failed: %s", exc)
 
 
 def default_data_dir() -> Path:
