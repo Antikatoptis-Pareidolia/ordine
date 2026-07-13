@@ -12,7 +12,7 @@ from keyring.errors import KeyringError
 from conveyor.core.config import AppConfig, load_config
 from conveyor.llm import logging as llm_logging
 from conveyor.llm.client import _LoggingClient, build_client
-from conveyor.llm.keys import ENV_NAMES, clear_key, get_key, set_key
+from conveyor.llm.keys import ENV_NAMES, SERVICE, clear_key, get_key, set_key
 from conveyor.llm.types import ImagePart, LLMResponse, Message, TextPart, Usage
 from conveyor.web.app import create_app
 
@@ -168,31 +168,56 @@ def test_logging_failure_does_not_fail_call(
     assert result.text == "ok"
 
 
-def test_settings_key_never_in_html(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_settings_key_presence_and_privacy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     secret = "anthropic-secret-key-12345"
     store: dict[tuple[str, str], str] = {}
 
-    monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.get_password",
-        lambda service, provider: store.get((service, provider)),
-    )
+    def fake_get(service: str, provider: str) -> str | None:
+        return store.get((service, provider))
+
+    monkeypatch.setattr("conveyor.llm.keys.keyring.get_password", fake_get)
     monkeypatch.setattr(
         "conveyor.llm.keys.keyring.set_password",
         lambda service, provider, key: store.__setitem__((service, provider), key),
     )
+    monkeypatch.setattr(
+        "conveyor.llm.keys.keyring.delete_password",
+        lambda service, provider: store.pop((service, provider), None),
+    )
+    monkeypatch.setattr("conveyor.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
     config_path = _write_config(tmp_path)
     config = load_config(config_path)
     client = TestClient(create_app(config))
 
+    def assert_absent_and_label(html: str, label: str) -> None:
+        assert secret not in html
+        assert f"key present: {label}" in html
+
+    # keyring
     response = client.post(
         "/settings/llm-key",
         data={"llm_provider": "anthropic", "api_key": secret, "action": "set"},
         headers=POST_HEADERS,
     )
     assert response.status_code == 200
-    assert secret not in response.text
-    assert "key present: yes" in response.text
+    assert_absent_and_label(response.text, "yes (keyring)")
+    assert_absent_and_label(client.get("/settings").text, "yes (keyring)")
 
-    page = client.get("/settings")
-    assert secret not in page.text
-    assert "key present: yes" in page.text
+    # env var (keyring cleared so env wins when present)
+    store.clear()
+    monkeypatch.setenv(ENV_NAMES["anthropic"], secret)
+    assert_absent_and_label(client.get("/settings").text, "yes (env var)")
+
+    # .env file
+    monkeypatch.delenv(ENV_NAMES["anthropic"], raising=False)
+    (tmp_path / ".env").write_text(f"{ENV_NAMES['anthropic']}={secret}\n", encoding="utf-8")
+    assert_absent_and_label(client.get("/settings").text, "yes (.env file)")
+
+    # clear keyring only — .env still visible
+    store[(SERVICE, "anthropic")] = secret
+    client.post(
+        "/settings/llm-key",
+        data={"llm_provider": "anthropic", "api_key": "", "action": "clear"},
+        headers=POST_HEADERS,
+    )
+    assert_absent_and_label(client.get("/settings").text, "yes (.env file)")

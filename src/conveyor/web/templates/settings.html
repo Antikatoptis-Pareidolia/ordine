@@ -50,8 +50,8 @@
     <input id="llm_max_tokens" name="llm_max_tokens" type="number" min="1" value="{{ config.llm_max_tokens }}" required />
     <label for="llm_session_token_cap">session_token_cap</label>
     <input id="llm_session_token_cap" name="llm_session_token_cap" type="number" min="1" value="{{ config.llm_session_token_cap }}" required />
-    <p>key present: {% if llm_key_present %}yes{% else %}no{% endif %}</p>
-    <p class="hint">Keys are stored in the system keyring. Fallback env vars: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>CONVEYOR_LLM_API_KEY</code>.</p>
+    <p>key present: {{ llm_key_label }}</p>
+    <p class="hint">Keys entered here are stored in the system keyring. Environment variables and <code>~/.config/conveyor/.env</code> are equally valid alternatives: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>CONVEYOR_LLM_API_KEY</code>. Clear removes the keyring entry only.</p>
   </section>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if saved %}<p class="flash flash-info">Settings saved.</p>{% endif %}

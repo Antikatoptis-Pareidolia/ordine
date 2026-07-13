@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from conveyor.core.config import AppConfig, load_config, save_llm_settings, save_web_runner_settings
 from conveyor.core.errors import ConfigError
 from conveyor.llm.errors import LLMError
-from conveyor.llm.keys import clear_key, has_stored_key, set_key
+from conveyor.llm.keys import clear_key, key_presence_label, set_key
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,7 @@ def _settings_context(
         "config": config,
         "error": error,
         "saved": saved,
-        "llm_key_present": has_stored_key(provider) if provider not in ("", "none") else False,
-        "keyring_env_hint": None,
+        "llm_key_label": key_presence_label(provider),
         **_flash(request),
     }
 

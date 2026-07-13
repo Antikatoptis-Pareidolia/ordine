@@ -42,20 +42,12 @@ def _keyring_error_message(provider: str) -> str:
     return f"keyring unavailable; use env var {env_name}"
 
 
-def has_stored_key(provider: str) -> bool:
-    """Return whether a key is stored in the system keyring for provider."""
-    try:
-        return keyring.get_password(SERVICE, provider) is not None
-    except KeyringError:
-        return False
-
-
-def get_key(provider: str) -> str | None:
-    """Resolve an API key: keyring, then env var, then CONFIG_DIR/.env."""
+def _resolve_key(provider: str) -> tuple[str | None, str | None]:
+    """Resolve an API key and its source label (keyring, env var, or .env file)."""
     try:
         stored = keyring.get_password(SERVICE, provider)
         if stored:
-            return stored
+            return stored, "keyring"
     except KeyringError as exc:
         raise LLMError(_keyring_error_message(provider)) from exc
 
@@ -63,12 +55,28 @@ def get_key(provider: str) -> str | None:
     if env_name:
         env_val = os.environ.get(env_name)
         if env_val:
-            return env_val
+            return env_val, "env var"
 
     dotenv = _read_dotenv(DEFAULT_CONFIG_DIR / ".env")
     if env_name and env_name in dotenv:
-        return dotenv[env_name]
-    return None
+        return dotenv[env_name], ".env file"
+    return None, None
+
+
+def get_key(provider: str) -> str | None:
+    """Resolve an API key: keyring, then env var, then CONFIG_DIR/.env."""
+    key, _source = _resolve_key(provider)
+    return key
+
+
+def key_presence_label(provider: str) -> str:
+    """Return a settings-safe presence label, e.g. 'yes (env var)' or 'no'."""
+    if provider in ("", "none"):
+        return "no"
+    key, source = _resolve_key(provider)
+    if key is None:
+        return "no"
+    return f"yes ({source})"
 
 
 def set_key(provider: str, key: str) -> None:
