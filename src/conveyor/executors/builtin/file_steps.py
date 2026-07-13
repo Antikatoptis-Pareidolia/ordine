@@ -13,6 +13,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from conveyor.core.errors import ManifestError
 from conveyor.core.manifest import load_manifest
 from conveyor.core.steps import StepContext, StepResult
 
@@ -70,7 +71,10 @@ class RenameFromManifestStep:
         if ctx.input_path is None:
             return StepResult(status="fail", message="rename requires an input artifact")
 
-        rows = load_manifest(Path(params.manifest).expanduser())
+        try:
+            rows = load_manifest(Path(params.manifest).expanduser())
+        except ManifestError as exc:
+            return StepResult(status="fail", message=str(exc))
         if ctx.ordinal > len(rows):
             message = f"manifest has {len(rows)} rows, task ordinal is {ctx.ordinal}"
             if params.on_missing_row == "passthrough":

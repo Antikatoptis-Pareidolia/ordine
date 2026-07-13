@@ -435,3 +435,27 @@ def test_rename_from_manifest_step_with_stub_naming(tmp_path: Path) -> None:
     assert result.output_path is not None
     assert result.output_path.name == "goat.png"
     assert result.output_path.read_bytes() == b"png"
+
+
+def test_rename_from_manifest_missing_manifest_returns_clean_fail(tmp_path: Path) -> None:
+    src = tmp_path / "in.png"
+    src.write_bytes(b"png")
+    workdir = TaskWorkdir.create(tmp_path, "demo", 1)
+    step_dir = workdir.step_dir(1, "file.rename_from_manifest")
+    ctx = StepContext(
+        task_id=1,
+        pipeline_name="demo",
+        source_ref=str(src),
+        ordinal=1,
+        input_path=src,
+        step_dir=step_dir,
+        logger=workdir.step_logger(step_dir),
+        naming=StubNaming(),
+    )
+    step = RenameFromManifestStep()
+    params = step.Params(manifest=str(tmp_path / "missing.csv"))
+    result = step.run(ctx, params)
+    assert result.status == "fail"
+    assert result.message is not None
+    assert result.message.startswith("cannot read manifest")
+    assert "unexpected error" not in result.message

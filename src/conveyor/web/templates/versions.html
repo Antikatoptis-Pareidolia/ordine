@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Versions · {{ pipeline_name }}{% endblock %}
 {% block content %}
+{% from "partials/version_label.html" import render as version_label %}
 <h1>Version history — {{ pipeline_name }}</h1>
 <p>
   <a href="/pipelines/{{ pipeline_id }}/edit">Edit current</a>
   · <a href="/pipelines/{{ pipeline_id }}/lab">Dry-run lab</a>
-  · current <code>{{ current_version }}</code>
-  {% if running_version %}· running <code>{{ running_version }}</code>{% endif %}
+  · current {{ version_label(current_version, current_version_note) }}
+  {% if running_version %}· running {{ version_label(running_version, running_version_note) }}{% endif %}
 </p>
 <table>
   <thead>
     <tr>
       <th>Version</th>
-      <th>Note</th>
       <th>Created</th>
       <th>Actions</th>
     </tr>
@@ -22,11 +22,10 @@
     {% set v = row.version %}
     <tr>
       <td style="padding-left: {{ row.depth * 1.5 }}rem">
-        <code>{{ v.public_id }}</code>
+        {{ version_label(v.public_id, v.note, parent_id=v.parent_public_id) }}
         {% if v.public_id == current_version %}<span class="chip">current</span>{% endif %}
         {% if v.public_id == running_version %}<span class="chip chip-running">running</span>{% endif %}
       </td>
-      <td>{{ v.note or "" }}</td>
       <td>{{ v.created_at }}</td>
       <td class="actions">
         <a href="/pipelines/{{ pipeline_id }}/edit?version={{ v.public_id }}">View</a>

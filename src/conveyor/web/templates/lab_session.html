@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Lab {{ sid }} · {{ pipeline_name }}{% endblock %}
 {% block content %}
+{% from "partials/version_label.html" import render as version_label %}
 <h1>Lab — {{ pipeline_name }}</h1>
 <p>
-  Version <code>{{ version_id }}</code>
+  Version {{ version_label(version_id, version_note) }}
   · <a href="/pipelines/{{ pipeline_id }}/lab">New session</a>
   · <a href="/pipelines/{{ pipeline_id }}/versions">History</a>
 </p>

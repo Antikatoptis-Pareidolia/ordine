@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from conveyor.core.ledger import Ledger
 from conveyor.web.services import ServiceManager
+from conveyor.web.views import version_label
 
 router = APIRouter()
 
@@ -48,12 +49,28 @@ def pipeline_cards(request: Request) -> list[dict[str, Any]]:
         runtime = services.runtime(summary.id)
         running_version = runtime.running_version
         current_version = summary.current_version
+        version_rows = {row.public_id: row for row in ledger.list_versions(summary.id)}
+        current_row = version_rows.get(current_version) if current_version else None
+        running_row = version_rows.get(running_version) if running_version else None
         cards.append(
             {
                 "id": summary.id,
                 "name": summary.name,
                 "current_version": current_version,
+                "current_version_label": version_label(
+                    current_version,
+                    current_row.note if current_row else None,
+                    parent_id=current_row.parent_public_id if current_row else None,
+                )
+                if current_version
+                else None,
                 "running_version": running_version,
+                "running_version_label": version_label(
+                    running_version,
+                    running_row.note if running_row else None,
+                )
+                if running_version
+                else None,
                 "version_drift": bool(
                     running_version and current_version and running_version != current_version
                 ),

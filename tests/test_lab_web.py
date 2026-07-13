@@ -111,10 +111,10 @@ def test_masterplan_fix_from_here_and_resume(lab_client: tuple[TestClient, Ledge
     assert 'id="steps-2"' in edit.text
     assert 'name="from_lab" value="' + sid + '"' in edit.text
     form = _parse_form_fields_from_html(edit.text)
+    assert form.get("from_lab") == sid
+    assert form.get("base_version") == v1
     form["steps-2-id"] = "util.noop"
     form["steps-2-params"] = ""
-    form["base_version"] = v1
-    form["from_lab"] = sid
     form["tab"] = "form"
     form["note"] = "lab fix step 3"
     saved = client.post(
@@ -125,6 +125,7 @@ def test_masterplan_fix_from_here_and_resume(lab_client: tuple[TestClient, Ledge
     assert saved.status_code == 200
     assert "branch of" in saved.text
     assert "Resume lab" in saved.text
+    assert "lab fix step 3" in saved.text
     v2, _yaml_v2 = ledger.get_current_playbook(pipeline_id)
     assert v2 == v2_current
     versions = ledger.list_versions(pipeline_id)
@@ -151,6 +152,88 @@ def test_masterplan_fix_from_here_and_resume(lab_client: tuple[TestClient, Ledge
     assert v1_yaml.steps[0].id == saved_playbook.steps[0].id
     assert v1_yaml.steps[1].id == saved_playbook.steps[1].id
     assert saved_playbook.steps[2].id == "util.noop"
+
+
+def test_lab_resume_when_session_uses_current_version(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    """Resume banner must appear when lab rehearses the current version (no redirect on save)."""
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "item.txt").write_text("payload", encoding="utf-8")
+    pipeline_id, v1 = _register_pipeline(ledger, FIVE_STEP_YAML)
+    current, _ = ledger.get_current_playbook(pipeline_id)
+    assert current == v1
+
+    sid = _start_lab(client, pipeline_id, samples)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+
+    edit = client.get(f"/pipelines/{pipeline_id}/edit?version={v1}&anchor=steps-2&from_lab={sid}")
+    form = _parse_form_fields_from_html(edit.text)
+    assert form.get("from_lab") == sid
+    form["steps-2-id"] = "util.noop"
+    form["steps-2-params"] = ""
+    form["tab"] = "form"
+    form["note"] = "fix on current"
+    saved = client.post(
+        f"/pipelines/{pipeline_id}/versions",
+        data=form,
+        headers=POST_HEADERS,
+    )
+    assert saved.status_code == 200
+    assert "Resume lab" in saved.text
+    assert "fix on current" in saved.text
+    assert current == ledger.get_current_playbook(pipeline_id)[0]
+
+
+def test_lab_setup_shows_output_redirections(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, tmp_path = lab_client
+    prod_out = tmp_path / "prod-out"
+    yaml_text = f"""version: 1
+name: lab-export-redir
+trigger: {{type: manual, path: ~/in}}
+steps:
+  - id: image.export
+    params:
+      dest: {prod_out}
+"""
+    pipeline_id, _ = ledger.register_pipeline(loads_playbook(yaml_text), yaml_text)
+    setup = client.get(f"/pipelines/{pipeline_id}/lab")
+    assert setup.status_code == 200
+    assert "Output redirections" in setup.text
+    assert str(prod_out) in setup.text
+    assert "outputs/" in setup.text
+    assert "→" in setup.text
+
+
+def test_editor_anchor_and_from_lab_banner(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, tmp_path = lab_client
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "item.txt").write_text("payload", encoding="utf-8")
+    pipeline_id, version_id = _register_pipeline(ledger, FIVE_STEP_YAML)
+    sid = _start_lab(client, pipeline_id, samples)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+    client.post(f"/lab/{sid}/tasks/0/next", headers=POST_HEADERS, follow_redirects=False)
+
+    edit = client.get(
+        f"/pipelines/{pipeline_id}/edit?version={version_id}&anchor=steps-2&from_lab={sid}"
+    )
+    assert edit.status_code == 200
+    assert 'id="steps-2"' in edit.text
+    assert (
+        'class="step-row lab-anchor"' in edit.text.replace("\n", " ") or "lab-anchor" in edit.text
+    )
+    assert "You are fixing this step" in edit.text
+    assert f'name="from_lab" value="{sid}"' in edit.text
 
 
 def test_lab_artifact_route_blocks_traversal(lab_client: tuple[TestClient, Ledger, Path]) -> None:

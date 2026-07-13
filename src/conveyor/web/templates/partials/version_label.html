@@ -1,0 +1,3 @@
+{% macro render(version_id, note=none, parent_id=none) -%}
+<code>{{ version_id }}</code>{% if note %} — {{ note }}{% endif %}{% if parent_id %} (from <code>{{ parent_id }}</code>){% endif %}
+{%- endmacro %}

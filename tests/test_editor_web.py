@@ -133,6 +133,7 @@ def test_branch_from_version(editor_client: tuple[TestClient, Ledger]) -> None:
     branch_form["steps-0-params"] = "fuzz: 12"
     branch_form["base_version"] = v1
     branch_form["tab"] = "form"
+    branch_form["note"] = "fuzz twelve branch"
     response = client.post(
         f"/pipelines/{pipeline_id}/versions",
         data=branch_form,
@@ -140,6 +141,8 @@ def test_branch_from_version(editor_client: tuple[TestClient, Ledger]) -> None:
     )
     assert response.status_code == 200
     assert "branch of" in response.text
+    assert "fuzz: 12" in response.text
+    assert "fuzz twelve branch" in response.text
     assert ledger.get_current_playbook(pipeline_id)[0] == v2
     saved_id = "pv_0003"
     branch_row = next(row for row in ledger.list_versions(pipeline_id) if row.public_id == saved_id)
@@ -395,3 +398,17 @@ def test_editor_form_labeling_and_empty_note(editor_client: tuple[TestClient, Le
     assert "Settle seconds (folder_watch only)" in edit.text
     assert "Poll seconds (manifest only)" in edit.text
     assert 'id="note" name="note" value=""' in edit.text
+
+
+def test_version_tree_shows_note_beside_id(editor_client: tuple[TestClient, Ledger]) -> None:
+    client, ledger = editor_client
+    yaml_text = FLAGSHIP.read_text(encoding="utf-8").replace(
+        "name: png-cleanup", "name: version-tree-notes"
+    )
+    playbook = loads_playbook(yaml_text)
+    pipeline_id, v1 = ledger.register_pipeline(playbook, yaml_text, note="flagship seed")
+    versions = client.get(f"/pipelines/{pipeline_id}/versions")
+    assert versions.status_code == 200
+    assert v1 in versions.text
+    assert "flagship seed" in versions.text
+    assert "(from" not in versions.text or v1 in versions.text

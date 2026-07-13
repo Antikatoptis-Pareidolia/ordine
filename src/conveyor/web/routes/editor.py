@@ -28,6 +28,7 @@ from conveyor.web.forms import (
     validate_editor_content,
 )
 from conveyor.web.services import ServiceManager
+from conveyor.web.views import version_label
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -253,6 +254,10 @@ def _validate_content(
     return validate_editor_content(registry, tab=tab, form=form, yaml_text=yaml_text)
 
 
+def _version_notes(request: Request, pipeline_id: int) -> dict[str, VersionInfo]:
+    return {row.public_id: row for row in _ledger(request).list_versions(pipeline_id)}
+
+
 def _editor_context(
     request: Request,
     *,
@@ -268,6 +273,7 @@ def _editor_context(
     anchor: str | None = None,
     from_lab: str | None = None,
     save_error: str | None = None,
+    version_notes: dict[str, VersionInfo] | None = None,
 ) -> dict[str, Any]:
     registry = _registry(request)
     engine = form_fields.get("engine", "headless")
@@ -277,6 +283,9 @@ def _editor_context(
         for step_id, engines, _origin in registry.list_step_metadata()
         if engine not in engines
     }
+    notes = version_notes or {}
+    base_row = notes.get(base_version or "")
+    current_row = notes.get(current_version or "") if current_version else None
     return {
         "request": request,
         "pipeline_id": pipeline_id,
@@ -296,6 +305,20 @@ def _editor_context(
         "from_lab": from_lab,
         "save_error": save_error,
         "rows_base_url": _rows_base_url(pipeline_id),
+        "base_version_label": version_label(
+            base_version or "",
+            base_row.note if base_row else None,
+            parent_id=base_row.parent_public_id if base_row else None,
+        )
+        if base_version
+        else None,
+        "current_version_label": version_label(
+            current_version,
+            current_row.note if current_row else None,
+            parent_id=current_row.parent_public_id if current_row else None,
+        )
+        if current_version
+        else None,
         **_flash(request),
     }
 
@@ -326,6 +349,7 @@ def _load_editor_from_version(
         errors=[],
         anchor=anchor,
         from_lab=from_lab,
+        version_notes=_version_notes(request, pipeline_id),
     )
 
 
@@ -696,6 +720,7 @@ async def save_version(
     current_version, _ = ledger.get_current_playbook(pipeline_id)
     base_version = form.get("base_version") or current_version
     note = (form.get("note") or "").strip() or None
+    from_lab = (form.get("from_lab") or "").strip() or None
     playbook, canonical_yaml, errors = _validate_content(
         registry, tab=tab, form=form, yaml_text=yaml_text
     )
@@ -713,9 +738,11 @@ async def save_version(
                 base_version=base_version,
                 current_version=current_version,
                 errors=errors,
+                from_lab=from_lab,
+                version_notes=_version_notes(request, pipeline_id),
             ),
         )
-    make_current = base_version == current_version
+    make_current = base_version == current_version and not from_lab
     _, saved_id = ledger.register_pipeline(
         playbook,
         canonical_yaml,
@@ -726,18 +753,28 @@ async def save_version(
     if make_current:
         return _redirect(
             f"/pipelines/{pipeline_id}/edit?version={saved_id}",
-            flash=f"Saved {saved_id}",
+            flash=f"Saved {version_label(saved_id, note)}",
         )
+    notes = _version_notes(request, pipeline_id)
+    base_row = notes.get(base_version)
+    current_row = notes.get(current_version or "")
     branch_banner = {
         "saved": saved_id,
+        "saved_note": note,
         "base": base_version,
+        "base_note": base_row.note if base_row else None,
         "current": current_version,
+        "current_note": current_row.note if current_row else None,
     }
-    from_lab = (form.get("from_lab") or "").strip() or None
     ctx = _load_editor_from_version(request, pipeline_id, saved_id, from_lab=from_lab)
     ctx["branch_banner"] = branch_banner
     if from_lab:
-        ctx["lab_resume_banner"] = {"sid": from_lab, "version_id": saved_id}
+        ctx["lab_resume_banner"] = {
+            "sid": from_lab,
+            "version_id": saved_id,
+            "note": note,
+            "parent_id": base_version,
+        }
     ctx["form_fields"]["base_version"] = saved_id
     return templates.TemplateResponse(request, "editor.html", ctx)
 
@@ -748,6 +785,9 @@ async def version_history(request: Request, pipeline_id: int) -> HTMLResponse:
     name, current_version = _pipeline_summary(request, pipeline_id)
     versions = ledger.list_versions(pipeline_id)
     running_version = _services(request).running_version(pipeline_id)
+    version_rows = {row.public_id: row for row in versions}
+    current_row = version_rows.get(current_version) if current_version else None
+    running_row = version_rows.get(running_version) if running_version else None
     templates = _templates(request)
     return templates.TemplateResponse(
         request,
@@ -757,7 +797,9 @@ async def version_history(request: Request, pipeline_id: int) -> HTMLResponse:
             "pipeline_id": pipeline_id,
             "pipeline_name": name,
             "current_version": current_version,
+            "current_version_note": current_row.note if current_row else None,
             "running_version": running_version,
+            "running_version_note": running_row.note if running_row else None,
             "rows": _version_tree_rows(versions),
             **_flash(request),
         },

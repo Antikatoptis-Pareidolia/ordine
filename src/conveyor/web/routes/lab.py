@@ -18,7 +18,11 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette import status
 
-from conveyor.core.dryrun import DryRunSession, playbook_contains_shell_run
+from conveyor.core.dryrun import (
+    DryRunSession,
+    playbook_contains_shell_run,
+    redirect_output_dirs,
+)
 from conveyor.core.errors import LedgerError, RunnerError
 from conveyor.core.ledger import Ledger
 from conveyor.core.playbook import loads_playbook
@@ -138,6 +142,13 @@ def _log_tail(artifact: Path | None, *, limit: int = 40) -> str:
     return "\n".join(lines[-limit:])
 
 
+def _version_note(request: Request, pipeline_id: int, version_id: str) -> str | None:
+    for row in _ledger(request).list_versions(pipeline_id):
+        if row.public_id == version_id:
+            return row.note
+    return None
+
+
 def _session_context(
     request: Request,
     record: LabSessionRecord,
@@ -161,6 +172,7 @@ def _session_context(
         "pipeline_id": record.pipeline_id,
         "pipeline_name": _pipeline_name(request, record.pipeline_id),
         "version_id": session.version_public_id,
+        "version_note": _version_note(request, record.pipeline_id, session.version_public_id),
         "tasks": session.tasks(),
         "task_ix": task_ix,
         "steps": steps,
@@ -184,12 +196,17 @@ def _session_context(
 @router.get("/pipelines/{pipeline_id}/lab", response_class=HTMLResponse)
 async def lab_setup(request: Request, pipeline_id: int) -> HTMLResponse:
     ledger = _ledger(request)
+    registry = _registry(request)
     try:
         version_id, yaml_text = ledger.get_current_playbook(pipeline_id)
     except LedgerError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     playbook = loads_playbook(yaml_text)
     versions = ledger.list_versions(pipeline_id)
+    sandbox_preview = _sandbox_root(request) / "preview"
+    _, output_redirections = redirect_output_dirs(playbook, registry, sandbox_preview)
+    version_notes = {row.public_id: row for row in versions}
+    current_row = version_notes.get(version_id)
     templates = _templates(request)
     return templates.TemplateResponse(
         request,
@@ -199,8 +216,10 @@ async def lab_setup(request: Request, pipeline_id: int) -> HTMLResponse:
             "pipeline_id": pipeline_id,
             "pipeline_name": _pipeline_name(request, pipeline_id),
             "current_version": version_id,
+            "current_version_note": current_row.note if current_row else None,
             "versions": versions,
             "shell_warning": playbook_contains_shell_run(playbook),
+            "output_redirections": output_redirections,
             "flash": request.query_params.get("flash"),
             "flash_level": request.query_params.get("flash_level", "info"),
         },

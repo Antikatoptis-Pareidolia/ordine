@@ -18,7 +18,7 @@
 </ol>
 {% if failed_ix is not none and fix_anchor %}
 <p>
-  <a href="/pipelines/{{ pipeline_id }}/edit?version={{ version_id }}&amp;anchor={{ fix_anchor }}&amp;from_lab={{ sid }}">
+  <a href="/pipelines/{{ pipeline_id }}/edit?version={{ version_id }}&amp;anchor={{ fix_anchor }}&amp;from_lab={{ sid }}#{{ fix_anchor }}">
     Fix from here
   </a>
   (step {{ failed_ix + 1 }})

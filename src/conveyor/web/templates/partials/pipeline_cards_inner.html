@@ -2,9 +2,9 @@
 <article class="pipeline-card">
   <h3>{{ card.name }}</h3>
   <p>
-    current <code>{{ card.current_version or "-" }}</code>
+    current {{ card.current_version_label or card.current_version or "-" }}
     {% if card.running_version %}
-    · running <code>{{ card.running_version }}</code>
+    · running {{ card.running_version_label or card.running_version }}
     {% if card.version_drift %}
     <span class="chip chip-warning">restart to apply</span>
     {% endif %}

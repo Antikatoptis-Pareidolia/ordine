@@ -1,4 +1,7 @@
 <fieldset class="step-row{% if anchor == 'steps-' ~ idx %} lab-anchor{% endif %}" id="steps-{{ idx }}">
+  {% if from_lab and anchor == 'steps-' ~ idx %}
+  <p class="lab-fix-banner" role="status">You are fixing this step</p>
+  {% endif %}
   <legend>Step {{ idx + 1 }} (steps.{{ idx }})</legend>
   <p>
     <label for="steps-{{ idx }}-id">Step id</label>

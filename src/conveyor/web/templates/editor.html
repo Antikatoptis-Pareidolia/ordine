@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Editor · Conveyor{% endblock %}
 {% block content %}
+{% from "partials/version_label.html" import render as version_label %}
+
 <h1>{% if pipeline_id %}Edit pipeline{% else %}New pipeline{% endif %}</h1>
 
 {% if branch_banner %}
 <p class="flash flash-info" role="status">
-  Saved as <code>{{ branch_banner.saved }}</code> (branch of <code>{{ branch_banner.base }}</code>).
-  Current is still <code>{{ branch_banner.current }}</code>.
+  Saved {{ version_label(branch_banner.saved, branch_banner.saved_note, parent_id=branch_banner.base) }}
+  (branch of {{ version_label(branch_banner.base, branch_banner.base_note) }}).
+  Current is still {{ version_label(branch_banner.current, branch_banner.current_note) }}.
   <form action="/pipelines/{{ pipeline_id }}/versions/{{ branch_banner.saved }}/make-current" method="post" style="display:inline">
     <button type="submit">Make current</button>
   </form>
@@ -14,8 +17,8 @@
 {% endif %}
 
 {% if lab_resume_banner %}
-<p class="flash flash-info" role="status">
-  Resume lab with <code>{{ lab_resume_banner.version_id }}</code>
+<p class="flash flash-info lab-resume-banner" role="status">
+  <strong>Resume lab</strong> with {{ version_label(lab_resume_banner.version_id, lab_resume_banner.note, parent_id=lab_resume_banner.parent_id) }}
   <form action="/lab/{{ lab_resume_banner.sid }}/resume" method="post" style="display:inline">
     <input type="hidden" name="version_id" value="{{ lab_resume_banner.version_id }}" />
     <button type="submit">Resume lab</button>
@@ -24,7 +27,8 @@
 {% endif %}
 
 {% if current_version %}
-<p>Current version: <code>{{ current_version }}</code> · editing from <code>{{ base_version }}</code>
+<p>Current version: {{ current_version_label or current_version }}
+  · editing from {{ base_version_label or base_version }}
   · <a href="/pipelines/{{ pipeline_id }}/versions">History</a>
   · <a href="/pipelines/{{ pipeline_id }}/lab">Dry-run lab</a></p>
 {% endif %}
