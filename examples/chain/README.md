@@ -20,10 +20,19 @@ ls ~/game/assets
 
 Register both playbooks, then start each pipeline from the dashboard (or CLI). The manifest trigger rescans when `assets.csv` changes.
 
+## Regeneration
+
+Edit a row's `prompt` in `assets.csv`, then rerun **both** pipeline legs:
+
+```bash
+uv run conveyor run examples/chain/gen-images.yml --oneshot
+uv run conveyor run examples/chain/png-cleanup.yml --oneshot
+```
+
+The manifest trigger enqueues a new task for the edited row only; unchanged rows stay `done`.
+
+**Collision policy:** `file.move` and `image.export` default to `on_collision: suffix`, which would write `img_0001-2.png` into `~/renders` on regeneration. The downstream `ordinal_regex` (`img_(\d+)\.png`) correctly ignores that file — so the regenerated asset would never reach `~/game/assets`. This chain sets `on_collision: replace` on **both** steps so regenerated content overwrites the same handoff and output filenames.
+
 ## Why row 7 stays row 7
 
 Ordinals travel in filenames (`img_0007.png`). Even if rows 3–6 fail generation, row 7 still maps to the manifest row encoded in the filename. Downstream `ordinal_regex` resolves the digit → manifest row → reserved name.
-
-## Regeneration
-
-Edit a row's `prompt` (or `name`) in `assets.csv`. The manifest trigger computes a new dedup key and enqueues a fresh task for that ordinal. Unchanged rows stay `done` forever.

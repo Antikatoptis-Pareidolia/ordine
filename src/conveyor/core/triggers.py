@@ -104,7 +104,7 @@ def _resolve_ordinal(
         return None
     ordinal = extract_ordinal(filename, ordinal_regex)
     if ordinal is None:
-        log.warning("no ordinal match for filename %r", filename)
+        log.warning("skipping file with no ordinal match: %s", filename)
     return ordinal
 
 
@@ -135,6 +135,8 @@ def _build_candidate(
         log.warning("skipping unreadable file %s: %s", path, exc)
         return None
     ordinal = _resolve_ordinal(path.name, ordinal_regex, log=log)
+    if ordinal_regex is not None and ordinal is None:
+        return None
     return TaskCandidate(
         source_ref=str(path.resolve()),
         dedup_key=dedup_key,

@@ -58,11 +58,16 @@ background poller).
 
 | Source | Config | Ordinal value |
 |--------|--------|---------------|
-| Regex | `ordinal_regex` with one capture group | `int` from group 1 on the bare filename; no match logs WARNING |
+| Regex | `ordinal_regex` with one capture group | `int` from group 1 on the bare filename; **no match → file skipped** (WARNING: `skipping file with no ordinal match: {name}`) |
 | Arrival order | `arrival_order_ordinals: true` | Assigned by `ledger_sink` via `Ledger.create_task_arrival` |
 | None | neither set | `ordinal` is `null` |
 
 Regex and arrival order are mutually exclusive (enforced by the playbook schema).
+
+When `ordinal_regex` is set, it acts as a **filter** as well as an ordinal source: files that match the
+playbook glob but not the regex are not ingested (a warning is logged and the file is skipped). This
+lets chained pipelines ignore stray handoff files such as `img_0001-2.png` created by suffix collision
+policies upstream.
 
 ## Ignore rules
 

@@ -15,6 +15,7 @@ steps:
   - id: file.move
     params:
       dest: ~/renders
+      on_collision: replace
 # Recovery branch example (uncomment to swap provider after a refusal):
 # on_failure:
 #   branches:

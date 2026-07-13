@@ -16,3 +16,4 @@ steps:
     params:
       dest: ~/game/assets
       use_reserved_name: true
+      on_collision: replace
