@@ -20,7 +20,7 @@ Configuration comes from the same TOML as the CLI (`[web]` section: `host`, `por
 | `/pipelines/{id}/tasks` | Task table with status filter tabs, 50 per page |
 | `/tasks/{id}` | Task detail — metadata, step timeline from `task.json`, log tails, before/after images, retry/cancel |
 | `/flags` | Open flags inbox (level desc, then age) with resolve form |
-| `/settings` | View paths (read-only); edit `[runner]` + `[web]`; LLM placeholder heading only |
+| `/settings` | View paths (read-only); edit `[runner]`, `[web]`, and `[llm]`; set/clear provider keys in the OS keyring |
 
 ## JavaScript-free baseline
 
@@ -36,7 +36,8 @@ Every action uses real `<form method="post">` or `<a href>` elements. With JavaS
 | `POST /tasks/{id}/retry` | `transition(pending)` when legal |
 | `POST /tasks/{id}/cancel` | `transition(skipped)` when legal |
 | `POST /flags/{id}/resolve` | Resolve flag (note required) |
-| `POST /settings` | Atomic TOML write-back for runner + web |
+| `POST /settings` | Atomic TOML write-back for runner, web, and LLM settings |
+| `POST /settings/llm-key` | Set or clear the selected provider key in the OS keyring |
 
 Illegal transitions redirect back with a flash message — never HTTP 500.
 
@@ -46,7 +47,7 @@ Illegal transitions redirect back with a flash message — never HTTP 500.
 - **POST hardening:** Each POST must either carry `HX-Request: true` (HTMX) or include a same-origin `Origin`/`Referer`. Requests with a foreign origin, or with no HX-Request and no Origin/Referer (e.g. bare `curl`), receive **403**.
 - **Artifacts:** `GET /artifacts/{task_id}/{rel_path}` resolves `(workdir / rel_path)` and rejects paths that escape the task workdir (404). Some malformed paths (e.g. a leading slash) are rejected by FastAPI routing with **422** before the handler runs — defense-in-depth; no file is served either way. Images served inline; `log.txt` as `text/plain`; other files as download.
 - **Templates:** Jinja2 autoescape enabled; user content (YAML, messages, filenames) is never marked safe.
-- **Future:** Step 15 notes — real CSRF tokens + optional auth (`hardening`).
+- **Current hardening:** Full same-origin comparison (scheme, host, and port), HTMX eval/script insertion disabled, and localhost-only default. Deferred items are tracked in [security.md](security.md#hardening-roadmap).
 
 ## Screenshots
 

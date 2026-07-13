@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from collections.abc import Sequence
@@ -19,6 +20,7 @@ from ordine.core.playbook import ManualTrigger, loads_playbook
 from ordine.core.registry import StepRegistry
 from ordine.core.runner import PipelineRunner
 from ordine.core.triggers import ManualScanService, ledger_sink
+from ordine.llm.client import build_client
 from ordine.llm.features.branches import apply_branch, suggest_branch
 from ordine.llm.features.drafting import draft_playbook
 from ordine.llm.types import LLMResponse, Message, Usage
@@ -329,5 +331,21 @@ def test_web_learning_loop_clickthrough(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 @pytest.mark.llm_live
-def test_live_draft_skipped_without_keys() -> None:
-    pytest.skip("manual live test — requires API keys")
+def test_live_draft_with_available_provider_key(tmp_path: Path) -> None:
+    """Run a real draft only when an explicitly supported provider key is present."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        provider, model = "anthropic", "claude-3-5-haiku-latest"
+    elif os.environ.get("OPENAI_API_KEY"):
+        provider, model = "openai", "gpt-4o-mini"
+    else:
+        pytest.skip("requires ANTHROPIC_API_KEY or OPENAI_API_KEY")
+    client = build_client(
+        AppConfig(
+            db_path=tmp_path / "db.sqlite3",
+            workdir_root=tmp_path / "workdirs",
+            llm_provider=provider,
+            llm_model=model,
+        )
+    )
+    result = draft_playbook(client, StepRegistry.load(), "copy files from ~/in to ~/out")
+    assert result.playbook is not None, result.problems

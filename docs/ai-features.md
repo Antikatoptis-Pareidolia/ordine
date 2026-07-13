@@ -1,6 +1,6 @@
 # AI features (Step 13)
 
-Three user-initiated features on top of the Step 12 LLM connector. **The LLM drafts, never executes** — no auto-save, auto-run, or auto-apply.
+Four opt-in features use the LLM connector. Text-model output never auto-saves, auto-runs, or auto-applies; image generation runs only when a playbook explicitly includes `llm.generate_image`.
 
 ## Features
 
@@ -9,17 +9,19 @@ Three user-initiated features on top of the Step 12 LLM connector. **The LLM dra
 | Draft | Editor “Draft with AI” / `ordine draft` | Unsaved YAML in editor (or stdout/`--out`) |
 | Diagnose | Task page / `ordine diagnose` | Structured cause + evidence in UI or JSON |
 | Suggest branch | Flagged/failed task | Approval panel with semantic diff; Approve saves a new version |
+| Generate image | `llm.generate_image` playbook step | PNG in the task workdir (mock/offline or OpenAI) |
 
 ## Privacy table (what leaves the machine)
 
-| Data | Draft | Diagnose | Suggest branch |
-|------|-------|----------|----------------|
-| Step catalog (ids + JSON Schema) | yes | yes | yes |
-| Current playbook YAML | revise only | yes | yes |
-| Task log tails (truncated) | no | yes | yes |
-| Input image (optional checkbox) | no | optional | no |
-| API keys / env secrets | **never** | **never** | **never** |
-| Other tasks' data | no | no | no |
+| Data | Draft | Diagnose | Suggest branch | Generate image |
+|------|-------|----------|----------------|----------------|
+| Step catalog (ids + JSON Schema) | yes | yes | yes | no |
+| Current playbook YAML | revise only | yes | yes | no |
+| Task log tails (truncated) | no | yes | yes | no |
+| Input image (optional checkbox) | no | optional | no | no |
+| Manifest prompt | no | no | no | yes (remote provider only) |
+| API keys / env secrets | **never in prompt** | **never in prompt** | **never in prompt** | sent only as provider auth |
+| Other tasks' data | no | no | no | no |
 
 Context is capped at 30,000 characters; oldest log sections drop first.
 
@@ -30,6 +32,7 @@ Context is capped at 30,000 characters; oldest log sections drop first.
 - `apply_branch` runs **only** from explicit Approve; Step 10’s restart-to-apply badge handles runner refresh.
 - Diagnosis persists as `{task_workdir}/_diagnosis/flag_{flag_id}.json` (no DB migration).
 - All calls logged to `$DATA_DIR/llm_log/` with a `purpose` tag (`draft_playbook`, `diagnose_failure`, `repair_diagnose`, `suggest_branch`, etc.).
+- Image generation enforces the process-wide `session_image_cap`; generated filenames remain contained in the task workdir.
 
 ## Prompt versioning
 
@@ -46,8 +49,8 @@ Configure the LLM in [Settings](/settings) or `[llm]` in `config.toml`.
 
 ## Threat model (v1)
 
-Context includes only the user’s own playbook, task logs, and optionally one input image. No remote/untrusted file ingestion, no RAG, no screenshots. Callers must not paste secrets into descriptions.
+Text context includes only the user’s own playbook, task logs, and optionally one input image. Image generation sends the selected manifest prompt to its configured provider. No RAG or screenshots are collected. Callers must not paste secrets into descriptions or prompts.
 
 ## Out of scope
 
-Auto-detection of recurring failures, streaming UI, background queues, GUI/screenshot context (Steps 16–17), image generation (Step 14).
+Auto-detection of recurring failures, streaming UI, background LLM queues, and GUI/screenshot context.

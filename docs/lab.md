@@ -60,7 +60,7 @@ When the rehearsed version is ready for production, open **History** (`/pipeline
 ordine dry-run PLAYBOOK --sample ./samples [--glob '*'] [--json]
 ```
 
-Runs `run_all()` in a temp sandbox, prints a table or JSON `report()`, then closes. Exit `0` all ok, `1` any fail/skip, `2` unreadable playbook. Never touches the production database.
+Runs `run_all()` in a temp sandbox, prints a table or JSON `report()`, then closes. Exit `0` means all ok; `1` means a rehearsed step failed/skipped; `2` means CLI usage, sample-directory validation, unreadable/invalid playbook YAML, or static step/engine validation failed. Never touches the production database.
 
 ## shell.run warning
 

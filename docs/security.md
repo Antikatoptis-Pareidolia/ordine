@@ -2,7 +2,7 @@
 
 ## Playbooks are code
 
-A playbook is a program. Steps can read inputs, write outputs, call external tools, and (with explicit opt-in steps such as future `shell.run`) execute shell commands. **Never run playbooks from strangers without reading them.**
+A playbook is a program. Steps can read inputs, write outputs, call external tools, and execute arbitrary installed plugin code. A plugin may provide a `shell.run` step, but Ordine 0.1 does not ship one. **Never run playbooks from strangers without reading them.**
 
 Treat playbook YAML like shell scripts: review triggers, destinations, and branch steps before `ordine serve` on a shared host.
 
@@ -29,18 +29,18 @@ See `src/ordine/web/security.py` and [web.md](web.md).
 | Playbook draft description | Yes | User clicks AI draft |
 | Task logs / error text | Yes | User clicks Diagnose or Suggest branch |
 | Input image (optional checkbox) | Yes | User enables include-image on diagnose |
-| API keys | Yes | HTTPS to provider only; never logged in plaintext |
-| JSONL audit log | No (local) | `~/.local/share/ordine/llm/` |
+| API keys | Yes | Sent to the configured provider endpoint (which may be HTTP for a local compatible server); never logged |
+| JSONL audit log | No (local) | `~/.local/share/ordine/llm_log/` |
 
-Purposes in the audit log include `draft_playbook`, `diagnose_failure`, `repair_diagnose`, `repair_branch`, `generate_image`, `llm_check`. See [ai-features.md](ai-features.md) and [llm.md](llm.md).
+Purpose tags are `draft_playbook`, `revise_playbook`, `repair_playbook`, `diagnose_failure`, `repair_diagnose`, `suggest_branch`, `repair_branch`, `generate_image`, and `llm_check`. See [ai-features.md](ai-features.md) and [llm.md](llm.md).
 
 **Vision / screenshots to LLM:** image generation and optional diagnose images; disable LLM provider (`none`) to keep all inference local.
 
 ## Key storage
 
-1. Environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …)
-2. OS keyring (`keyring` package) via Settings UI or `ordine` key helpers
-3. Never commit keys; `.env` is user-local only
+1. OS keyring (`keyring` package) via Settings UI or `ordine` key helpers
+2. Environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …)
+3. `~/.config/ordine/.env` as a plaintext fallback; never commit it
 
 ## Telemetry
 
@@ -49,3 +49,12 @@ Purposes in the audit log include `draft_playbook`, `diagnose_failure`, `repair_
 ## Reporting vulnerabilities
 
 See [SECURITY.md](../SECURITY.md) in the repo root.
+
+## Hardening roadmap
+
+- **CSRF tokens:** deferred because `HX-Request` is a non-simple header that a cross-origin browser cannot send without a successful CORS preflight, and Ordine enables no CORS while remaining localhost-first.
+- **`base_url` SSRF gating:** deferred because the endpoint is user-owned configuration; provider data flow and credential forwarding are documented above and in [llm.md](llm.md).
+- **Artifact-serving TOCTOU hardening:** deferred because the symlink-swap window requires a concurrent local actor in the current single-user threat model.
+- **JSONL retention configuration:** deferred to avoid expanding retention semantics late in 0.1; [llm.md](llm.md) documents manual cleanup in the meantime.
+- **Dedicated CI integration job:** deferred because the current full matrix remains within the release budget; splitting it changes workflow topology rather than product correctness.
+- **Starlette/httpx deprecation:** deferred until the upstream FastAPI/Starlette transition stabilizes; the current pinned-compatible stack passes the full suite.

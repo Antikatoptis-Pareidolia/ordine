@@ -32,7 +32,7 @@ The package installs a venv under `/opt/ordine`, a `/usr/bin/ordine` symlink, an
 ```bash
 sudo apt install imagemagick
 git clone https://github.com/Antikatoptis-Pareidolia/ordine.git && cd ordine
-uv venv && uv sync --extra dev
+uv venv && uv sync --locked --extra dev
 uv pip install -e tests/fixtures/ordine_test_plugin
 uv run ordine --help
 ```

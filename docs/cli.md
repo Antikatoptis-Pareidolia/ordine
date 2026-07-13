@@ -24,6 +24,26 @@ All human-readable output is **plain text by design** (fixed-width tables and si
 
 ## Commands
 
+| Command | Options and defaults |
+|---------|----------------------|
+| `init` | `--config PATH` (XDG default) |
+| `example [DIR]` | `DIR=~/ordine-demo` |
+| `check PLAYBOOK` | `--json=false` |
+| `run PLAYBOOK` | `--oneshot=false`, `--note=None`, `--json=false` |
+| `status` | `--json=false` |
+| `tasks PIPELINE` | `--status=None`, `--limit=100`, `--json=false` |
+| `task ID` | `--json=false` |
+| `retry ID` | `--json=false` |
+| `flags` | `--pipeline=None`, `--min-level=0`, `--json=false` |
+| `resolve-flag ID` | `--note TEXT` (required), `--json=false` |
+| `steps` | `--json=false` |
+| `dry-run PLAYBOOK` | `--sample DIR` (required), `--glob='*'`, `--json=false` |
+| `draft DESCRIPTION` | `--pipeline=None`, `--out=None` |
+| `diagnose TASK_ID` | `--json=false` |
+| `llm check` | `--json=false` |
+| `cleanup` | `--days` from config (default `30`), `--include-failed=false`, `--dry-run=false`, `--json=false` |
+| `serve` | `--host`/`--port` from config (defaults `127.0.0.1:8484`) |
+
 ### `ordine init [--config PATH]`
 
 Create the config file (default or `--config` path), database parent directory, and workdir root. Refuses to overwrite an existing config file.
@@ -268,6 +288,26 @@ List registered step plugins.
 }
 ```
 
+### `ordine dry-run PLAYBOOK --sample DIR [--glob GLOB] [--json]`
+
+Statically validate and rehearse copied samples in a temporary sandbox without opening the production ledger. Exit `0` when every step is ok, `1` for a rehearsed fail/skip, and `2` for usage or static-input errors. See [lab.md](lab.md).
+
+### `ordine draft DESCRIPTION [--pipeline NAME] [--out PATH]`
+
+Ask the configured LLM for a validated playbook draft. Output goes to stdout unless `--out` is supplied; nothing is registered or run. `--pipeline` loads that registered pipeline's current YAML as revision context.
+
+### `ordine diagnose TASK_ID [--json]`
+
+Diagnose a flagged/failed task using bounded local text context. The CLI does not include the optional source image; that opt-in is available from the task page. The result is stored under the task workdir.
+
+### `ordine llm check [--json]`
+
+Send a minimal completion to the configured provider. Exit `0` on success, `1` when unconfigured/auth fails, and `2` for other connector errors.
+
+### `ordine serve [--host HOST] [--port PORT]`
+
+Start the web UI and service manager. Defaults come from `[web]` (`127.0.0.1:8484`); non-local binds warn that authentication is absent, and a bind failure suggests another `--port`.
+
 ## Flagship walkthrough
 
 ```bash
@@ -313,6 +353,12 @@ ordine task 1 --json | jq .
 | `flags` | always | unknown pipeline | — |
 | `resolve-flag` | resolved | not found | — |
 | `steps` | always | — | — |
+| `dry-run` | all ok | task fail/skip | usage/static input |
+| `draft` | valid draft | provider/model output failure | input/output error |
+| `diagnose` | diagnosis saved | task/provider failure | input/output error |
+| `llm check` | provider ok | unconfigured/auth | connector error |
+| `cleanup` | completed | — | config/usage error |
+| `serve` | stopped | bind/start failure | config/usage error |
 | global `--config` | — | — | config error |
 
 Second SIGINT/SIGTERM during `run` (default mode): exit `130`.

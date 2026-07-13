@@ -4,8 +4,19 @@ version = "0.1.0"
 description = "Ordine — self-healing task pipelines for your desktop."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Constantin Vlad" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Utilities",
+]
 dependencies = [
   "pydantic>=2.8",
   "PyYAML>=6.0",
@@ -48,7 +59,21 @@ build-backend = "hatchling.build"
 packages = ["src/ordine"]
 
 [tool.hatch.build.targets.sdist]
-exclude = [".venv*", "build", "dist", ".pytest_cache", ".mypy_cache", ".ruff_cache"]
+exclude = [
+  "/.github",
+  "/Plans",
+  "/demo",
+  "/tests",
+  "/uv.lock",
+  "/scripts/bump_version.py",
+  "**/.env*",
+  "/.venv*",
+  "/build",
+  "/dist",
+  "/.pytest_cache",
+  "/.mypy_cache",
+  "/.ruff_cache",
+]
 
 [tool.ruff]
 line-length = 100

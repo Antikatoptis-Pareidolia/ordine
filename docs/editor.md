@@ -9,7 +9,7 @@ Flat indexed names in `web/forms.py`:
 | Field pattern | Purpose |
 |---------------|---------|
 | `name`, `description`, `engine`, `dedup` | Playbook metadata |
-| `trigger-type`, `trigger-path`, `trigger-glob`, `trigger-settle_seconds`, `trigger-ordinal_regex`, `trigger-arrival_order_ordinals` | Trigger config |
+| `trigger-type`, `trigger-path`, `trigger-glob`, `trigger-settle_seconds`, `trigger-poll_seconds`, `trigger-ordinal_regex`, `trigger-arrival_order_ordinals` | Trigger config |
 | `steps-{i}-id` | Step id (select from registry) |
 | `steps-{i}-params` | Step params as YAML textarea (empty → `{}`) |
 | `steps-{i}-onfail-enabled`, `-retries`, `-then` | Per-step failure policy |
@@ -56,7 +56,7 @@ The **What changed** card lists semantic edits detected by `web/diffing.py` on t
 
 Read the summary first for a quick audit; use the raw diff below for line-level context.
 
-![Diff view with change summary and side-by-side YAML](images/editor-diff-summary.png)
+The summary is rendered directly above the side-by-side YAML diff.
 
 ### Side-by-side vs unified raw diff
 

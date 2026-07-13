@@ -36,7 +36,7 @@ stays done forever; edit the prompt or name and only that row is re-enqueued.
 
 ### Mock provider (first-class)
 
-Deterministic Pillow PNG: white background, ordinal label, byte-stable per ordinal. Use for tests, CI, and offline rehearsal (`examples/chain/`).
+Deterministic Pillow PNG: white background, ordinal label, and a prompt-keyed accent band; output is byte-stable for the same prompt and ordinal. The accent band gives cleanup examples non-white content to preserve while removing the background. Use it for tests, CI, and offline rehearsal (`examples/chain/`).
 
 ### OpenAI provider
 

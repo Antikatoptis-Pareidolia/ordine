@@ -17,6 +17,8 @@ STAGED_PYTHON="${STAGING_DIR}${VENV_PYTHON}"
 STAGED_ORDINE="${STAGING_DIR}${VENV_ORDINE}"
 
 rm -rf "${STAGING_DIR}"
+mkdir -p "${DIST_DIR}"
+rm -rf "${DIST_DIR:?}/"*
 mkdir -p "${DIST_DIR}" "${STAGED_ROOT}" "${STAGING_DIR}/usr/bin"
 mkdir -p "${STAGING_DIR}/usr/lib/systemd/user"
 
@@ -25,9 +27,19 @@ mkdir -p "${STAGING_DIR}/usr/lib/systemd/user"
 python3 -m venv --copies "${STAGED_ROOT}"
 
 echo "Installing ordine ${VERSION} into staging venv..."
-"${STAGED_BIN}/pip" install --upgrade pip
+"${STAGED_BIN}/pip" install --upgrade --no-compile pip
 # Install from repo root (not a pre-built wheel) so paths with spaces stay robust.
-"${STAGED_BIN}/pip" install "${REPO_ROOT}"
+"${STAGED_BIN}/pip" install --no-compile "${REPO_ROOT}"
+
+# Editable/source provenance is not useful in the relocatable artifact and can embed REPO_ROOT.
+while IFS= read -r -d '' direct_url; do
+  record="${direct_url%/direct_url.json}/RECORD"
+  rm -f "${direct_url}"
+  if [[ -f "${record}" ]]; then
+    grep -v 'direct_url\.json' "${record}" >"${record}.tmp"
+    mv "${record}.tmp" "${record}"
+  fi
+done < <(find "${STAGED_ROOT}" -type f -name direct_url.json -print0)
 
 if [[ ! -f "${STAGED_ORDINE}" ]]; then
   echo "missing venv entry point: ${VENV_ORDINE}" >&2
@@ -52,6 +64,13 @@ if [[ "${ordine_shebang}" != "#!${VENV_PYTHON}" ]]; then
   exit 1
 fi
 
+metadata_name="$("${STAGED_PYTHON}" -c 'from importlib.metadata import metadata; print(metadata("ordine")["Name"])')"
+if [[ "${metadata_name}" != "ordine" ]]; then
+  echo "unexpected Python artifact metadata Name: ${metadata_name}" >&2
+  exit 1
+fi
+echo "Assertion passed: Python artifact metadata Name=ordine"
+
 # Absolute target: ../opt/... from /usr/bin resolves to /usr/opt/... (wrong).
 ln -sf "${VENV_ORDINE}" "${STAGING_DIR}/usr/bin/ordine"
 cp "${REPO_ROOT}/packaging/ordine.service" "${STAGING_DIR}/usr/lib/systemd/user/ordine.service"
@@ -60,6 +79,18 @@ if [[ "$(readlink "${STAGING_DIR}/usr/bin/ordine")" != "${VENV_ORDINE}" ]]; then
   echo "usr/bin/ordine symlink target unexpected" >&2
   exit 1
 fi
+
+# Normalize package permissions after installers have populated the tree.
+find "${STAGING_DIR}" -type d -exec chmod 0755 {} +
+find "${STAGING_DIR}" -type f -exec chmod 0644 {} +
+find "${STAGED_BIN}" -maxdepth 1 -type f -exec chmod 0755 {} +
+
+if home_hits="$(grep -RIl --binary-files=without-match '/home/' "${STAGING_DIR}")"; then
+  echo "build-machine paths found in deb staging:" >&2
+  printf '%s\n' "${home_hits}" >&2
+  exit 1
+fi
+echo "Assertion passed: no /home/ build-machine paths in staging"
 
 if ! command -v fpm >/dev/null 2>&1; then
   echo "fpm is required to build the .deb (gem install fpm)" >&2
@@ -84,5 +115,11 @@ fi
 listing="$(dpkg-deb -c "${DEB_OUT}")"
 grep -q './usr/bin/ordine' <<<"${listing}"
 grep -q './opt/ordine/bin/ordine' <<<"${listing}"
+package_name="$(dpkg-deb -f "${DEB_OUT}" Package)"
+if [[ "${package_name}" != "ordine" ]]; then
+  echo "unexpected deb package name: ${package_name}" >&2
+  exit 1
+fi
+echo "Assertion passed: deb Package=ordine"
 
 echo "Built ${DEB_OUT}"

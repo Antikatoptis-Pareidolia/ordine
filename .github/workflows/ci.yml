@@ -30,7 +30,9 @@ jobs:
       - name: Typecheck
         run: uv run mypy
       - name: Test
-        run: uv run pytest -m "not llm_live"
+        run: |
+          uv run pytest -m "not llm_live" --cov-report=term-missing --cov-report=json:coverage.json
+          uv run python scripts/check_core_coverage.py coverage.json
       - name: CLI e2e
         run: |
           set -euo pipefail

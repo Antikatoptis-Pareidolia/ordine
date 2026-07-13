@@ -44,11 +44,11 @@ jobs:
           PKG="$(uv run python -c 'import ordine; print(ordine.__version__)')"
           test "${TAG}" = "${PKG}"
 
-      - name: Build distributions
-        run: uv build
-
       - name: Build deb
         run: bash scripts/build_deb.sh
+
+      - name: Build distributions
+        run: uv build
 
       - name: Extract changelog section
         run: |

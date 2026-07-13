@@ -22,12 +22,12 @@ When a step or pipeline fails, `on_failure.retries` are exhausted first (flag le
 |---|---|---|
 | `version` | `1` | Schema version (required) |
 | `name` | slug | Pipeline identifier |
-| `description` | string | Optional human description |
+| `description` | string | Optional human description (default absent) |
 | `trigger` | Trigger | How tasks enter the pipeline |
-| `dedup` | enum | `content_hash`, `filename`, or `none` |
+| `dedup` | enum | `content_hash` (default), `filename`, or `none` |
 | `engine` | slug | Executor engine name (default `headless`) |
 | `steps` | StepSpec[] | Ordered steps (min 1) |
-| `on_failure` | FailurePolicy | Pipeline-level failure policy |
+| `on_failure` | FailurePolicy | Pipeline-level failure policy (defaults to no retries/branches, then `mark_failed`) |
 | `meta` | PlaybookMeta | Authoring version metadata |
 
 ## StepSpec
@@ -35,23 +35,23 @@ When a step or pipeline fails, `on_failure.retries` are exhausted first (flag le
 | Field | Type | Description |
 |---|---|---|
 | `id` | step id | Dotted lowercase id, e.g. `image.trim` |
-| `params` | object | Opaque step parameters (validated by step registry in Step 4) |
-| `on_failure` | FailurePolicy | Optional step-level failure policy |
+| `params` | object | Opaque step parameters (default `{}`; validated by the step registry) |
+| `on_failure` | FailurePolicy | Optional step-level failure policy (default absent) |
 
 ## FailurePolicy
 
 | Field | Type | Description |
 |---|---|---|
-| `retries` | int ≥ 0 | Primary attempts before branches |
-| `branches` | RecoveryBranch[] | Ordered recovery branches |
-| `then` | enum | `mark_failed` or `skip` after all branches exhausted |
+| `retries` | int ≥ 0 | Primary retries before branches (default `0`) |
+| `branches` | RecoveryBranch[] | Ordered recovery branches (default `[]`) |
+| `then` | enum | `mark_failed` (default) or `skip` after all branches are exhausted |
 
 ## RecoveryBranch
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | slug | Unique branch name within the policy |
-| `retries` | int ≥ 0 | Retries for this branch's step sequence |
+| `name` | slug | Branch name; must be unique across every step and pipeline policy in the playbook |
+| `retries` | int ≥ 0 | Retries for this branch's step sequence (default `0`) |
 | `steps` | StepSpec[] | Alternative steps (min 1; no nested `on_failure`) |
 
 ## Triggers
@@ -79,7 +79,7 @@ Same fields as `folder_watch` except `type: manual` and no `settle_seconds`.
 |---|---|---|
 | `type` | `manifest` | Discriminator |
 | `path` | string | Job manifest file (.csv / .json / .txt) |
-| `poll_seconds` | float ≥ 0 | Re-read interval; 0 = scan once at start |
+| `poll_seconds` | float ≥ 0 | Re-read interval (default `30`); `0` = scan once at start |
 
 ## PlaybookMeta
 

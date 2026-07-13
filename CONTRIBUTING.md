@@ -20,6 +20,8 @@ uv run mypy
 uv run pytest -m "not llm_live"
 ```
 
+Pre-commit runs Ruff and repository hygiene hooks. `mypy` remains a required CI/manual gate rather than a local pre-commit hook.
+
 ## Conventions
 
 All changes must comply with [CONVENTIONS.md](CONVENTIONS.md). Highlights:
@@ -31,7 +33,7 @@ All changes must comply with [CONVENTIONS.md](CONVENTIONS.md). Highlights:
 
 ## Plans & audit workflow
 
-Features are scoped by step plans in `Plans/ordine-step-NN-plan.md` in the parent repo. **Out-of-scope creep is a bug** — if something seems missing, open an issue instead of improvising.
+Features are scoped by historical step plans in `Plans/conveyor-step-NN-plan.md` in the parent repo. Those filenames intentionally retain the pre-Ordine project name as planning provenance. **Out-of-scope creep is a bug** — if something seems missing, open an issue instead of improvising.
 
 When a step completes:
 

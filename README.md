@@ -8,19 +8,25 @@ Watch folders or manifests, run ordered steps with exactly-once guarantees, reco
 
 ## Quickstart (≤10 minutes)
 
+### From source (works today)
+
 ```bash
-# pipx (recommended) or install the .deb — see docs/install.md
-pipx install ordine
+git clone https://github.com/Antikatoptis-Pareidolia/ordine.git
+cd ordine
+uv sync --locked
 sudo apt install -y imagemagick   # recommended for image pipelines
 
-ordine example ~/ordine-demo
-cd ~/ordine-demo
-ordine check png-cleanup.yml
-ordine run png-cleanup.yml --oneshot
-ordine serve   # open http://127.0.0.1:8484
+uv run ordine example ./ordine-demo
+uv run ordine check ./ordine-demo/png-cleanup.yml
+uv run ordine run ./ordine-demo/png-cleanup.yml --oneshot
+uv run ordine serve   # open http://127.0.0.1:8484
 ```
 
-`ordine example` scaffolds six sample images, `assets.csv`, and a ready-to-run cleanup playbook. The quickstart path is also exercised in CI (`tests/test_example_cmd.py`).
+No config file is required for this path; built-in XDG defaults are used. `ordine example` scaffolds six sample images, `assets.csv`, and a ready-to-run cleanup playbook. The runtime commands are exercised literally in CI (`tests/test_example_cmd.py`).
+
+### Package installs (after the first release)
+
+After 0.1.0 is published, install with `pipx install ordine` or use the `.deb`, then run the same `ordine example`, `ordine check`, `ordine run`, and `ordine serve` commands without the `uv run` prefix. See [docs/install.md](docs/install.md).
 
 ## Features
 
