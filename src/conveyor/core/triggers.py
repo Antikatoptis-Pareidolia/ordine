@@ -21,8 +21,9 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-from conveyor.core.errors import TriggerError
+from conveyor.core.errors import ManifestError, TriggerError
 from conveyor.core.ledger import Ledger
+from conveyor.core.manifest import ManifestRow, load_manifest
 from conveyor.core.playbook import FolderWatchTrigger, ManifestTrigger, ManualTrigger, Trigger
 
 logger = logging.getLogger(__name__)
@@ -150,6 +151,38 @@ def _emit_candidate(candidate: TaskCandidate, sink: Sink) -> int | None:
             candidate.dedup_key,
         )
     return task_id
+
+
+def manifest_row_dedup_key(row: ManifestRow) -> str:
+    """Stable dedup key for one manifest row (ordinal + name + prompt)."""
+    payload = f"{row.name}\n{row.prompt or ''}"
+    digest = hashlib.sha256(payload.encode()).hexdigest()[:32]
+    return f"mrow:{row.ordinal}:{digest}"
+
+
+def manifest_sink(ledger: Ledger, pipeline_id: int, manifest_path: Path) -> Sink:
+    """Sink that reserves ordinal→name bindings immediately after task creation."""
+    inner = ledger_sink(ledger, pipeline_id)
+    resolved = manifest_path.expanduser().resolve()
+
+    def sink(candidate: TaskCandidate) -> int | None:
+        task_id = inner(candidate)
+        if task_id is None or candidate.ordinal is None:
+            return task_id
+        try:
+            rows = load_manifest(resolved)
+            row = rows[candidate.ordinal - 1]
+            ledger.reserve_name(pipeline_id, candidate.ordinal, row.name, task_id)
+        except (ManifestError, IndexError) as exc:
+            logger.warning(
+                "manifest reservation skipped for task %s ordinal %s: %s",
+                task_id,
+                candidate.ordinal,
+                exc,
+            )
+        return task_id
+
+    return sink
 
 
 def ledger_sink(ledger: Ledger, pipeline_id: int, *, arrival_order: bool = False) -> Sink:
@@ -440,19 +473,139 @@ class FolderWatchService:
                 empty_since = None
             time.sleep(self._poll_interval)
 
+        self._started = False
+
+
+class ManifestTriggerService:
+    """Poll a job manifest and emit one task per row."""
+
+    def __init__(
+        self,
+        spec: ManifestTrigger,
+        dedup: DedupMode,
+        sink: Sink,
+        *,
+        ledger: Ledger,
+        pipeline_id: int,
+    ) -> None:
+        self._spec = spec
+        self._dedup = dedup
+        self._sink = sink
+        self._ledger = ledger
+        self._pipeline_id = pipeline_id
+        self._manifest_path = Path(spec.path).expanduser().resolve()
+        self._log = logging.getLogger(f"{__name__}.manifest.{spec.path}")
+        self._stop = threading.Event()
+        self._poller_thread: threading.Thread | None = None
+        self._started = False
+        self._last_good_mtime: float | None = None
+        self._flagged_error_mtime: float | None = None
+
+    def _manifest_mtime(self) -> float:
+        try:
+            return self._manifest_path.stat().st_mtime
+        except OSError:
+            return -1.0
+
+    def _flag_unreadable(self, message: str) -> None:
+        mtime = self._manifest_mtime()
+        if self._flagged_error_mtime == mtime:
+            return
+        self._log.error("manifest unreadable: %s", message)
+        self._ledger.raise_flag(
+            self._pipeline_id,
+            task_id=None,
+            level=1,
+            kind="manifest_unreadable",
+            message=message,
+        )
+        self._flagged_error_mtime = mtime
+
+    def _scan(self) -> int:
+        """Read the manifest and emit candidates; return emit count."""
+        try:
+            rows = load_manifest(self._manifest_path)
+        except ManifestError as exc:
+            self._flag_unreadable(str(exc))
+            return 0
+        self._flagged_error_mtime = None
+        self._last_good_mtime = self._manifest_mtime()
+        abs_path = str(self._manifest_path)
+        emitted = 0
+        for row in rows:
+            candidate = TaskCandidate(
+                source_ref=f"manifest:{abs_path}#row{row.ordinal}",
+                dedup_key=manifest_row_dedup_key(row),
+                ordinal=row.ordinal,
+            )
+            if _emit_candidate(candidate, self._sink) is not None:
+                emitted += 1
+        return emitted
+
+    def _poller_loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                mtime = self._manifest_mtime()
+                if self._last_good_mtime is None or mtime != self._last_good_mtime:
+                    self._scan()
+            except Exception:
+                self._log.exception("manifest poller error")
+            self._stop.wait(self._spec.poll_seconds)
+
+    def run(self) -> int:
+        """One-shot scan without starting the poller thread."""
+        return self._scan()
+
+    def start(self) -> None:
+        """Initial scan; start poller when poll_seconds > 0."""
+        if self._started:
+            return
+        self._started = True
+        self._stop.clear()
+        self._scan()
+        if self._spec.poll_seconds > 0:
+            self._poller_thread = threading.Thread(
+                target=self._poller_loop,
+                name="manifest-trigger-poller",
+                daemon=True,
+            )
+            self._poller_thread.start()
+
+    def stop(self) -> None:
+        """Stop poller; idempotent."""
+        if not self._started:
+            return
+        self._stop.set()
+        if self._poller_thread is not None:
+            self._poller_thread.join(timeout=_STOP_JOIN_TIMEOUT)
+            self._poller_thread = None
+        self._started = False
+
 
 def build_trigger_service(
     spec: Trigger,
     dedup: DedupMode,
     sink: Sink,
     *,
+    ledger: Ledger | None = None,
+    pipeline_id: int | None = None,
     poll_interval: float | None = None,
-) -> ManualScanService | FolderWatchService:
+) -> ManualScanService | FolderWatchService | ManifestTriggerService:
     """Construct a trigger service for *spec*."""
     if isinstance(spec, ManualTrigger):
         return ManualScanService(spec, dedup, sink)
     if isinstance(spec, FolderWatchTrigger):
         return FolderWatchService(spec, dedup, sink, poll_interval=poll_interval)
     if isinstance(spec, ManifestTrigger):
-        raise TriggerError("manifest trigger lands in step 14")
+        if ledger is None or pipeline_id is None:
+            raise TriggerError("manifest trigger requires ledger and pipeline_id")
+        manifest_path = Path(spec.path).expanduser()
+        manifest_path_sink = manifest_sink(ledger, pipeline_id, manifest_path)
+        return ManifestTriggerService(
+            spec,
+            dedup,
+            manifest_path_sink,
+            ledger=ledger,
+            pipeline_id=pipeline_id,
+        )
     raise TriggerError(f"unsupported trigger type: {type(spec)!r}")

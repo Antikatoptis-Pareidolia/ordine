@@ -30,10 +30,21 @@ from conveyor.core.errors import (
     RunnerError,
 )
 from conveyor.core.ledger import Ledger, PipelineSummary, TaskStatus, TaskView
-from conveyor.core.playbook import FolderWatchTrigger, ManualTrigger, Playbook, load_playbook
+from conveyor.core.playbook import (
+    FolderWatchTrigger,
+    ManifestTrigger,
+    ManualTrigger,
+    Playbook,
+    load_playbook,
+)
 from conveyor.core.registry import StepRegistry
 from conveyor.core.runner import PipelineRunner, PipelineService
-from conveyor.core.triggers import ManualScanService, ledger_sink
+from conveyor.core.triggers import (
+    ManifestTriggerService,
+    ManualScanService,
+    build_trigger_service,
+    ledger_sink,
+)
 from conveyor.llm.client import build_client
 from conveyor.llm.errors import LLMAuthError, LLMError, LLMNotConfiguredError
 from conveyor.llm.features.diagnosis import diagnose
@@ -117,6 +128,16 @@ def _manual_trigger(playbook: Playbook) -> ManualTrigger:
 
 
 def _scan_playbook(ledger: Ledger, pipeline_id: int, playbook: Playbook) -> int:
+    if isinstance(playbook.trigger, ManifestTrigger):
+        service = build_trigger_service(
+            playbook.trigger,
+            playbook.dedup,
+            ledger_sink(ledger, pipeline_id),
+            ledger=ledger,
+            pipeline_id=pipeline_id,
+        )
+        assert isinstance(service, ManifestTriggerService)
+        return service.run()
     manual = _manual_trigger(playbook)
     arrival = manual.arrival_order_ordinals
     sink = ledger_sink(ledger, pipeline_id, arrival_order=arrival)

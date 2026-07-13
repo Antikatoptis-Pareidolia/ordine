@@ -11,11 +11,11 @@ from pathlib import Path
 import pytest
 
 from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.errors import TriggerError
 from conveyor.core.ledger import Ledger
 from conveyor.core.playbook import FolderWatchTrigger, ManifestTrigger, ManualTrigger
 from conveyor.core.triggers import (
     FolderWatchService,
+    ManifestTriggerService,
     ManualScanService,
     TaskCandidate,
     build_trigger_service,
@@ -294,10 +294,19 @@ def test_create_task_arrival_concurrent_race(engine, ledger: Ledger) -> None:
     assert ordinals == [1, 2]
 
 
-def test_build_trigger_service_manifest_raises() -> None:
-    spec = ManifestTrigger(type="manifest", path="/tmp/m")
-    with pytest.raises(TriggerError, match="step 14"):
-        build_trigger_service(spec, "none", lambda _c: None)
+def test_build_trigger_service_manifest(tmp_path: Path, ledger: Ledger) -> None:
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name,prompt\na.png,one\n", encoding="utf-8")
+    spec = ManifestTrigger(type="manifest", path=str(manifest))
+    pipeline_id = _register_pipeline(ledger)
+    service = build_trigger_service(
+        spec,
+        "none",
+        ledger_sink(ledger, pipeline_id),
+        ledger=ledger,
+        pipeline_id=pipeline_id,
+    )
+    assert isinstance(service, ManifestTriggerService)
 
 
 def test_rescan_mid_write_emits_complete_file_once(tmp_path: Path, ledger: Ledger) -> None:

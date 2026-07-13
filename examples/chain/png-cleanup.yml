@@ -1,0 +1,18 @@
+version: 1
+name: chain-cleanup
+description: Flagship cleanup on generated ordinal filenames
+trigger:
+  type: manual
+  path: ~/renders
+  glob: "*.png"
+  ordinal_regex: 'img_(\d+)\.png'
+steps:
+  - image.validate
+  - image.white_to_alpha
+  - image.trim
+  - file.rename_from_manifest:
+      manifest: examples/chain/assets.csv
+  - id: image.export
+    params:
+      dest: ~/game/assets
+      use_reserved_name: true

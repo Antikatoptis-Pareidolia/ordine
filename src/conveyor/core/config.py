@@ -35,7 +35,9 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
     "runner": frozenset({"stale_after_minutes", "reconcile_policy"}),
     "log": frozenset({"level"}),
     "web": frozenset({"host", "port", "autostart_pipelines"}),
-    "llm": frozenset({"provider", "model", "base_url", "max_tokens", "session_token_cap"}),
+    "llm": frozenset(
+        {"provider", "model", "base_url", "max_tokens", "session_token_cap", "session_image_cap"}
+    ),
 }
 
 
@@ -56,6 +58,7 @@ class AppConfig:
     llm_base_url: str = ""
     llm_max_tokens: int = 1024
     llm_session_token_cap: int = 200_000
+    llm_session_image_cap: int = 200
     config_file: Path | None = None
 
 
@@ -145,6 +148,10 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     if not isinstance(llm_session_token_cap, int):
         raise ConfigError("llm.session_token_cap must be an integer")
 
+    llm_session_image_cap = llm.get("session_image_cap", defaults.llm_session_image_cap)
+    if not isinstance(llm_session_image_cap, int):
+        raise ConfigError("llm.session_image_cap must be an integer")
+
     return AppConfig(
         db_path=db_path,
         workdir_root=workdir_root,
@@ -159,6 +166,7 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         llm_base_url=llm_base_url,
         llm_max_tokens=llm_max_tokens,
         llm_session_token_cap=llm_session_token_cap,
+        llm_session_image_cap=llm_session_image_cap,
         config_file=config_file,
     )
 
@@ -277,5 +285,6 @@ model = ""
 base_url = ""
 max_tokens = 1024
 session_token_cap = 200000
+session_image_cap = 200
 """
     expanded.write_text(template, encoding="utf-8")

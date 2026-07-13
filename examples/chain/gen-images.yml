@@ -1,0 +1,26 @@
+version: 1
+name: chain-gen
+description: Generate ordinal-named images from assets.csv (mock provider for offline rehearsal)
+trigger:
+  type: manifest
+  path: examples/chain/assets.csv
+  poll_seconds: 0
+dedup: none
+steps:
+  - id: llm.generate_image
+    params:
+      manifest: examples/chain/assets.csv
+      provider: mock
+      size: 512x512
+  - id: file.move
+    params:
+      dest: ~/renders
+# Recovery branch example (uncomment to swap provider after a refusal):
+# on_failure:
+#   branches:
+#     - name: mock-fallback
+#       steps:
+#         - id: llm.generate_image
+#           params:
+#             manifest: examples/chain/assets.csv
+#             provider: mock

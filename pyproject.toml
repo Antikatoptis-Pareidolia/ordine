@@ -88,6 +88,7 @@ image_validate = "conveyor.executors.headless.steps:ValidateStep"
 image_white_to_alpha = "conveyor.executors.headless.steps:WhiteToAlphaStep"
 image_trim = "conveyor.executors.headless.steps:TrimStep"
 image_export = "conveyor.executors.headless.steps:ExportStep"
+llm_generate_image = "conveyor.llm.steps:GenerateImageStep"
 
 [project.entry-points."conveyor.engines"]
 headless = "conveyor.core.engines:HeadlessEngine"

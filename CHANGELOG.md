@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run lab with step-through, sandbox isolation, checkpoint resume, and `conveyor dry-run` CLI (Step 11)
 - Provider-agnostic LLM connector: raw REST adapters (Anthropic/OpenAI/compatible), keyring keys, JSONL audit log, token budget, settings UI, and `conveyor llm check` (Step 12)
 - AI drafting, failure diagnosis, and learned recovery branches with explicit approval only (Step 13)
+- Manifest trigger (`ManifestTriggerService`) with row ordinals, mrow dedup keys, and reservation-at-creation sink (Step 14)
+- `llm.generate_image` step with mock and OpenAI image providers, `ImageBudget`, and `session_image_cap` config (Step 14)
+- Chained example under `examples/chain/` and `docs/chaining.md` (Step 14)
 
 ### Changed
 

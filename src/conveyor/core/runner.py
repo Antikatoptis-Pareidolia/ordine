@@ -23,6 +23,7 @@ from conveyor.core.registry import StepRegistry
 from conveyor.core.steps import Step, StepContext, StepResult
 from conveyor.core.triggers import (
     FolderWatchService,
+    ManifestTriggerService,
     ManualScanService,
     build_trigger_service,
     ledger_sink,
@@ -355,7 +356,7 @@ class PipelineService:
         self._reconcile_policy = reconcile_policy
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
-        self._trigger: FolderWatchService | ManualScanService | None = None
+        self._trigger: FolderWatchService | ManualScanService | ManifestTriggerService | None = None
         self._started = False
 
     def start(self) -> None:
@@ -370,10 +371,15 @@ class PipelineService:
             policy=self._reconcile_policy,
         )
         arrival = getattr(self._playbook.trigger, "arrival_order_ordinals", False)
-        sink = ledger_sink(self._ledger, self._pipeline_id, arrival_order=arrival)
-        trigger = build_trigger_service(self._playbook.trigger, self._playbook.dedup, sink)
+        trigger = build_trigger_service(
+            self._playbook.trigger,
+            self._playbook.dedup,
+            ledger_sink(self._ledger, self._pipeline_id, arrival_order=arrival),
+            ledger=self._ledger,
+            pipeline_id=self._pipeline_id,
+        )
         self._trigger = trigger
-        if isinstance(trigger, FolderWatchService):
+        if isinstance(trigger, (FolderWatchService, ManifestTriggerService)):
             trigger.start()
         self._worker = threading.Thread(
             target=self._worker_loop, name="pipeline-worker", daemon=True
@@ -388,7 +394,7 @@ class PipelineService:
         if self._worker is not None:
             self._worker.join(timeout=120.0)
             self._worker = None
-        if isinstance(self._trigger, FolderWatchService):
+        if isinstance(self._trigger, (FolderWatchService, ManifestTriggerService)):
             self._trigger.stop()
         self._trigger = None
         self._started = False
