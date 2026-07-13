@@ -10,16 +10,21 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
           enable-cache: true
+      - name: Install Python ${{ matrix.python-version }}
+        run: uv python install "${{ matrix.python-version }}"
+      - name: Verify Python
+        run: |
+          python --version || true
+          uv run python --version
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y imagemagick jq
       - name: Install
         run: |
           uv sync --locked --extra dev
-          uv pip install -e tests/fixtures/conveyor_test_plugin
+          uv pip install -e tests/fixtures/ordine_test_plugin
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Typecheck
@@ -80,10 +85,10 @@ jobs:
                 use_reserved_name: true
           """)
           PY
-          uv run conveyor init --config "$CONFIG"
-          uv run conveyor --config "$CONFIG" check "$PLAYBOOK"
-          uv run conveyor --config "$CONFIG" run --oneshot "$PLAYBOOK"
-          status_json="$(uv run conveyor --config "$CONFIG" status --json)"
+          uv run ordine init --config "$CONFIG"
+          uv run ordine --config "$CONFIG" check "$PLAYBOOK"
+          uv run ordine --config "$CONFIG" run --oneshot "$PLAYBOOK"
+          status_json="$(uv run ordine --config "$CONFIG" status --json)"
           jq -e '.pipelines[0].counts.done == 5' <<<"${status_json}"
           for name in goat.png jug.png crown.png ring.png sword.png; do
             test -f "$OUT/$name"
@@ -116,18 +121,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          apt-get install -y "./dist/conveyor_"*.deb
+          apt-get install -y "./dist/ordine_"*.deb
           echo "=== deb contents (sample) ==="
-          deb_listing="$(dpkg -L conveyor)"
+          deb_listing="$(dpkg -L ordine)"
           head -n 50 <<<"${deb_listing}"
-          ls -la /usr/bin/conveyor /opt/conveyor/bin/ 2>&1 || true
-          DEMO="/tmp/conveyor-demo"
+          ls -la /usr/bin/ordine /opt/ordine/bin/ 2>&1 || true
+          DEMO="/tmp/ordine-demo"
           export XDG_CONFIG_HOME="/tmp/xdg-config"
           export XDG_DATA_HOME="/tmp/xdg-data"
-          CONFIG="/tmp/conveyor-config.toml"
-          conveyor --help
-          conveyor example "${DEMO}"
-          conveyor init --config "${CONFIG}"
-          conveyor --config "${CONFIG}" run --oneshot "${DEMO}/png-cleanup.yml"
+          CONFIG="/tmp/ordine-config.toml"
+          ordine --help
+          ordine example "${DEMO}"
+          ordine init --config "${CONFIG}"
+          ordine --config "${CONFIG}" run --oneshot "${DEMO}/png-cleanup.yml"
           COUNT="$(find "${DEMO}/exports" -maxdepth 1 -name '*.png' | wc -l)"
           test "${COUNT}" -eq 6

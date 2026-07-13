@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from conveyor.core.registry import StepRegistry
-from conveyor.core.steps import StepContext
-from conveyor.core.workdir import TaskWorkdir
-from conveyor.executors.headless.backends import find_imagemagick, pick_backend, run_im
-from conveyor.executors.headless.steps import (
+from ordine.core.registry import StepRegistry
+from ordine.core.steps import StepContext
+from ordine.core.workdir import TaskWorkdir
+from ordine.executors.headless.backends import find_imagemagick, pick_backend, run_im
+from ordine.executors.headless.steps import (
     ExportStep,
     TrimStep,
     ValidateStep,
@@ -288,7 +288,7 @@ def test_cross_backend_tolerance(tmp_path: Path) -> None:
 
 def test_imagemagick_missing_returns_fail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "conveyor.executors.headless.steps.find_imagemagick",
+        "ordine.executors.headless.steps.find_imagemagick",
         lambda: None,
     )
     find_imagemagick.cache_clear()

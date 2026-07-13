@@ -51,8 +51,8 @@ user transitions.
 
 `claim_next` uses `BEGIN IMMEDIATE`, so cross-process double-claims are impossible. Other transitions use
 plain sessions; until a later hardening pass (Step 15), the supported mode is **one writer process per
-pipeline at a time** — for example, do not run `conveyor run --oneshot` against a pipeline that
-`conveyor serve` is actively serving. WAL mode and dedup unique constraints keep exactly-once intact
+pipeline at a time** — for example, do not run `ordine run --oneshot` against a pipeline that
+`ordine serve` is actively serving. WAL mode and dedup unique constraints keep exactly-once intact
 regardless; the only risk without single-writer discipline is benign status-update races between
 concurrent writers.
 
@@ -75,7 +75,7 @@ tables on first run and rejects unknown versions. Alembic migrations are deferre
 
 ## API surface
 
-All database access goes through `conveyor.core.ledger.Ledger`. ORM rows are never exposed;
+All database access goes through `ordine.core.ledger.Ledger`. ORM rows are never exposed;
 callers receive frozen dataclass views (`TaskView`, `VersionInfo`, `FlagView`).
 
 Notable methods added for later steps:

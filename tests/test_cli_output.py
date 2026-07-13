@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from conveyor.cli import output
+from ordine.cli import output
 
 
 @pytest.mark.parametrize("tz_name", ["UTC", "Europe/Moscow", "America/New_York"])

@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.naming import LedgerNamingService
-from conveyor.core.playbook import load_playbook
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.naming import LedgerNamingService
+from ordine.core.playbook import load_playbook
 
 FIXTURE_YAML = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v01_minimal.yml"
 

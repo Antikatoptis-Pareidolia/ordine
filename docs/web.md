@@ -1,12 +1,12 @@
-# Conveyor Web UI
+# Ordine Web UI
 
 Local-first web interface for operating pipelines without the CLI. Built with FastAPI, Jinja2, and a **single vendored HTMX 2.0.4** file (`static/htmx.min.js` — see `static/htmx.version`). No Node.js, no CDN, no frontend build step.
 
 ## Starting the server
 
 ```bash
-conveyor serve              # binds 127.0.0.1:8484 by default
-conveyor serve --host 0.0.0.0 --port 9000   # prints a loud warning (no auth in v1)
+ordine serve              # binds 127.0.0.1:8484 by default
+ordine serve --host 0.0.0.0 --port 9000   # prints a loud warning (no auth in v1)
 ```
 
 Configuration comes from the same TOML as the CLI (`[web]` section: `host`, `port`, `autostart_pipelines`).
@@ -60,7 +60,7 @@ Thumbnails are not generated; original images are served from the workdir. A cac
 
 ## Manual walkthrough (no CLI)
 
-1. `conveyor serve`
+1. `ordine serve`
 2. Open `http://127.0.0.1:8484`
 3. Paste flagship YAML → Register
 4. Start pipeline → drop PNGs into the watched folder

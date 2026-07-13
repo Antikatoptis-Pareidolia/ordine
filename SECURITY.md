@@ -22,6 +22,6 @@ We aim to acknowledge within 72 hours and provide a remediation timeline for con
 
 ## Scope
 
-In scope: Conveyor application code (CLI, core, web UI, default playbooks). Out of scope: third-party provider APIs (OpenAI, Anthropic), misconfiguration (binding serve to `0.0.0.0` without auth), or malicious playbooks the operator chose to run.
+In scope: Ordine application code (CLI, core, web UI, default playbooks). Out of scope: third-party provider APIs (OpenAI, Anthropic), misconfiguration (binding serve to `0.0.0.0` without auth), or malicious playbooks the operator chose to run.
 
 See [docs/security.md](docs/security.md) for the product security posture.

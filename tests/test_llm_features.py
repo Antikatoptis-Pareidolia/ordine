@@ -10,19 +10,19 @@ import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from conveyor.core.config import AppConfig
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import Playbook, RecoveryBranch, loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.llm.adapters.openai import OpenAIClient
-from conveyor.llm.client import TokenBudget, _BudgetClient, _LoggingClient, build_client
-from conveyor.llm.errors import LLMResponseError
-from conveyor.llm.features.branches import suggest_branch
-from conveyor.llm.features.context import MAX_CONTEXT_CHARS, failure_context, step_catalog
-from conveyor.llm.features.diagnosis import diagnose, load_diagnosis, save_diagnosis
-from conveyor.llm.features.drafting import draft_playbook
-from conveyor.llm.types import LLMResponse, Message, Usage
+from ordine.core.config import AppConfig
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import Playbook, RecoveryBranch, loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.llm.adapters.openai import OpenAIClient
+from ordine.llm.client import TokenBudget, _BudgetClient, _LoggingClient, build_client
+from ordine.llm.errors import LLMResponseError
+from ordine.llm.features.branches import suggest_branch
+from ordine.llm.features.context import MAX_CONTEXT_CHARS, failure_context, step_catalog
+from ordine.llm.features.diagnosis import diagnose, load_diagnosis, save_diagnosis
+from ordine.llm.features.drafting import draft_playbook
+from ordine.llm.types import LLMResponse, Message, Usage
 
 FIXTURES = Path(__file__).parent / "fixtures" / "llm"
 
@@ -155,14 +155,14 @@ def test_draft_full_stack_mock_transport_logs_and_charges_budget(
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     config = AppConfig(
-        db_path=data_dir / "conveyor.sqlite3",
+        db_path=data_dir / "ordine.sqlite3",
         workdir_root=tmp_path / "work",
         llm_provider="openai",
         llm_model="gpt-test",
         llm_max_tokens=4096,
         llm_session_token_cap=50_000,
     )
-    monkeypatch.setattr("conveyor.llm.client.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.client.get_key", lambda _provider: "test-key")
 
     budget = TokenBudget(50_000)
     client = build_client(config, budget=budget)
@@ -292,7 +292,7 @@ def test_branch_name_collision_suffix(registry: StepRegistry) -> None:
         }
     )
     branch = RecoveryBranch.model_validate({"name": "ai-fix", "steps": [{"id": "util.copy"}]})
-    from conveyor.llm.features import branches as branches_mod
+    from ordine.llm.features import branches as branches_mod
 
     modified = branches_mod._graft_branch(playbook, step_index=0, branch=branch)
     assert modified.steps[0].on_failure is not None
@@ -319,7 +319,7 @@ def test_branch_name_collision_suffix_playbook_wide(registry: StepRegistry) -> N
         }
     )
     branch = RecoveryBranch.model_validate({"name": "ai-fix", "steps": [{"id": "util.noop"}]})
-    from conveyor.llm.features import branches as branches_mod
+    from ordine.llm.features import branches as branches_mod
 
     modified = branches_mod._graft_branch(playbook, step_index=1, branch=branch)
     step_policy = modified.steps[1].on_failure
@@ -340,7 +340,7 @@ steps:
 """
     )
     branch = RecoveryBranch.model_validate({"name": "ai-fix", "steps": [{"id": "util.copy"}]})
-    from conveyor.llm.features import branches as branches_mod
+    from ordine.llm.features import branches as branches_mod
 
     modified = branches_mod._graft_branch(playbook, step_index=1, branch=branch)
     step_policy = modified.steps[1].on_failure

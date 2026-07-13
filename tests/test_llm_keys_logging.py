@@ -9,12 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 from keyring.errors import KeyringError
 
-from conveyor.core.config import AppConfig, load_config
-from conveyor.llm import logging as llm_logging
-from conveyor.llm.client import _LoggingClient, build_client
-from conveyor.llm.keys import ENV_NAMES, SERVICE, clear_key, get_key, set_key
-from conveyor.llm.types import ImagePart, LLMResponse, Message, TextPart, Usage
-from conveyor.web.app import create_app
+from ordine.core.config import AppConfig, load_config
+from ordine.llm import logging as llm_logging
+from ordine.llm.client import _LoggingClient, build_client
+from ordine.llm.keys import ENV_NAMES, SERVICE, clear_key, get_key, set_key
+from ordine.llm.types import ImagePart, LLMResponse, Message, TextPart, Usage
+from ordine.web.app import create_app
 
 POST_HEADERS = {"HX-Request": "true", "Origin": "http://127.0.0.1:8484"}
 
@@ -23,7 +23,7 @@ def _write_config(tmp_path: Path) -> Path:
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         f"""[paths]
-db = "{tmp_path / "conveyor.sqlite3"}"
+db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
@@ -52,9 +52,9 @@ def test_key_precedence_keyring_over_env_over_dotenv(
     def fake_set(service: str, provider: str, key: str) -> None:
         store[(service, provider)] = key
 
-    monkeypatch.setattr("conveyor.llm.keys.keyring.get_password", fake_get)
-    monkeypatch.setattr("conveyor.llm.keys.keyring.set_password", fake_set)
-    monkeypatch.setattr("conveyor.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr("ordine.llm.keys.keyring.get_password", fake_get)
+    monkeypatch.setattr("ordine.llm.keys.keyring.set_password", fake_set)
+    monkeypatch.setattr("ordine.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
     dotenv = tmp_path / ".env"
     dotenv.write_text(f"{ENV_NAMES['anthropic']}=from-dotenv\n", encoding="utf-8")
     monkeypatch.setenv(ENV_NAMES["anthropic"], "from-env")
@@ -65,7 +65,7 @@ def test_key_precedence_keyring_over_env_over_dotenv(
 
 
 def test_openai_compatible_without_key_is_legal(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.client.get_key", lambda _provider: None)
+    monkeypatch.setattr("ordine.llm.client.get_key", lambda _provider: None)
     client = build_client(
         AppConfig(
             db_path=Path("/tmp/db.sqlite"),
@@ -82,7 +82,7 @@ def test_keyring_error_includes_env_name(monkeypatch: pytest.MonkeyPatch) -> Non
     def boom(*_args: object, **_kwargs: object) -> None:
         raise KeyringError("no backend")
 
-    monkeypatch.setattr("conveyor.llm.keys.keyring.get_password", boom)
+    monkeypatch.setattr("ordine.llm.keys.keyring.get_password", boom)
     with pytest.raises(Exception, match=ENV_NAMES["openai"]):
         get_key("openai")
 
@@ -91,15 +91,15 @@ def test_set_and_clear_key(monkeypatch: pytest.MonkeyPatch) -> None:
     store: dict[tuple[str, str], str] = {}
 
     monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.get_password",
+        "ordine.llm.keys.keyring.get_password",
         lambda service, provider: store.get((service, provider)),
     )
     monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.set_password",
+        "ordine.llm.keys.keyring.set_password",
         lambda service, provider, key: store.__setitem__((service, provider), key),
     )
     monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.delete_password",
+        "ordine.llm.keys.keyring.delete_password",
         lambda service, provider: store.pop((service, provider), None),
     )
     set_key("anthropic", "sekrit")
@@ -175,16 +175,16 @@ def test_settings_key_presence_and_privacy(monkeypatch: pytest.MonkeyPatch, tmp_
     def fake_get(service: str, provider: str) -> str | None:
         return store.get((service, provider))
 
-    monkeypatch.setattr("conveyor.llm.keys.keyring.get_password", fake_get)
+    monkeypatch.setattr("ordine.llm.keys.keyring.get_password", fake_get)
     monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.set_password",
+        "ordine.llm.keys.keyring.set_password",
         lambda service, provider, key: store.__setitem__((service, provider), key),
     )
     monkeypatch.setattr(
-        "conveyor.llm.keys.keyring.delete_password",
+        "ordine.llm.keys.keyring.delete_password",
         lambda service, provider: store.pop((service, provider), None),
     )
-    monkeypatch.setattr("conveyor.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr("ordine.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
     config_path = _write_config(tmp_path)
     config = load_config(config_path)
     client = TestClient(create_app(config))

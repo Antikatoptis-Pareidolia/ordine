@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.config import AppConfig
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.web.services import ServiceManager
+from ordine.core.config import AppConfig
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.web.services import ServiceManager
 from tests.test_image_steps import make_test_image
 
 

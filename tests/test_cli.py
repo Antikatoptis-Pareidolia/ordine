@@ -12,9 +12,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from conveyor.cli.main import app
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
+from ordine.cli.main import app
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
 from tests.test_image_steps import make_test_image
 from tests.test_runner_e2e import ASSET_NAMES
 
@@ -26,7 +26,7 @@ def _write_config(tmp_path: Path) -> Path:
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         f"""[paths]
-db = "{tmp_path / "conveyor.sqlite3"}"
+db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 """,
         encoding="utf-8",
@@ -80,7 +80,7 @@ def test_init_creates_config_and_dirs(tmp_path: Path, monkeypatch: pytest.Monkey
     result = RUNNER.invoke(app, ["init", "--config", str(config_file)])
     assert result.exit_code == 0
     assert config_file.exists()
-    assert (tmp_path / "data" / "conveyor" / "conveyor.sqlite3").parent.exists()
+    assert (tmp_path / "data" / "ordine" / "ordine.sqlite3").parent.exists()
 
 
 def test_init_second_time_exits_one(tmp_path: Path) -> None:
@@ -259,7 +259,7 @@ def test_run_auto_registration_version_churn(tmp_path: Path) -> None:
     yaml_text = _game_assets_yaml(watch=watch, manifest=manifest, output=output, fuzz=8)
     playbook.write_text(yaml_text, encoding="utf-8")
     _invoke(config_file, "run", str(playbook), "--oneshot")
-    engine = create_engine_for(tmp_path / "conveyor.sqlite3")
+    engine = create_engine_for(tmp_path / "ordine.sqlite3")
     init_db(engine)
     ledger = Ledger(engine)
     pipeline_id = ledger.find_pipeline_id("cli-game-assets")
@@ -391,7 +391,7 @@ steps:
         [
             sys.executable,
             "-m",
-            "conveyor.cli.main",
+            "ordine.cli.main",
             "--config",
             str(config_file),
             "run",
@@ -442,7 +442,7 @@ steps:
 def test_cli_dry_run_json_leaves_prod_db_untouched(tmp_path: Path) -> None:
     import sqlite3
 
-    from conveyor.core.db import create_engine_for, init_db
+    from ordine.core.db import create_engine_for, init_db
 
     config_file = _write_config(tmp_path)
     samples = tmp_path / "samples"
@@ -459,7 +459,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    db_path = tmp_path / "conveyor.sqlite3"
+    db_path = tmp_path / "ordine.sqlite3"
     engine = create_engine_for(db_path)
     init_db(engine)
     with sqlite3.connect(db_path) as conn:

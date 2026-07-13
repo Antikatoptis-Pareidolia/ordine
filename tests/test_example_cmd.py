@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from conveyor.cli.main import app
+from ordine.cli.main import app
 
 
 def test_example_scaffold_runs_oneshot(tmp_path: Path, monkeypatch) -> None:
@@ -19,7 +19,7 @@ def test_example_scaffold_runs_oneshot(tmp_path: Path, monkeypatch) -> None:
     assert (demo / "png-cleanup.yml").is_file()
     assert len(list((demo / "samples").glob("img_*.png"))) == 6
 
-    config = tmp_path / "conveyor.toml"
+    config = tmp_path / "ordine.toml"
     init = runner.invoke(app, ["init", "--config", str(config)])
     assert init.exit_code == 0, init.output
 

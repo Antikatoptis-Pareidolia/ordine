@@ -10,19 +10,19 @@ from typing import Any
 import httpx
 import pytest
 
-from conveyor.core.config import AppConfig
-from conveyor.llm.adapters import request_json
-from conveyor.llm.adapters.anthropic import AnthropicClient
-from conveyor.llm.adapters.openai import OpenAIClient, chat_completions_url
-from conveyor.llm.client import TokenBudget, _BudgetClient, build_client
-from conveyor.llm.errors import (
+from ordine.core.config import AppConfig
+from ordine.llm.adapters import request_json
+from ordine.llm.adapters.anthropic import AnthropicClient
+from ordine.llm.adapters.openai import OpenAIClient, chat_completions_url
+from ordine.llm.client import TokenBudget, _BudgetClient, build_client
+from ordine.llm.errors import (
     LLMAuthError,
     LLMBudgetError,
     LLMRateLimitError,
     LLMResponseError,
     LLMTimeoutError,
 )
-from conveyor.llm.types import ImagePart, Message, TextPart
+from ordine.llm.types import ImagePart, Message, TextPart
 
 
 def _anthropic_ok() -> dict[str, Any]:
@@ -148,7 +148,7 @@ def test_429_retries_three_times_then_rate_limit(monkeypatch: pytest.MonkeyPatch
         attempts["n"] += 1
         return httpx.Response(429, headers={"Retry-After": "2"}, text="slow down")
 
-    monkeypatch.setattr("conveyor.llm.adapters.time.sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr("ordine.llm.adapters.time.sleep", lambda s: sleeps.append(s))
     http = httpx.Client(transport=_mock_transport(handler))
     with pytest.raises(LLMRateLimitError):
         request_json(
@@ -193,7 +193,7 @@ def test_budget_refuses_before_http() -> None:
 
 
 def test_switch_provider_config_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.client.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.client.get_key", lambda _provider: "test-key")
     base = AppConfig(
         db_path=Path("/tmp/db.sqlite"),
         workdir_root=Path("/tmp/work"),

@@ -10,15 +10,15 @@ from typing import ClassVar
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.dryrun import DryRunSession, redirect_output_dirs
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.core.steps import StepContext, StepResult
-from conveyor.executors.builtin.file_steps import MoveStep
-from conveyor.executors.builtin.steps import CopyStep, FailStep, NoopStep
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.dryrun import DryRunSession, redirect_output_dirs
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.core.steps import StepContext, StepResult
+from ordine.executors.builtin.file_steps import MoveStep
+from ordine.executors.builtin.steps import CopyStep, FailStep, NoopStep
 
 
 class WriteDestParams(BaseModel):

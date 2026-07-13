@@ -8,15 +8,15 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from conveyor.core.config import load_config
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import ManualTrigger, loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.core.runner import PipelineRunner
-from conveyor.core.triggers import ManualScanService, ledger_sink
-from conveyor.web.app import create_app
+from ordine.core.config import load_config
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import ManualTrigger, loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.core.runner import PipelineRunner
+from ordine.core.triggers import ManualScanService, ledger_sink
+from ordine.web.app import create_app
 from tests.test_runner_e2e import ASSET_NAMES, _game_assets_yaml, _seed_images, _write_manifest
 
 POST_HEADERS = {"HX-Request": "true", "Origin": "http://127.0.0.1:8484"}
@@ -26,7 +26,7 @@ def _write_config(tmp_path: Path) -> Path:
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         f"""[paths]
-db = "{tmp_path / "conveyor.sqlite3"}"
+db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]

@@ -1,26 +1,26 @@
-# Conveyor
+# Ordine — self-healing task pipelines for your desktop.
 
-Local-first, AI-assisted task automation pipelines for Linux. Watch folders or manifests, run ordered steps with exactly-once guarantees, recover from failures with branches, and optionally use LLMs to draft playbooks or diagnose flags — all on your machine.
+Watch folders or manifests, run ordered steps with exactly-once guarantees, recover from failures with branches, and optionally use LLMs to draft playbooks or diagnose flags — all on your machine.
 
-[![CI](https://github.com/OWNER/conveyor/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/conveyor/actions/workflows/ci.yml)
+[![CI](https://github.com/OWNER/ordine/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/ordine/actions/workflows/ci.yml)
 
-**Privacy:** Conveyor collects no telemetry, crash reports, or usage analytics — ever — without explicit opt-in. There is none today.
+**Privacy:** Ordine collects no telemetry, crash reports, or usage analytics — ever — without explicit opt-in. There is none today.
 
 ## Quickstart (≤10 minutes)
 
 ```bash
 # pipx (recommended) or install the .deb — see docs/install.md
-pipx install conveyor-automation
+pipx install ordine
 sudo apt install -y imagemagick   # recommended for image pipelines
 
-conveyor example ~/conveyor-demo
-cd ~/conveyor-demo
-conveyor check png-cleanup.yml
-conveyor run png-cleanup.yml --oneshot
-conveyor serve   # open http://127.0.0.1:8484
+ordine example ~/ordine-demo
+cd ~/ordine-demo
+ordine check png-cleanup.yml
+ordine run png-cleanup.yml --oneshot
+ordine serve   # open http://127.0.0.1:8484
 ```
 
-`conveyor example` scaffolds six sample images, `assets.csv`, and a ready-to-run cleanup playbook. The quickstart path is also exercised in CI (`tests/test_example_cmd.py`).
+`ordine example` scaffolds six sample images, `assets.csv`, and a ready-to-run cleanup playbook. The quickstart path is also exercised in CI (`tests/test_example_cmd.py`).
 
 ## Features
 

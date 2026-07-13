@@ -9,7 +9,7 @@ Step 12 provides provider-agnostic plumbing for text completions. Features that 
 | `none` | — | — | Default; pipelines never need LLM |
 | `anthropic` | `https://api.anthropic.com/v1/messages` | `ANTHROPIC_API_KEY` | Claude models |
 | `openai` | `{base}/v1/chat/completions` | `OPENAI_API_KEY` | Default base `https://api.openai.com` |
-| `openai_compatible` | `{base}/v1/chat/completions` | `CONVEYOR_LLM_API_KEY` (optional) | Ollama, LM Studio, vLLM |
+| `openai_compatible` | `{base}/v1/chat/completions` | `ORDINE_LLM_API_KEY` (optional) | Ollama, LM Studio, vLLM |
 
 Configure provider, model, `base_url` (compatible only), `max_tokens`, and `session_token_cap` in **Settings** (`/settings`) or `[llm]` in `config.toml`.
 
@@ -17,9 +17,9 @@ Configure provider, model, `base_url` (compatible only), `max_tokens`, and `sess
 
 Precedence (highest first):
 
-1. System keyring (`conveyor` service, provider name)
+1. System keyring (`ordine` service, provider name)
 2. Environment variable (see table)
-3. `~/.config/conveyor/.env` (`KEY=VALUE` lines; `#` comments)
+3. `~/.config/ordine/.env` (`KEY=VALUE` lines; `#` comments)
 
 Set or clear keys from the settings page (stored in keyring). The UI shows **key present: yes/no** only — never the secret.
 
@@ -39,7 +39,7 @@ session_token_cap = 200000
 ```
 
 ```bash
-conveyor llm check
+ordine llm check
 ```
 
 ## Token budget
@@ -60,8 +60,8 @@ Logging failures are reported to stderr and do not fail the call.
 ## CLI smoke test
 
 ```bash
-conveyor llm check          # human-readable ok/latency/usage
-conveyor llm check --json   # machine-readable
+ordine llm check          # human-readable ok/latency/usage
+ordine llm check --json   # machine-readable
 ```
 
 Exit codes: `0` success, `1` not configured or auth failure, `2` other errors.

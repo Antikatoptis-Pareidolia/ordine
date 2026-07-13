@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.errors import PlaybookSyntaxError, PlaybookValidationError
-from conveyor.core.playbook import Playbook, emit_json_schema, load_playbook, loads_playbook
+from ordine.core.errors import PlaybookSyntaxError, PlaybookValidationError
+from ordine.core.playbook import Playbook, emit_json_schema, load_playbook, loads_playbook
 
 FIXTURES = Path(__file__).parent / "fixtures" / "playbooks"
 VALID_DIR = FIXTURES / "valid"
@@ -291,7 +291,7 @@ steps:
 def test_emit_schema_module_main(tmp_path: Path) -> None:
     dest = tmp_path / "cli-schema.json"
     subprocess.run(
-        [sys.executable, "-m", "conveyor.core.playbook", "--emit-schema", str(dest)],
+        [sys.executable, "-m", "ordine.core.playbook", "--emit-schema", str(dest)],
         check=True,
     )
     data = json.loads(dest.read_text(encoding="utf-8"))

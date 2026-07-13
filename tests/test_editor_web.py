@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from conveyor.core.config import load_config
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import dump_playbook, load_playbook, loads_playbook
-from conveyor.web.app import create_app
-from conveyor.web.forms import playbook_to_form
-from conveyor.web.routes.editor import STARTER_YAML
+from ordine.core.config import load_config
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import dump_playbook, load_playbook, loads_playbook
+from ordine.web.app import create_app
+from ordine.web.forms import playbook_to_form
+from ordine.web.routes.editor import STARTER_YAML
 from tests.test_branch_regression import _parse_form_fields_from_html
 from tests.test_web import POST_HEADERS, _write_config
 

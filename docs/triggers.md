@@ -126,10 +126,10 @@ import tempfile
 import time
 from pathlib import Path
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import FolderWatchTrigger, load_playbook
-from conveyor.core.triggers import FolderWatchService, ledger_sink
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import FolderWatchTrigger, load_playbook
+from ordine.core.triggers import FolderWatchService, ledger_sink
 
 watch = Path(tempfile.mkdtemp())
 db = watch / "ledger.db"

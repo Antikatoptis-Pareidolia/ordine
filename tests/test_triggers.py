@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import FolderWatchTrigger, ManifestTrigger, ManualTrigger
-from conveyor.core.triggers import (
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import FolderWatchTrigger, ManifestTrigger, ManualTrigger
+from ordine.core.triggers import (
     FolderWatchService,
     ManifestTriggerService,
     ManualScanService,
@@ -40,7 +40,7 @@ def ledger(engine) -> Ledger:
 
 
 def _register_pipeline(ledger: Ledger) -> int:
-    from conveyor.core.playbook import load_playbook
+    from ordine.core.playbook import load_playbook
 
     playbook = load_playbook(FIXTURE_YAML)
     pipeline_id, _ = ledger.register_pipeline(playbook, FIXTURE_YAML.read_text(encoding="utf-8"))
@@ -51,7 +51,7 @@ def test_compute_dedup_key_sha256(tmp_path: Path) -> None:
     import hashlib
 
     path = tmp_path / "data.bin"
-    data = b"hello conveyor"
+    data = b"hello ordine"
     path.write_bytes(data)
     assert compute_dedup_key(path, "content_hash") == f"sha256:{hashlib.sha256(data).hexdigest()}"
 
@@ -60,7 +60,7 @@ def test_compute_dedup_key_known_hash(tmp_path: Path) -> None:
     import hashlib
 
     path = tmp_path / "known.bin"
-    data = b"conveyor-step-6"
+    data = b"ordine-step-6"
     path.write_bytes(data)
     expected = f"sha256:{hashlib.sha256(data).hexdigest()}"
     assert compute_dedup_key(path, "content_hash") == expected

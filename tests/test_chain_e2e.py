@@ -8,14 +8,14 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import ManifestTrigger, loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.core.runner import PipelineRunner
-from conveyor.core.triggers import build_trigger_service
-from conveyor.llm.steps import reset_image_budget_for_tests
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import ManifestTrigger, loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.core.runner import PipelineRunner
+from ordine.core.triggers import build_trigger_service
+from ordine.llm.steps import reset_image_budget_for_tests
 from tests.test_ledger_crash import SimulatedCrash
 
 CHAIN_NAMES = [f"asset{i:02d}.png" for i in range(1, 21)]
@@ -181,7 +181,7 @@ def _scan_cleanup(
     clean_pb: object,
     workdir: Path,
 ) -> PipelineRunner:
-    from conveyor.core.triggers import ManualScanService, ledger_sink
+    from ordine.core.triggers import ManualScanService, ledger_sink
 
     ManualScanService(
         clean_pb.trigger,

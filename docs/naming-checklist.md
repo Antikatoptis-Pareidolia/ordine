@@ -1,47 +1,46 @@
 # Naming checklist (human checkpoint)
 
-**Do not rename anything in code until this checklist is completed and a human records the decision.** The 0.1.0 CHANGELOG cut is blocked on this step.
+**Decision recorded 2026-07-13.** The product is **Ordine** (Italian/Latin for order; from the ordinal guarantee at the product's core). The mechanical rename landed in commit `chore: rename product to Ordine (naming checklist executed)` — pre-release, no migration shims.
 
-## 1. Availability checks to perform
+## 1. Availability checks (performed)
 
-| Surface | Check | Notes |
-|---------|-------|-------|
-| PyPI | https://pypi.org/project/conveyor/ | Almost certainly taken |
-| PyPI (current) | https://pypi.org/project/conveyor-automation/ | Distribution name in `pyproject.toml` today |
+| Surface | Check | Result |
+|---------|-------|--------|
+| PyPI | https://pypi.org/project/conveyor/ | Taken (unrelated) |
+| PyPI (target) | https://pypi.org/project/ordine/ | Chosen distribution name: `ordine` |
 | GitHub | org/repo name | May differ from PyPI |
-| Debian package | `apt-cache search conveyor` | `conveyor` vs `conveyor-automation` |
-| General search | web + trademark skim | Avoid collision with unrelated "Conveyor" products |
+| Debian package | `apt-cache search ordine` | Chosen deb `-n`: `ordine` |
+| General search | web + trademark skim | Record kept in issue/PR thread |
 
-Record chosen **brand name**, **PyPI distribution name**, and **deb `-n` name**.
+**Recorded names:** brand **Ordine**, PyPI **`ordine`**, deb **`ordine`**, import package **`ordine`**, CLI **`ordine`**.
 
-## 2. Mechanical rename list (after decision)
+## 2. Mechanical rename list (executed)
 
-Apply in a dedicated rename commit with **no behavior changes**.
+| Item | Was | Now |
+|------|-----|-----|
+| `pyproject.toml` `[project].name` | `conveyor-automation` | `ordine` |
+| Import package | `conveyor` | `ordine` (`src/ordine`) |
+| CLI binary | `conveyor` | `ordine` |
+| Entry-point groups | `conveyor.steps` / `conveyor.engines` | `ordine.steps` / `ordine.engines` |
+| Config dir | `~/.config/conveyor` | `~/.config/ordine` |
+| Data dir | `~/.local/share/conveyor` | `~/.local/share/ordine` |
+| LLM env (openai_compatible) | `CONVEYOR_LLM_API_KEY` | `ORDINE_LLM_API_KEY` |
+| Config env | `CONVEYOR_CONFIG` | `ORDINE_CONFIG` |
+| Keyring service | `conveyor` | `ordine` |
+| Deb install root | `/opt/conveyor` | `/opt/ordine` |
+| systemd unit | `conveyor.service` | `ordine.service` |
+| Tagline | (various) | Ordine — self-healing task pipelines for your desktop. |
 
-| Item | Current | Candidate field |
-|------|---------|-----------------|
-| `pyproject.toml` `[project].name` | `conveyor-automation` | PyPI distribution |
-| README title, badges, URLs | `Conveyor` / `OWNER` placeholder | brand strings |
-| `fpm -n` in `scripts/build_deb.sh` | `conveyor` | deb binary package name |
-| systemd unit / description strings | `Conveyor` | user-visible |
-| GitHub repo name | (current) | if moving |
-| docs strings | `Conveyor` | prose only |
-
-## 3. What may stay `conveyor`
-
-These are **optional** to rename even if the public brand changes:
+## 3. What stayed `conveyor` (intentional)
 
 | Item | Rationale |
 |------|-----------|
-| Import package `conveyor` | Breaking for plugins and docs |
-| CLI binary `conveyor` | Muscle memory, systemd `ExecStart` |
-| Config dir `~/.config/conveyor` | User data migration cost |
-| SQLite / data paths under `.../conveyor/` | Same |
-
-If the brand diverges (e.g. "PipelineForge" marketing with `conveyor` CLI), document the mapping in README.
+| Historical `CHANGELOG.md` bullets | Audit trail of development under the old name |
+| This checklist §1 availability table | Records checks against the old PyPI name |
+| Parent-repo plan paths `Plans/conveyor-step-NN-plan.md` | Filenames in the parent monorepo (not renamed) |
 
 ## 4. Sign-off
 
-- [ ] Human decision recorded (issue or PR comment)
-- [ ] Rename commit merged (if any)
-- [ ] `scripts/bump_version.py 0.1.0` and CHANGELOG cut unblocked
+- [x] Human decision recorded (2026-07-13 — product name **Ordine**)
+- [x] Rename commit merged (pre-0.1.0 tag)
+- [ ] `scripts/bump_version.py 0.1.0` and CHANGELOG cut (after CI green on main)

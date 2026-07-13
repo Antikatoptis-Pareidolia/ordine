@@ -6,8 +6,8 @@ Three user-initiated features on top of the Step 12 LLM connector. **The LLM dra
 
 | Feature | Trigger | Output |
 |---------|---------|--------|
-| Draft | Editor “Draft with AI” / `conveyor draft` | Unsaved YAML in editor (or stdout/`--out`) |
-| Diagnose | Task page / `conveyor diagnose` | Structured cause + evidence in UI or JSON |
+| Draft | Editor “Draft with AI” / `ordine draft` | Unsaved YAML in editor (or stdout/`--out`) |
+| Diagnose | Task page / `ordine diagnose` | Structured cause + evidence in UI or JSON |
 | Suggest branch | Flagged/failed task | Approval panel with semantic diff; Approve saves a new version |
 
 ## Privacy table (what leaves the machine)
@@ -33,13 +33,13 @@ Context is capped at 30,000 characters; oldest log sections drop first.
 
 ## Prompt versioning
 
-Prompt templates live in `src/conveyor/llm/prompts.py` with `*_VERSION` constants. Bump the version when changing instructions materially.
+Prompt templates live in `src/ordine/llm/prompts.py` with `*_VERSION` constants. Bump the version when changing instructions materially.
 
 ## Local usage
 
 ```bash
-conveyor draft "watch ~/in, clear white, rename from assets.csv, export to ~/out"
-conveyor diagnose TASK_ID --json
+ordine draft "watch ~/in, clear white, rename from assets.csv, export to ~/out"
+ordine diagnose TASK_ID --json
 ```
 
 Configure the LLM in [Settings](/settings) or `[llm]` in `config.toml`.

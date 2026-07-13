@@ -14,11 +14,11 @@ Use this for every `vX.Y.Z` tag. CI automates build/test/publish; the VM gate st
 
 ```bash
 uv run python scripts/bump_version.py X.Y.Z   # refuses empty Unreleased
-git add pyproject.toml src/conveyor/__init__.py CHANGELOG.md
+git add pyproject.toml src/ordine/__init__.py CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
 ```
 
-`test_version_sync.py` guards `pyproject.toml` ↔ `conveyor.__version__`.
+`test_version_sync.py` guards `pyproject.toml` ↔ `ordine.__version__`.
 
 ## Tag & CI
 
@@ -42,7 +42,7 @@ git push origin main --tags
 Someone who did **not** build the project:
 
 1. Start stopwatch
-2. Follow **README quickstart only** (pipx or deb + imagemagick + `conveyor example` + run + serve)
+2. Follow **README quickstart only** (pipx or deb + imagemagick + `ordine example` + run + serve)
 3. Stop when the web UI shows a completed pipeline
 4. **Pass:** < 10 minutes
 
@@ -52,7 +52,7 @@ Record OS version and any friction in the release issue.
 
 - [ ] Record demo GIF from `demo/demo.tape` with [vhs](https://github.com/charmbracelet/vhs) (not in CI)
 - [ ] `pipx install` on a clean user account; walk the UI
-- [ ] `systemctl --user enable --now conveyor`; verify survive re-login
+- [ ] `systemctl --user enable --now ordine`; verify survive re-login
 - [ ] `retention.on_serve_start = true`; confirm log line on serve
 
 ## Announce

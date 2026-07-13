@@ -6,18 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.config import load_config, write_default_config
-from conveyor.core.errors import ConfigError
+from ordine.core.config import load_config, write_default_config
+from ordine.core.errors import ConfigError
 
 
 def test_load_defaults_without_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
-    monkeypatch.delenv("CONVEYOR_CONFIG", raising=False)
+    monkeypatch.delenv("ORDINE_CONFIG", raising=False)
     config = load_config()
     assert config.stale_after_minutes == 15
     assert config.reconcile_policy == "retry"
     assert config.log_level == "INFO"
-    assert config.db_path.name == "conveyor.sqlite3"
+    assert config.db_path.name == "ordine.sqlite3"
     assert config.workdir_root.name == "workdirs"
 
 
@@ -38,7 +38,7 @@ workdir_root = "{tmp_path / "work-two"}"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("CONVEYOR_CONFIG", str(env_file))
+    monkeypatch.setenv("ORDINE_CONFIG", str(env_file))
     config = load_config(explicit)
     assert config.db_path == tmp_path / "one.sqlite3"
     assert config.workdir_root == tmp_path / "work-one"
@@ -53,7 +53,7 @@ workdir_root = "{tmp_path / "work-env"}"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("CONVEYOR_CONFIG", str(env_file))
+    monkeypatch.setenv("ORDINE_CONFIG", str(env_file))
     config = load_config()
     assert config.db_path == tmp_path / "env.sqlite3"
 

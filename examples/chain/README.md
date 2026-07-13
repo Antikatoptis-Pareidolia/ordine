@@ -8,9 +8,9 @@ Two pipelines implement the full game-assets story:
 ## Offline rehearsal (mock provider)
 
 ```bash
-cd conveyor   # repository root (where pyproject.toml lives)
-uv run conveyor run examples/chain/gen-images.yml --oneshot
-uv run conveyor run examples/chain/png-cleanup.yml --oneshot
+cd ordine   # repository root (where pyproject.toml lives)
+uv run ordine run examples/chain/gen-images.yml --oneshot
+uv run ordine run examples/chain/png-cleanup.yml --oneshot
 ls ~/game/assets
 ```
 
@@ -25,8 +25,8 @@ Register both playbooks, then start each pipeline from the dashboard (or CLI). T
 Edit a row's `prompt` in `assets.csv`, then rerun **both** pipeline legs:
 
 ```bash
-uv run conveyor run examples/chain/gen-images.yml --oneshot
-uv run conveyor run examples/chain/png-cleanup.yml --oneshot
+uv run ordine run examples/chain/gen-images.yml --oneshot
+uv run ordine run examples/chain/png-cleanup.yml --oneshot
 ```
 
 The manifest trigger enqueues a new task for the edited row only; unchanged rows stay `done`.

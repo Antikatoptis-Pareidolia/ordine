@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Product renamed to **Ordine**: PyPI/deb/CLI/import package `ordine`, config/data dirs, keyring service, entry-point groups `ordine.steps`/`ordine.engines`, CI Python matrix via `uv python install` (Step 15 naming)
 - Pillow white-to-alpha uses `get_flattened_data()`; diagnosis repair calls use `repair_diagnose` purpose tag (Step 15)
 - Flags inbox shows one-line hints per known flag kind (Step 15)
 

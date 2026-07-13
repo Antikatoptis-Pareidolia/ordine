@@ -1,4 +1,4 @@
-from conveyor import __version__
+from ordine import __version__
 
 
 def test_version_is_semver() -> None:

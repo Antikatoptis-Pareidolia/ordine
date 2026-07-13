@@ -36,9 +36,9 @@ or tests. Layout is a **public contract** — the UI and audit tools depend on i
 
 ```python
 from pathlib import Path
-from conveyor.core.workdir import TaskWorkdir
+from ordine.core.workdir import TaskWorkdir
 
-workdir = TaskWorkdir.create(Path("~/conveyor-work"), "png-cleanup", task_id=42)
+workdir = TaskWorkdir.create(Path("~/ordine-work"), "png-cleanup", task_id=42)
 step_dir = workdir.step_dir(1, "image.white_to_alpha")
 logger = workdir.step_logger(step_dir)
 branch_dir = workdir.step_dir(1, "image.export", branch="fallback-pillow", branch_no=1)
@@ -53,17 +53,17 @@ Steps receive `ctx.input_path` (current artifact, read-only) and return `StepRes
 
 ## Retention cleanup
 
-Terminal task workdirs can grow without bound. `conveyor cleanup` (and optional serve-start retention) deletes on-disk directories only — **never** export destinations or ledger rows beyond clearing `tasks.workdir`.
+Terminal task workdirs can grow without bound. `ordine cleanup` (and optional serve-start retention) deletes on-disk directories only — **never** export destinations or ledger rows beyond clearing `tasks.workdir`.
 
 | Config (`[retention]`) | Default | Meaning |
 |---|---|---|
 | `days` | `30` | Delete workdirs for tasks finished longer ago |
 | `keep_failed` | `true` | Keep `failed` and `flagged` workdirs as evidence |
-| `on_serve_start` | `false` | Run cleanup once when `conveyor serve` starts |
+| `on_serve_start` | `false` | Run cleanup once when `ordine serve` starts |
 
 ```bash
-conveyor cleanup --dry-run --json
-conveyor cleanup --days 7 --include-failed
+ordine cleanup --dry-run --json
+ordine cleanup --days 7 --include-failed
 ```
 
-After cleanup, task detail shows **workdir cleaned** when the path was cleared. Implementation: `conveyor.core.retention.cleanup_workdirs` + `Ledger.clear_workdir`.
+After cleanup, task detail shows **workdir cleaned** when the path was cleared. Implementation: `ordine.core.retention.cleanup_workdirs` + `Ledger.clear_workdir`.

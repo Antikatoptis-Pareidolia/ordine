@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.playbook import dump_playbook, load_playbook, loads_playbook
+from ordine.core.playbook import dump_playbook, load_playbook, loads_playbook
 
 VALID_DIR = Path(__file__).parent / "fixtures" / "playbooks" / "valid"
 VALID_FIXTURES = sorted(VALID_DIR.glob("*.yml"))

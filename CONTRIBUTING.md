@@ -1,14 +1,14 @@
-# Contributing to Conveyor
+# Contributing to Ordine
 
-Thank you for helping improve Conveyor. This project follows explicit step plans and strict conventions — read both before opening a PR.
+Thank you for helping improve Ordine. This project follows explicit step plans and strict conventions — read both before opening a PR.
 
 ## Development setup
 
 ```bash
 sudo apt install imagemagick
-git clone <repo> && cd conveyor
+git clone <repo> && cd ordine
 uv venv && uv sync --locked --extra dev
-uv pip install -e tests/fixtures/conveyor_test_plugin
+uv pip install -e tests/fixtures/ordine_test_plugin
 pre-commit install
 ```
 
@@ -24,7 +24,7 @@ uv run pytest -m "not llm_live"
 
 All changes must comply with [CONVENTIONS.md](CONVENTIONS.md). Highlights:
 
-- `conveyor.core` stays domain-generic (no image/LLM/web imports)
+- `ordine.core` stays domain-generic (no image/LLM/web imports)
 - Typed contracts across layers
 - Tests ship with behavior changes; no monkeypatching the subject under test (rule 21)
 - Conventional Commits; update `CHANGELOG.md` `[Unreleased]`

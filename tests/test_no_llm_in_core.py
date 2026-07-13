@@ -1,4 +1,4 @@
-"""Deterministic-runs guarantee: core and executors must never import conveyor.llm."""
+"""Deterministic-runs guarantee: core and executors must never import ordine.llm."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import ast
 import sys
 from pathlib import Path
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.registry import StepRegistry
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.registry import StepRegistry
 from tests.test_runner_e2e import (
     ASSET_NAMES,
     _game_assets_yaml,
@@ -19,7 +19,7 @@ from tests.test_runner_e2e import (
     _write_manifest,
 )
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "conveyor"
+_SRC = Path(__file__).resolve().parents[1] / "src" / "ordine"
 _SCAN_ROOTS = (_SRC / "core", _SRC / "executors")
 
 
@@ -32,11 +32,11 @@ def _llm_import_violations() -> list[tuple[Path, str]]:
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         mod = alias.name
-                        if mod == "conveyor.llm" or mod.startswith("conveyor.llm."):
+                        if mod == "ordine.llm" or mod.startswith("ordine.llm."):
                             violations.append((path, mod))
                 elif isinstance(node, ast.ImportFrom) and node.module:
                     mod = node.module
-                    if mod == "conveyor.llm" or mod.startswith("conveyor.llm."):
+                    if mod == "ordine.llm" or mod.startswith("ordine.llm."):
                         violations.append((path, mod))
     return violations
 
@@ -47,10 +47,10 @@ def test_no_llm_imports_in_core_or_executors() -> None:
 
 
 class _LLMImportBlocker:
-    """Block any import of conveyor.llm* at runtime."""
+    """Block any import of ordine.llm* at runtime."""
 
     def find_module(self, fullname: str, path: object | None = None) -> _LLMImportBlocker | None:
-        if fullname == "conveyor.llm" or fullname.startswith("conveyor.llm."):
+        if fullname == "ordine.llm" or fullname.startswith("ordine.llm."):
             return self
         return None
 
@@ -59,7 +59,7 @@ class _LLMImportBlocker:
 
 
 def test_flagship_e2e_runs_without_llm_module(tmp_path: Path) -> None:
-    """Step 7 flagship e2e must complete with conveyor.llm blocked on sys.meta_path."""
+    """Step 7 flagship e2e must complete with ordine.llm blocked on sys.meta_path."""
     eng = create_engine_for(tmp_path / "ledger.db")
     init_db(eng)
     ledger = Ledger(eng)

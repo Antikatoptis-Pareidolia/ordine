@@ -1,4 +1,4 @@
-# Conveyor documentation index
+# Ordine documentation index
 
 Read these in any order; each doc is scoped to one concern. This index was reconciled during Step 15 against the current codebase.
 
@@ -7,7 +7,7 @@ Read these in any order; each doc is scoped to one concern. This index was recon
 | Doc | Topic |
 |-----|-------|
 | [install.md](install.md) | pipx, `.deb`, from source, systemd user unit |
-| [cli.md](cli.md) | `conveyor` commands, `--json`, config paths |
+| [cli.md](cli.md) | `ordine` commands, `--json`, config paths |
 | [chaining.md](chaining.md) | manifest → generate → cleanup chain |
 
 ## Core platform
@@ -31,7 +31,7 @@ Read these in any order; each doc is scoped to one concern. This index was recon
 
 | Doc | Topic |
 |-----|-------|
-| [web.md](web.md) | `conveyor serve`, routes, security mitigations |
+| [web.md](web.md) | `ordine serve`, routes, security mitigations |
 | [editor.md](editor.md) | playbook editor, versions, diffs |
 | [lab.md](lab.md) | dry-run lab, checkpoints |
 
@@ -53,4 +53,4 @@ Read these in any order; each doc is scoped to one concern. This index was recon
 ## Examples in the repo
 
 - `examples/chain/` — offline mock chain (8 rows)
-- `conveyor example DIR` — six-file quickstart scaffold (CI-guaranteed)
+- `ordine example DIR` — six-file quickstart scaffold (CI-guaranteed)

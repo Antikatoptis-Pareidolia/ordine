@@ -8,11 +8,11 @@ from urllib.parse import unquote
 import pytest
 from fastapi.testclient import TestClient
 
-from conveyor.core.config import load_config
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import loads_playbook
-from conveyor.web.app import create_app
-from conveyor.web.routes.lab import LabSessionStore
+from ordine.core.config import load_config
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import loads_playbook
+from ordine.web.app import create_app
+from ordine.web.routes.lab import LabSessionStore
 from tests.test_branch_regression import _parse_form_fields_from_html
 from tests.test_web import POST_HEADERS, _write_config
 
@@ -573,7 +573,7 @@ steps:
         ),
         "version: 1\nname: shutdown-lab\ntrigger: {type: manual, path: ~/in}\nsteps:\n  - util.noop\n",
     )
-    from conveyor.core.dryrun import DryRunSession
+    from ordine.core.dryrun import DryRunSession
 
     session = DryRunSession.create(
         playbook=loads_playbook(
@@ -593,7 +593,7 @@ steps:
         yaml_text="version: 1\nname: shutdown-lab\ntrigger: {type: manual, path: ~/in}\nsteps:\n  - util.noop\n",
     )
     sandbox = session.sandbox
-    from conveyor.web.routes.lab import LabSessionRecord
+    from ordine.web.routes.lab import LabSessionRecord
 
     store.put(LabSessionRecord(sid=session.session_id, pipeline_id=pipeline_id, session=session))
     assert sandbox.exists()

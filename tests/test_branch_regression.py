@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from conveyor.core.config import load_config
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import FailurePolicy, Playbook, loads_playbook
-from conveyor.web.app import create_app
+from ordine.core.config import load_config
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import FailurePolicy, Playbook, loads_playbook
+from ordine.web.app import create_app
 from tests.test_web import POST_HEADERS, _write_config
 
 BRANCHY_COMBINED_YAML = """\

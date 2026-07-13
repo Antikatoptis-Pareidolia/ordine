@@ -9,12 +9,12 @@
 ## pipx (recommended)
 
 ```bash
-pipx install conveyor-automation
+pipx install ordine
 pipx ensurepath
-conveyor --help
+ordine --help
 ```
 
-Upgrade: `pipx upgrade conveyor-automation`
+Upgrade: `pipx upgrade ordine`
 
 ## `.deb` (self-contained venv)
 
@@ -22,27 +22,27 @@ Build locally (requires [fpm](https://fpm.readthedocs.io/)):
 
 ```bash
 bash scripts/build_deb.sh
-sudo apt install ./dist/conveyor_*_amd64.deb imagemagick
+sudo apt install ./dist/ordine_*_amd64.deb imagemagick
 ```
 
-The package installs a venv under `/opt/conveyor`, a `/usr/bin/conveyor` symlink, and a systemd user unit at `/usr/lib/systemd/user/conveyor.service`.
+The package installs a venv under `/opt/ordine`, a `/usr/bin/ordine` symlink, and a systemd user unit at `/usr/lib/systemd/user/ordine.service`.
 
 ## From source (development)
 
 ```bash
 sudo apt install imagemagick
-git clone <repo> && cd conveyor
+git clone <repo> && cd ordine
 uv venv && uv sync --extra dev
-uv pip install -e tests/fixtures/conveyor_test_plugin
-uv run conveyor --help
+uv pip install -e tests/fixtures/ordine_test_plugin
+uv run ordine --help
 ```
 
 ## First run
 
 ```bash
-conveyor init                    # writes ~/.config/conveyor/config.toml
-conveyor example ~/conveyor-demo
-cd ~/conveyor-demo && conveyor run png-cleanup.yml --oneshot
+ordine init                    # writes ~/.config/ordine/config.toml
+ordine example ~/ordine-demo
+cd ~/ordine-demo && ordine run png-cleanup.yml --oneshot
 ```
 
 ## systemd (user service)
@@ -51,17 +51,17 @@ cd ~/conveyor-demo && conveyor run png-cleanup.yml --oneshot
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now conveyor
-systemctl --user status conveyor
+systemctl --user enable --now ordine
+systemctl --user status ordine
 ```
 
-**pipx install** — copy or adapt `packaging/conveyor.service`, setting:
+**pipx install** — copy or adapt `packaging/ordine.service`, setting:
 
 ```ini
-ExecStart=%h/.local/bin/conveyor serve
+ExecStart=%h/.local/bin/ordine serve
 ```
 
-Logs: `journalctl --user -u conveyor -f`
+Logs: `journalctl --user -u ordine -f`
 
 Optional retention at startup: set `on_serve_start = true` under `[retention]` in config.
 

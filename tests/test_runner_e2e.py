@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import ManualTrigger, loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.core.runner import PipelineRunner, PipelineService
-from conveyor.core.triggers import ManualScanService, ledger_sink
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import ManualTrigger, loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.core.runner import PipelineRunner, PipelineService
+from ordine.core.triggers import ManualScanService, ledger_sink
 from tests.test_image_steps import make_test_image
 
 ASSET_NAMES = [

@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.errors import IllegalTransitionError, LedgerError, SchemaVersionError
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import load_playbook
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.errors import IllegalTransitionError, LedgerError, SchemaVersionError
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import load_playbook
 
 FIXTURE = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v01_minimal.yml"
 
@@ -212,7 +212,7 @@ def test_rule_6_reconcile(ledger: Ledger) -> None:
     assert touched_none == 0
     assert ledger.get_task(fresh_id).status == "processing"
 
-    from conveyor.core.playbook import loads_playbook
+    from ordine.core.playbook import loads_playbook
 
     fail_yaml = FIXTURE.read_text(encoding="utf-8").replace("name: minimal", "name: fail-pipeline")
     fail_playbook = loads_playbook(fail_yaml)

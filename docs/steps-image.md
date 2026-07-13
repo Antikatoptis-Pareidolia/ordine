@@ -1,6 +1,6 @@
 # Headless image steps
 
-Four steps live in `conveyor.executors.headless.steps`. Each runs in isolation under the Step 4 contract; sequencing, retries, branches, and flag wiring are handled by the runner (Step 7).
+Four steps live in `ordine.executors.headless.steps`. Each runs in isolation under the Step 4 contract; sequencing, retries, branches, and flag wiring are handled by the runner (Step 7).
 
 ## Steps overview
 
@@ -128,11 +128,11 @@ When output format matches input, bytes are copied verbatim (no re-encode). Conv
 
 ```python
 from pathlib import Path
-from conveyor.core.steps import StepContext
-from conveyor.core.workdir import TaskWorkdir
-from conveyor.executors.headless.steps import WhiteToAlphaStep, TrimStep, ExportStep
+from ordine.core.steps import StepContext
+from ordine.core.workdir import TaskWorkdir
+from ordine.executors.headless.steps import WhiteToAlphaStep, TrimStep, ExportStep
 
-workdir = TaskWorkdir.create(Path("/tmp/conveyor-demo"), "demo", 1)
+workdir = TaskWorkdir.create(Path("/tmp/ordine-demo"), "demo", 1)
 src = Path("my-ai-image.png")
 step_dir = workdir.step_dir(1, "image.white_to_alpha")
 ctx = StepContext(

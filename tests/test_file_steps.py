@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.steps import StepContext
-from conveyor.core.workdir import TaskWorkdir
-from conveyor.executors.builtin.file_steps import MoveStep
+from ordine.core.steps import StepContext
+from ordine.core.workdir import TaskWorkdir
+from ordine.executors.builtin.file_steps import MoveStep
 
 
 def _ctx(tmp_path: Path, *, input_path: Path, step_id: str = "file.move") -> StepContext:

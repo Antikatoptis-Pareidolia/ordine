@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import conveyor
+import ordine
 
 
 def test_version_matches_pyproject() -> None:
@@ -13,4 +13,4 @@ def test_version_matches_pyproject() -> None:
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
     match = re.search(r'^version = "([^"]+)"', pyproject, re.MULTILINE)
     assert match is not None, "pyproject.toml missing version"
-    assert conveyor.__version__ == match.group(1)
+    assert ordine.__version__ == match.group(1)

@@ -10,19 +10,19 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from conveyor.core.config import AppConfig, load_config
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.dryrun import DryRunSession
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.ledger import Ledger
-from conveyor.core.playbook import ManualTrigger, loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.core.runner import PipelineRunner
-from conveyor.core.triggers import ManualScanService, ledger_sink
-from conveyor.llm.features.branches import apply_branch, suggest_branch
-from conveyor.llm.features.drafting import draft_playbook
-from conveyor.llm.types import LLMResponse, Message, Usage
-from conveyor.web.app import create_app
+from ordine.core.config import AppConfig, load_config
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.dryrun import DryRunSession
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.ledger import Ledger
+from ordine.core.playbook import ManualTrigger, loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.core.runner import PipelineRunner
+from ordine.core.triggers import ManualScanService, ledger_sink
+from ordine.llm.features.branches import apply_branch, suggest_branch
+from ordine.llm.features.drafting import draft_playbook
+from ordine.llm.types import LLMResponse, Message, Usage
+from ordine.web.app import create_app
 from tests.test_image_steps import make_test_image
 
 FIXTURES = Path(__file__).parent / "fixtures" / "llm"
@@ -62,7 +62,7 @@ def _write_config(tmp_path: Path) -> Path:
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         f"""[paths]
-db = "{tmp_path / "conveyor.sqlite3"}"
+db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
@@ -215,10 +215,10 @@ def test_web_not_configured_card(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         config_file=config_path,
     )
     monkeypatch.setattr(
-        "conveyor.web.routes.editor.build_client",
+        "ordine.web.routes.editor.build_client",
         lambda _c: (_ for _ in ()).throw(
             __import__(
-                "conveyor.llm.errors", fromlist=["LLMNotConfiguredError"]
+                "ordine.llm.errors", fromlist=["LLMNotConfiguredError"]
             ).LLMNotConfiguredError()
         ),
     )
@@ -282,7 +282,7 @@ on_failure: {{ retries: 0, then: mark_failed }}
 def test_web_draft_clickthrough(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = load_config(_write_config(tmp_path))
     canned = CannedLLMClient([_fixture("flagship_draft.yaml.txt")])
-    monkeypatch.setattr("conveyor.web.routes.editor.build_client", lambda _c: canned)
+    monkeypatch.setattr("ordine.web.routes.editor.build_client", lambda _c: canned)
     client = TestClient(create_app(config))
     response = client.post(
         "/pipelines/new/ai/draft",
@@ -310,7 +310,7 @@ def test_web_learning_loop_clickthrough(tmp_path: Path, monkeypatch: pytest.Monk
         tmp_path,
     )
     canned = CannedLLMClient([_fixture("branch_suggestion.json.txt")])
-    monkeypatch.setattr("conveyor.web.routes.tasks.build_client", lambda _c: canned)
+    monkeypatch.setattr("ordine.web.routes.tasks.build_client", lambda _c: canned)
     client = TestClient(app)
     suggest = client.post(f"/tasks/{task_id}/ai/suggest-branch", headers=POST_HEADERS)
     assert suggest.status_code == 200

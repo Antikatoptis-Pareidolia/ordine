@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from conveyor.core.engines import HeadlessEngine
-from conveyor.core.registry import StepRegistry
-from conveyor.core.steps import StepContext, StepResult
-from conveyor.core.workdir import TaskWorkdir
-from conveyor.executors.builtin.steps import CopyStep, FailStep, NoopStep
+from ordine.core.engines import HeadlessEngine
+from ordine.core.registry import StepRegistry
+from ordine.core.steps import StepContext, StepResult
+from ordine.core.workdir import TaskWorkdir
+from ordine.executors.builtin.steps import CopyStep, FailStep, NoopStep
 
 
 @pytest.fixture

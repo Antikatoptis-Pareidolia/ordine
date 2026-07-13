@@ -7,14 +7,14 @@ import logging
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from conveyor.core.errors import StepError, StepParamError, UnknownStepError
-from conveyor.core.playbook import loads_playbook
-from conveyor.core.registry import StepRegistry
-from conveyor.executors.builtin.steps import NoopStep
+from ordine.core.errors import StepError, StepParamError, UnknownStepError
+from ordine.core.playbook import loads_playbook
+from ordine.core.registry import StepRegistry
+from ordine.executors.builtin.steps import NoopStep
 
 PLUGIN_INSTALLED = False
 try:
-    import conveyor_test_plugin  # noqa: F401
+    import ordine_test_plugin  # noqa: F401
 
     PLUGIN_INSTALLED = True
 except ImportError:
@@ -31,7 +31,7 @@ def test_discovery_finds_builtins(registry: StepRegistry) -> None:
     assert {"util.noop", "util.fail", "util.copy"} <= ids
 
 
-@pytest.mark.skipif(not PLUGIN_INSTALLED, reason="conveyor_test_plugin not installed")
+@pytest.mark.skipif(not PLUGIN_INSTALLED, reason="ordine_test_plugin not installed")
 def test_discovery_finds_fixture_plugin(registry: StepRegistry) -> None:
     assert "test.echo" in registry.ids()
 

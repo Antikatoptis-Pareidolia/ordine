@@ -57,7 +57,7 @@ When the rehearsed version is ready for production, open **History** (`/pipeline
 ## CLI
 
 ```bash
-conveyor dry-run PLAYBOOK --sample ./samples [--glob '*'] [--json]
+ordine dry-run PLAYBOOK --sample ./samples [--glob '*'] [--json]
 ```
 
 Runs `run_all()` in a temp sandbox, prints a table or JSON `report()`, then closes. Exit `0` all ok, `1` any fail/skip, `2` unreadable playbook. Never touches the production database.

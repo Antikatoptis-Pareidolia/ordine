@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.errors import TriggerError
-from conveyor.core.ledger import Ledger
-from conveyor.core.manifest import load_manifest
-from conveyor.core.playbook import ManifestTrigger
-from conveyor.core.triggers import (
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.errors import TriggerError
+from ordine.core.ledger import Ledger
+from ordine.core.manifest import load_manifest
+from ordine.core.playbook import ManifestTrigger
+from ordine.core.triggers import (
     ManifestTriggerService,
     build_trigger_service,
     manifest_row_dedup_key,
@@ -40,7 +40,7 @@ trigger:
   path: ~/assets.csv
 steps: [util.noop]
 """
-    from conveyor.core.playbook import loads_playbook
+    from ordine.core.playbook import loads_playbook
 
     playbook = loads_playbook(yaml_text)
     pipeline_id, _ = ledger.register_pipeline(playbook, yaml_text)
@@ -219,7 +219,7 @@ def test_manifest_sink_caches_rows_per_mtime(
         load_calls += 1
         return real_load(path)
 
-    monkeypatch.setattr("conveyor.core.triggers.load_manifest", counting_load)
+    monkeypatch.setattr("ordine.core.triggers.load_manifest", counting_load)
     spec = ManifestTrigger(type="manifest", path=str(manifest), poll_seconds=0)
     service = build_trigger_service(
         spec,

@@ -6,8 +6,8 @@ import logging
 
 import pytest
 
-from conveyor.core.engines import EngineRegistry, HeadlessEngine
-from conveyor.core.errors import UnknownEngineError
+from ordine.core.engines import EngineRegistry, HeadlessEngine
+from ordine.core.errors import UnknownEngineError
 
 
 def test_engine_registry_loads_headless() -> None:

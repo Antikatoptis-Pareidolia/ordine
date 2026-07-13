@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.errors import ManifestError
-from conveyor.core.manifest import load_manifest
+from ordine.core.errors import ManifestError
+from ordine.core.manifest import load_manifest
 
 
 def test_csv_happy_path(tmp_path: Path) -> None:

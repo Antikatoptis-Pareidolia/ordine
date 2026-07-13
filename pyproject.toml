@@ -1,7 +1,7 @@
 [project]
-name = "conveyor-automation"
+name = "ordine"
 version = "0.1.0"
-description = "Local-first, AI-assisted task automation pipelines"
+description = "Ordine — self-healing task pipelines for your desktop."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -13,7 +13,7 @@ dependencies = [
   "watchdog>=4",  # folder_watch trigger: filesystem events + settle detection
   "typer>=0.12",
   "fastapi>=0.115",  # web UI HTTP layer
-  "uvicorn>=0.30",  # ASGI server for conveyor serve
+  "uvicorn>=0.30",  # ASGI server for ordine serve
   "jinja2>=3.1",  # HTML templates
   "python-multipart>=0.0.9",  # HTML form parsing
   "tomli-w>=1.0",  # atomic settings write-back
@@ -31,14 +31,14 @@ dev = [
 ]
 
 [project.scripts]
-conveyor = "conveyor.cli.main:main"
+ordine = "ordine.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/conveyor"]
+packages = ["src/ordine"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [".venv*", "build", "dist", ".pytest_cache", ".mypy_cache", ".ruff_cache"]
@@ -55,38 +55,38 @@ ignore = ["E501"]  # line length handled by formatter
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["conveyor"]
+packages = ["ordine"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
 enable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
-module = "conveyor.core.*"
+module = "ordine.core.*"
 strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --cov=conveyor --cov-report=term-missing"
+addopts = "-q --cov=ordine --cov-report=term-missing"
 markers = [
     "integration: long-running trigger integration tests (default run)",
     "llm_live: real LLM calls requiring API keys (excluded from default CI)",
 ]
 
 [tool.coverage.run]
-source = ["src/conveyor"]
+source = ["src/ordine"]
 
-[project.entry-points."conveyor.steps"]
-util_noop = "conveyor.executors.builtin.steps:NoopStep"
-util_fail = "conveyor.executors.builtin.steps:FailStep"
-util_copy = "conveyor.executors.builtin.steps:CopyStep"
-file_rename_from_manifest = "conveyor.executors.builtin.file_steps:RenameFromManifestStep"
-file_move = "conveyor.executors.builtin.file_steps:MoveStep"
-image_validate = "conveyor.executors.headless.steps:ValidateStep"
-image_white_to_alpha = "conveyor.executors.headless.steps:WhiteToAlphaStep"
-image_trim = "conveyor.executors.headless.steps:TrimStep"
-image_export = "conveyor.executors.headless.steps:ExportStep"
-llm_generate_image = "conveyor.llm.steps:GenerateImageStep"
+[project.entry-points."ordine.steps"]
+util_noop = "ordine.executors.builtin.steps:NoopStep"
+util_fail = "ordine.executors.builtin.steps:FailStep"
+util_copy = "ordine.executors.builtin.steps:CopyStep"
+file_rename_from_manifest = "ordine.executors.builtin.file_steps:RenameFromManifestStep"
+file_move = "ordine.executors.builtin.file_steps:MoveStep"
+image_validate = "ordine.executors.headless.steps:ValidateStep"
+image_white_to_alpha = "ordine.executors.headless.steps:WhiteToAlphaStep"
+image_trim = "ordine.executors.headless.steps:TrimStep"
+image_export = "ordine.executors.headless.steps:ExportStep"
+llm_generate_image = "ordine.llm.steps:GenerateImageStep"
 
-[project.entry-points."conveyor.engines"]
-headless = "conveyor.core.engines:HeadlessEngine"
+[project.entry-points."ordine.engines"]
+headless = "ordine.core.engines:HeadlessEngine"

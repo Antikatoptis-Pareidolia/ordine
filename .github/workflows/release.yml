@@ -13,10 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
           enable-cache: true
+      - name: Install Python 3.12
+        run: uv python install 3.12
+      - name: Verify Python
+        run: |
+          uv run python --version
 
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y imagemagick jq ruby-dev build-essential
@@ -26,7 +30,7 @@ jobs:
       - name: Sync dev environment
         run: |
           uv sync --locked --extra dev
-          uv pip install -e tests/fixtures/conveyor_test_plugin
+          uv pip install -e tests/fixtures/ordine_test_plugin
 
       - name: Lint and typecheck
         run: uv run ruff check . && uv run ruff format --check . && uv run mypy
@@ -37,7 +41,7 @@ jobs:
       - name: Assert tag matches package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(uv run python -c 'import conveyor; print(conveyor.__version__)')"
+          PKG="$(uv run python -c 'import ordine; print(ordine.__version__)')"
           test "${TAG}" = "${PKG}"
 
       - name: Build distributions

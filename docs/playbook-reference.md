@@ -1,6 +1,6 @@
 # Playbook Reference
 
-Version 1 playbook format for Conveyor pipelines. YAML documents are validated against `playbook.schema.json`.
+Version 1 playbook format for Ordine pipelines. YAML documents are validated against `playbook.schema.json`.
 
 ## Step forms
 

@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from conveyor.core.playbook import Playbook, load_playbook
-from conveyor.web.forms import FormConversionError, form_to_dict, playbook_to_form
+from ordine.core.playbook import Playbook, load_playbook
+from ordine.web.forms import FormConversionError, form_to_dict, playbook_to_form
 
 FLAGSHIP = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v02_flagship.yml"
 BRANCHY = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v04_pipeline_branches.yml"

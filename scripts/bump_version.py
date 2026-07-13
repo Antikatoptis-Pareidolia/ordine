@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bump conveyor version in pyproject.toml, __init__.py, and CHANGELOG."""
+"""Bump ordine version in pyproject.toml, __init__.py, and CHANGELOG."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def main() -> int:
         return 1
     pyproject.write_text(py_new, encoding="utf-8")
 
-    init_py = root / "src" / "conveyor" / "__init__.py"
+    init_py = root / "src" / "ordine" / "__init__.py"
     init_text = init_py.read_text(encoding="utf-8")
     init_new, count = re.subn(
         r'^__version__ = "[^"]+"',

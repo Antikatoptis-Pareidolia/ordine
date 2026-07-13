@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from conveyor.core.db import create_engine_for, init_db
-from conveyor.core.ledger import Ledger
-from conveyor.core.retention import cleanup_workdirs
+from ordine.core.db import create_engine_for, init_db
+from ordine.core.ledger import Ledger
+from ordine.core.retention import cleanup_workdirs
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def ledger(engine) -> Ledger:
 
 
 def _register(ledger: Ledger) -> int:
-    from conveyor.core.playbook import loads_playbook
+    from ordine.core.playbook import loads_playbook
 
     yaml_text = """version: 1
 name: retention-test
@@ -51,7 +51,7 @@ def _seed_task(
 ) -> int:
     from sqlalchemy import update
 
-    from conveyor.core.models import Task
+    from ordine.core.models import Task
 
     task_id = ledger.create_task(pipeline_id, "/in/file.png", f"key-{workdir.name}") or 0
     ledger.set_workdir(task_id, workdir)

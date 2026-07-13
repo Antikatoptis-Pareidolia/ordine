@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conveyor.core.workdir import TaskWorkdir
+from ordine.core.workdir import TaskWorkdir
 
 
 def test_create_is_idempotent(tmp_path: Path) -> None:

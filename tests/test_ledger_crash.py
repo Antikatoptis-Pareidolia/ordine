@@ -8,10 +8,10 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from conveyor.core.db import create_engine_for, init_db, session_factory
-from conveyor.core.ledger import Ledger
-from conveyor.core.models import BranchAttempt
-from conveyor.core.playbook import load_playbook
+from ordine.core.db import create_engine_for, init_db, session_factory
+from ordine.core.ledger import Ledger
+from ordine.core.models import BranchAttempt
+from ordine.core.playbook import load_playbook
 
 FIXTURE = Path(__file__).parent / "fixtures" / "playbooks" / "valid" / "v01_minimal.yml"
 CRASH_POINTS: tuple[str | None, ...] = (

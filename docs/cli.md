@@ -1,17 +1,17 @@
-# Conveyor CLI
+# Ordine CLI
 
-Thin command-line interface over the Conveyor core. The CLI parses arguments, loads configuration, calls ledger/runner/registry APIs, and formats output. It contains no pipeline business logic.
+Thin command-line interface over the Ordine core. The CLI parses arguments, loads configuration, calls ledger/runner/registry APIs, and formats output. It contains no pipeline business logic.
 
-Install the package (`uv pip install -e .` or `pip install -e .`), then invoke `conveyor`.
+Install the package (`uv pip install -e .` or `pip install -e .`), then invoke `ordine`.
 
 ## Global options
 
 | Option | Description |
 |--------|-------------|
-| `--config PATH` | Config TOML path (overrides `$CONVEYOR_CONFIG` and the default file) |
+| `--config PATH` | Config TOML path (overrides `$ORDINE_CONFIG` and the default file) |
 | `-v`, `--verbose` | Debug logging on **stderr** only |
 
-Config precedence: `--config` > `$CONVEYOR_CONFIG` > `$XDG_CONFIG_HOME/conveyor/config.toml` > built-in defaults (no file required).
+Config precedence: `--config` > `$ORDINE_CONFIG` > `$XDG_CONFIG_HOME/ordine/config.toml` > built-in defaults (no file required).
 
 ## Output contract
 
@@ -24,25 +24,25 @@ All human-readable output is **plain text by design** (fixed-width tables and si
 
 ## Commands
 
-### `conveyor init [--config PATH]`
+### `ordine init [--config PATH]`
 
 Create the config file (default or `--config` path), database parent directory, and workdir root. Refuses to overwrite an existing config file.
 
 Exit codes: `0` success; `1` if the config file already exists.
 
-### `conveyor example [DIR]`
+### `ordine example [DIR]`
 
-Scaffold a self-contained quickstart at `DIR` (default `~/conveyor-demo`): six mock PNGs in `samples/`, `assets.csv`, `png-cleanup.yml`, and a `chain/` variant with `provider: mock`. Refuses non-empty directories.
+Scaffold a self-contained quickstart at `DIR` (default `~/ordine-demo`): six mock PNGs in `samples/`, `assets.csv`, `png-cleanup.yml`, and a `chain/` variant with `provider: mock`. Refuses non-empty directories.
 
 Prints exact next commands (`check`, `run --oneshot`, `serve`). Covered by CI in `tests/test_example_cmd.py`.
 
-### `conveyor cleanup [--days N] [--include-failed] [--dry-run] [--json]`
+### `ordine cleanup [--days N] [--include-failed] [--dry-run] [--json]`
 
 Delete terminal task workdirs older than the retention cutoff. Default keeps `flagged` and `failed` workdirs; `--include-failed` also deletes failed. Never touches export destinations or deletes tasks from the ledger (only sets `workdir` NULL via `clear_workdir`).
 
 Config defaults live under `[retention]` in config.toml.
 
-### `conveyor check PLAYBOOK [--json]`
+### `ordine check PLAYBOOK [--json]`
 
 Load and statically validate a playbook (`load_playbook` + `StepRegistry.check_playbook`).
 
@@ -65,7 +65,7 @@ png-cleanup: valid (4 steps, trigger=folder_watch)
 }
 ```
 
-### `conveyor run PLAYBOOK [--oneshot] [--note TEXT] [--json]`
+### `ordine run PLAYBOOK [--oneshot] [--note TEXT] [--json]`
 
 Load and check the playbook, auto-register a playbook version when YAML text differs from the current stored version (unchanged YAML does not create a new version), reconcile stale tasks, then:
 
@@ -95,7 +95,7 @@ Exit codes: `0` success; `1` check problems; `2` runtime error.
 }
 ```
 
-### `conveyor status [--json]`
+### `ordine status [--json]`
 
 Summarize all registered pipelines. Plain output lists every **non-zero** task status count, plus open-flag totals.
 
@@ -128,7 +128,7 @@ cli-game-assets pv_0001 done=3 skipped=2 flags=2 max_level=1
 }
 ```
 
-### `conveyor tasks PIPELINE [--status STATUS] [--limit N] [--json]`
+### `ordine tasks PIPELINE [--status STATUS] [--limit N] [--json]`
 
 List tasks for a pipeline.
 
@@ -149,7 +149,7 @@ List tasks for a pipeline.
 }
 ```
 
-### `conveyor task ID [--json]`
+### `ordine task ID [--json]`
 
 Show one task with branch attempts and open flags (ledger reads only).
 
@@ -196,7 +196,7 @@ flags:
 }
 ```
 
-### `conveyor retry ID [--json]`
+### `ordine retry ID [--json]`
 
 Re-queue a failed or flagged task (`transition` to `pending`).
 
@@ -211,7 +211,7 @@ Exit codes: `0` success; `1` illegal transition or not found.
 }
 ```
 
-### `conveyor flags [--pipeline NAME] [--min-level N] [--json]`
+### `ordine flags [--pipeline NAME] [--min-level N] [--json]`
 
 List open flags.
 
@@ -234,7 +234,7 @@ List open flags.
 }
 ```
 
-### `conveyor resolve-flag ID --note TEXT [--json]`
+### `ordine resolve-flag ID --note TEXT [--json]`
 
 Resolve an open flag.
 
@@ -250,7 +250,7 @@ Exit codes: `0` success; `1` not found.
 }
 ```
 
-### `conveyor steps [--json]`
+### `ordine steps [--json]`
 
 List registered step plugins.
 
@@ -262,7 +262,7 @@ List registered step plugins.
     {
       "id": "image.validate",
       "engines": ["headless"],
-      "origin": "conveyor.executors.headless.steps.ValidateStep"
+      "origin": "ordine.executors.headless.steps.ValidateStep"
     }
   ]
 }
@@ -276,8 +276,8 @@ export XDG_CONFIG_HOME="$PWD/local/config"
 export XDG_DATA_HOME="$PWD/local/data"
 mkdir -p inbox out
 
-conveyor init
-conveyor check tests/fixtures/playbooks/valid/v02_flagship.yml
+ordine init
+ordine check tests/fixtures/playbooks/valid/v02_flagship.yml
 
 # Prepare five images and a manifest (example)
 python - <<'PY'
@@ -293,10 +293,10 @@ Path("assets.csv").write_text("name\ngoat.png\njug.png\ncrown.png\nring.png\nswo
 PY
 
 # Edit a manual-trigger copy of the playbook pointing at inbox/, assets.csv, out/
-conveyor run my-playbook.yml --oneshot
-conveyor status --json | jq .
-conveyor tasks my-pipeline --json | jq .
-conveyor task 1 --json | jq .
+ordine run my-playbook.yml --oneshot
+ordine status --json | jq .
+ordine tasks my-pipeline --json | jq .
+ordine task 1 --json | jq .
 ```
 
 ## Exit code summary

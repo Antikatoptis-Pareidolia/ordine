@@ -10,9 +10,9 @@ import httpx
 import pytest
 from PIL import Image
 
-from conveyor.core.steps import StepContext
-from conveyor.core.workdir import TaskWorkdir
-from conveyor.llm.steps import (
+from ordine.core.steps import StepContext
+from ordine.core.workdir import TaskWorkdir
+from ordine.llm.steps import (
     IMAGE_PROVIDERS,
     GenerateImageStep,
     ImageGenerationFailure,
@@ -87,7 +87,7 @@ def test_generate_image_filename_uses_name_stem(tmp_path: Path) -> None:
 
 
 def test_openai_provider_request_shape_and_decode(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.steps.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.steps.get_key", lambda _provider: "test-key")
     png = render_mock_image(size="64x64", prompt="goat", ordinal=1)
     encoded = base64.b64encode(png).decode()
 
@@ -122,7 +122,7 @@ def test_openai_provider_request_shape_and_decode(monkeypatch: pytest.MonkeyPatc
 
 
 def test_openai_policy_refusal_maps_to_generation_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.steps.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.steps.get_key", lambda _provider: "test-key")
 
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -145,7 +145,7 @@ def test_openai_policy_refusal_maps_to_generation_refused(monkeypatch: pytest.Mo
 
 
 def test_openai_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.steps.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.steps.get_key", lambda _provider: "test-key")
 
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"error": {"message": "invalid key"}})
@@ -164,7 +164,7 @@ def test_openai_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_image_budget_blocks_before_http(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("conveyor.llm.steps.get_key", lambda _provider: "test-key")
+    monkeypatch.setattr("ordine.llm.steps.get_key", lambda _provider: "test-key")
     manifest = tmp_path / "assets.csv"
     _manifest(manifest, [("a.png", "1"), ("b.png", "2"), ("c.png", "3")])
     reset_image_budget_for_tests(cap=2)
@@ -232,7 +232,7 @@ def test_no_ordinal(tmp_path: Path) -> None:
 @pytest.mark.llm_live
 def test_llm_live_openai_generation(tmp_path: Path) -> None:
     """One real OpenAI image generation; skipped without API key."""
-    from conveyor.llm.keys import get_key
+    from ordine.llm.keys import get_key
 
     if not get_key("openai"):
         pytest.skip("OPENAI_API_KEY not set")
