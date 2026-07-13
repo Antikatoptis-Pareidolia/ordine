@@ -302,7 +302,6 @@ def test_build_trigger_service_manifest(tmp_path: Path, ledger: Ledger) -> None:
     service = build_trigger_service(
         spec,
         "none",
-        ledger_sink(ledger, pipeline_id),
         ledger=ledger,
         pipeline_id=pipeline_id,
     )

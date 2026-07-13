@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 
 from conveyor.core.db import create_engine_for, init_db
+from conveyor.core.errors import TriggerError
 from conveyor.core.ledger import Ledger
 from conveyor.core.manifest import load_manifest
 from conveyor.core.playbook import ManifestTrigger
 from conveyor.core.triggers import (
     ManifestTriggerService,
     build_trigger_service,
-    ledger_sink,
     manifest_row_dedup_key,
     manifest_sink,
 )
@@ -61,7 +61,6 @@ def test_manifest_scan_creates_tasks_and_reservations(tmp_path: Path, ledger: Le
     service = build_trigger_service(
         spec,
         "none",
-        ledger_sink(ledger, pipeline_id),
         ledger=ledger,
         pipeline_id=pipeline_id,
     )
@@ -86,7 +85,6 @@ def test_manifest_rescan_no_duplicates(tmp_path: Path, ledger: Ledger) -> None:
     service = build_trigger_service(
         spec,
         "none",
-        ledger_sink(ledger, pipeline_id),
         ledger=ledger,
         pipeline_id=pipeline_id,
     )
@@ -133,7 +131,6 @@ def test_manifest_append_row_creates_new_task(tmp_path: Path, ledger: Ledger) ->
     service = build_trigger_service(
         spec,
         "none",
-        ledger_sink(ledger, pipeline_id),
         ledger=ledger,
         pipeline_id=pipeline_id,
     )
@@ -184,3 +181,51 @@ def test_poll_seconds_zero_no_poller_thread(tmp_path: Path, ledger: Ledger) -> N
     service.start()
     assert service._poller_thread is None
     service.stop()
+
+
+def test_build_trigger_service_rejects_caller_sink_for_manifest(
+    tmp_path: Path, ledger: Ledger
+) -> None:
+    manifest = tmp_path / "assets.csv"
+    _write_manifest(manifest, [("a.png", "one")])
+    pipeline_id = _register(ledger)
+    spec = ManifestTrigger(type="manifest", path=str(manifest))
+
+    def bogus_sink(_candidate: object) -> None:
+        raise AssertionError("caller sink must not be invoked for manifest triggers")
+
+    with pytest.raises(TriggerError, match="do not accept a caller sink"):
+        build_trigger_service(
+            spec,
+            "none",
+            sink=bogus_sink,
+            ledger=ledger,
+            pipeline_id=pipeline_id,
+        )
+
+
+def test_manifest_sink_caches_rows_per_mtime(
+    tmp_path: Path, ledger: Ledger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = tmp_path / "assets.csv"
+    rows = [(f"asset{i:02d}.png", f"prompt {i}") for i in range(1, 51)]
+    _write_manifest(manifest, rows)
+    pipeline_id = _register(ledger)
+    load_calls = 0
+    real_load = load_manifest
+
+    def counting_load(path: Path):
+        nonlocal load_calls
+        load_calls += 1
+        return real_load(path)
+
+    monkeypatch.setattr("conveyor.core.triggers.load_manifest", counting_load)
+    spec = ManifestTrigger(type="manifest", path=str(manifest), poll_seconds=0)
+    service = build_trigger_service(
+        spec,
+        "none",
+        ledger=ledger,
+        pipeline_id=pipeline_id,
+    )
+    assert service.run() == 50
+    assert load_calls <= 2

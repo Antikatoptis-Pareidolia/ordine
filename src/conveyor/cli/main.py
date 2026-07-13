@@ -132,7 +132,6 @@ def _scan_playbook(ledger: Ledger, pipeline_id: int, playbook: Playbook) -> int:
         service = build_trigger_service(
             playbook.trigger,
             playbook.dedup,
-            ledger_sink(ledger, pipeline_id),
             ledger=ledger,
             pipeline_id=pipeline_id,
         )

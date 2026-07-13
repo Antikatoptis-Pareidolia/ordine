@@ -164,13 +164,28 @@ def manifest_sink(ledger: Ledger, pipeline_id: int, manifest_path: Path) -> Sink
     """Sink that reserves ordinal→name bindings immediately after task creation."""
     inner = ledger_sink(ledger, pipeline_id)
     resolved = manifest_path.expanduser().resolve()
+    row_cache: dict[tuple[Path, float], list[ManifestRow]] = {}
+
+    def _cached_rows() -> list[ManifestRow]:
+        try:
+            mtime = resolved.stat().st_mtime
+        except OSError:
+            mtime = -1.0
+        key = (resolved, mtime)
+        cached = row_cache.get(key)
+        if cached is not None:
+            return cached
+        row_cache.clear()
+        rows = load_manifest(resolved)
+        row_cache[key] = rows
+        return rows
 
     def sink(candidate: TaskCandidate) -> int | None:
         task_id = inner(candidate)
         if task_id is None or candidate.ordinal is None:
             return task_id
         try:
-            rows = load_manifest(resolved)
+            rows = _cached_rows()
             row = rows[candidate.ordinal - 1]
             ledger.reserve_name(pipeline_id, candidate.ordinal, row.name, task_id)
         except (ManifestError, IndexError) as exc:
@@ -585,27 +600,39 @@ class ManifestTriggerService:
 def build_trigger_service(
     spec: Trigger,
     dedup: DedupMode,
-    sink: Sink,
     *,
+    sink: Sink | None = None,
     ledger: Ledger | None = None,
     pipeline_id: int | None = None,
     poll_interval: float | None = None,
 ) -> ManualScanService | FolderWatchService | ManifestTriggerService:
-    """Construct a trigger service for *spec*."""
+    """Construct a trigger service for *spec*.
+
+    For ``manual`` and ``folder_watch``, *sink* is required (typically ``ledger_sink``).
+    For ``manifest``, omit *sink* — the factory always builds the reservation-creating
+    ``manifest_sink``; a caller-provided sink is rejected.
+    """
+    if isinstance(spec, ManifestTrigger):
+        if sink is not None:
+            raise TriggerError(
+                "manifest triggers do not accept a caller sink; "
+                "the factory constructs the reservation-creating manifest_sink"
+            )
+        if ledger is None or pipeline_id is None:
+            raise TriggerError("manifest trigger requires ledger and pipeline_id")
+        manifest_path = Path(spec.path).expanduser()
+        reservation_sink = manifest_sink(ledger, pipeline_id, manifest_path)
+        return ManifestTriggerService(
+            spec,
+            dedup,
+            reservation_sink,
+            ledger=ledger,
+            pipeline_id=pipeline_id,
+        )
+    if sink is None:
+        raise TriggerError("sink is required for manual and folder_watch triggers")
     if isinstance(spec, ManualTrigger):
         return ManualScanService(spec, dedup, sink)
     if isinstance(spec, FolderWatchTrigger):
         return FolderWatchService(spec, dedup, sink, poll_interval=poll_interval)
-    if isinstance(spec, ManifestTrigger):
-        if ledger is None or pipeline_id is None:
-            raise TriggerError("manifest trigger requires ledger and pipeline_id")
-        manifest_path = Path(spec.path).expanduser()
-        manifest_path_sink = manifest_sink(ledger, pipeline_id, manifest_path)
-        return ManifestTriggerService(
-            spec,
-            dedup,
-            manifest_path_sink,
-            ledger=ledger,
-            pipeline_id=pipeline_id,
-        )
     raise TriggerError(f"unsupported trigger type: {type(spec)!r}")

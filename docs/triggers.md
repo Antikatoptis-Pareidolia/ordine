@@ -10,7 +10,7 @@ triggers only insert them.
 |---------|----------|
 | `folder_watch` | Watch a directory, settle files, emit `TaskCandidate`s continuously |
 | `manual` | One-shot scan of a directory |
-| `manifest` | Step 14 — `build_trigger_service` raises `TriggerError` |
+| `manifest` | Poll a job manifest (`assets.csv`); one task per row with `mrow:` dedup keys and reservation-at-creation |
 
 Each trigger produces `TaskCandidate` records handed to a **sink**. The usual sink is `ledger_sink`,
 which calls `Ledger.create_task` (or `Ledger.create_task_arrival` for arrival-order ordinals).
@@ -96,11 +96,23 @@ Exceptions inside watchdog/poller threads are logged with `logger.exception`. Af
 poller crashes, the service stops itself and logs CRITICAL. Raising to the runner belongs to Step 7
 supervision.
 
+## Manifest trigger
+
+`ManifestTriggerService` reads a CSV/JSON/txt manifest and emits one `TaskCandidate` per row.
+Ordinals are 1-based row indices. Each candidate carries an `mrow:{ordinal}:{sha256(name+prompt)[:32]}`
+dedup key independent of the playbook `dedup:` field.
+
+`build_trigger_service` for manifest triggers **does not accept a caller sink** — it always
+constructs `manifest_sink`, which wraps `ledger_sink` and calls `reserve_name` immediately after
+each successful `create_task`. Pass `ledger` and `pipeline_id` only.
+
+When `poll_seconds > 0`, a background poller re-scans on mtime change. Unreadable manifests raise one
+`manifest_unreadable` pipeline flag per bad mtime; the service keeps polling.
+
 ## Known limitations (v1)
 
 - Top-level directory only — glob applies to immediate children, not recursive subdirectories.
 - Default OS observer only — no polling fallback for network filesystems; inotify limits not tuned.
-- Manifest trigger is not implemented (Step 14).
 
 ## Manual smoke test
 

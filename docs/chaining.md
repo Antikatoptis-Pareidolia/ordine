@@ -24,6 +24,12 @@ assets.csv  →  [gen pipeline]  →  ~/renders/img_NNNN.png  →  [cleanup pipe
 
 Reservations are created **at task creation** (manifest sink wrapper), before any step runs.
 
+Manifest triggers always enforce row-level exactly-once via the `mrow:` dedup keys on each
+`TaskCandidate`, regardless of the playbook `dedup:` field. The chain example sets `dedup: none`
+because file-hash or filename dedup does not apply — there is no watched file per row, only a
+manifest row identity. Row unchanged ⇒ same `mrow:` key ⇒ `create_task` returns `None` and the row
+stays done forever; edit the prompt or name and only that row is re-enqueued.
+
 ## Providers
 
 `llm.generate_image` accepts `provider: mock | openai`. The `IMAGE_PROVIDERS` registry dict is the extension point for future backends (Stability, Replicate, etc.).

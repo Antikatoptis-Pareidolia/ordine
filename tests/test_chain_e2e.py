@@ -108,7 +108,6 @@ def _scan_manifest(ledger: Ledger, pipeline_id: int, playbook: object) -> int:
     service = build_trigger_service(
         trigger,
         playbook.dedup,
-        ledger_sink(ledger, pipeline_id),
         ledger=ledger,
         pipeline_id=pipeline_id,
     )

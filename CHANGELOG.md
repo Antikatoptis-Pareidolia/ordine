@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Step 14 follow-up: manifest `build_trigger_service` rejects caller sinks; `manifest_sink` caches rows by mtime; trigger/chaining docs corrected
 - Step 13 follow-up: web wiring scope convention, full-stack draft MockTransport test, CI `llm_live` filter
 
 ### Fixed

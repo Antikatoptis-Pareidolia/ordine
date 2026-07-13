@@ -18,7 +18,7 @@ from conveyor.core.engines import EngineRegistry
 from conveyor.core.errors import RunnerError
 from conveyor.core.ledger import Ledger, TaskStatus, TaskView
 from conveyor.core.naming import LedgerNamingService
-from conveyor.core.playbook import Playbook, StepSpec
+from conveyor.core.playbook import ManifestTrigger, Playbook, StepSpec
 from conveyor.core.registry import StepRegistry
 from conveyor.core.steps import Step, StepContext, StepResult
 from conveyor.core.triggers import (
@@ -371,13 +371,19 @@ class PipelineService:
             policy=self._reconcile_policy,
         )
         arrival = getattr(self._playbook.trigger, "arrival_order_ordinals", False)
-        trigger = build_trigger_service(
-            self._playbook.trigger,
-            self._playbook.dedup,
-            ledger_sink(self._ledger, self._pipeline_id, arrival_order=arrival),
-            ledger=self._ledger,
-            pipeline_id=self._pipeline_id,
-        )
+        if isinstance(self._playbook.trigger, ManifestTrigger):
+            trigger = build_trigger_service(
+                self._playbook.trigger,
+                self._playbook.dedup,
+                ledger=self._ledger,
+                pipeline_id=self._pipeline_id,
+            )
+        else:
+            trigger = build_trigger_service(
+                self._playbook.trigger,
+                self._playbook.dedup,
+                sink=ledger_sink(self._ledger, self._pipeline_id, arrival_order=arrival),
+            )
         self._trigger = trigger
         if isinstance(trigger, (FolderWatchService, ManifestTriggerService)):
             trigger.start()
