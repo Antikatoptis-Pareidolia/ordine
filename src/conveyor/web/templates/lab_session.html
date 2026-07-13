@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Lab {{ sid }} · {{ pipeline_name }}{% endblock %}
+{% block content %}
+<h1>Lab — {{ pipeline_name }}</h1>
+<p>
+  Version <code>{{ version_id }}</code>
+  · <a href="/pipelines/{{ pipeline_id }}/lab">New session</a>
+  · <a href="/pipelines/{{ pipeline_id }}/versions">History</a>
+</p>
+{% if flash %}
+<p class="flash flash-{{ flash_level }}" role="status">{{ flash }}</p>
+{% endif %}
+
+{% if output_redirections %}
+<section class="card">
+  <h2>Output redirections</h2>
+  <ul>
+    {% for location, mapping in output_redirections %}
+    <li><code>{{ location }}</code>: {{ mapping }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Tasks</h2>
+  <ul class="lab-task-tabs">
+    {% for task in tasks %}
+    <li>
+      <a href="/lab/{{ sid }}?task_ix={{ task.index }}" {% if task.index == task_ix %}aria-current="page"{% endif %}>
+        {{ task.sample_name }} ({{ task.status }})
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Step timeline</h2>
+  {% include "partials/lab_step.html" %}
+</section>
+
+<section class="card">
+  <h2>Controls</h2>
+  <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/next" method="post" style="display:inline">
+    <button type="submit">Next step</button>
+  </form>
+  <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/retry" method="post" style="display:inline">
+    <button type="submit">Retry</button>
+  </form>
+  <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/branches" method="post" style="display:inline">
+    <button type="submit">Run branches</button>
+  </form>
+  <form action="/lab/{{ sid }}/tasks/{{ task_ix }}/to-end" method="post" style="display:inline">
+    <button type="submit">Run to end</button>
+  </form>
+  <form action="/lab/{{ sid }}/run-all" method="post" style="display:inline">
+    <button type="submit">Run all</button>
+  </form>
+  <form action="/lab/{{ sid }}/close" method="post" style="display:inline">
+    <button type="submit">Close session</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Artifacts</h2>
+  {% include "partials/lab_artifacts.html" %}
+</section>
+{% endblock %}

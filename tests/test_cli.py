@@ -423,3 +423,46 @@ steps:
     finally:
         if proc.poll() is None:
             proc.kill()
+
+
+def test_cli_dry_run_json_leaves_prod_db_untouched(tmp_path: Path) -> None:
+    import sqlite3
+
+    from conveyor.core.db import create_engine_for, init_db
+
+    config_file = _write_config(tmp_path)
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    (samples / "one.txt").write_text("data", encoding="utf-8")
+    playbook_file = tmp_path / "dryrun.yml"
+    playbook_file.write_text(
+        """version: 1
+name: cli-dry-run
+trigger: {type: manual, path: ~/in}
+steps:
+  - util.copy
+  - util.fail: {message: boom, times: -1}
+""",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "conveyor.sqlite3"
+    engine = create_engine_for(db_path)
+    init_db(engine)
+    with sqlite3.connect(db_path) as conn:
+        before = conn.execute("SELECT COUNT(*) FROM pipelines").fetchone()[0]
+
+    result = _invoke(
+        config_file,
+        "dry-run",
+        str(playbook_file),
+        "--sample",
+        str(samples),
+        "--json",
+    )
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["tasks"][0]["steps"][-1]["status"] == "fail"
+
+    with sqlite3.connect(db_path) as conn:
+        after = conn.execute("SELECT COUNT(*) FROM pipelines").fetchone()[0]
+    assert before == after

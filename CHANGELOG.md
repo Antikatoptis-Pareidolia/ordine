@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Form-tab recovery branch editing (step-level and pipeline-level) with HTMX add/remove fragments (Step 10 follow-up)
 - Semantic version diffs, metadata-only diff notice, and editor form labeling polish (Step 10 follow-up 2)
 - Structured change summary and side-by-side diff view (`web/diffing.py`; Step 10 follow-up 3)
+- Dry-run lab with step-through, sandbox isolation, checkpoint resume, and `conveyor dry-run` CLI (Step 11)
 
 ### Fixed
 

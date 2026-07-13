@@ -53,6 +53,87 @@ class StepLogEntry:
     finished_at: datetime
 
 
+def failure_policy_groups(
+    step: StepSpec, playbook: Playbook
+) -> list[tuple[str | None, int, list[StepSpec]]]:
+    """Build primary + recovery branch attempt groups for a playbook step."""
+    policy = step.on_failure if step.on_failure is not None else playbook.on_failure
+    return [
+        (None, policy.retries, [step]),
+        *[(branch.name, branch.retries, branch.steps) for branch in policy.branches],
+    ]
+
+
+def execute_step_sequence(
+    *,
+    task: TaskView,
+    workdir: TaskWorkdir,
+    seq: list[StepSpec],
+    primary_index: int,
+    branch_name: str | None,
+    branch_no: int,
+    seq_input: Path | None,
+    attempt_no: int,
+    ledger: Ledger,
+    registry: StepRegistry,
+    engine: object,
+    playbook: Playbook,
+    pipeline_id: int,
+    step_log: list[StepLogEntry] | None = None,
+) -> tuple[StepResult, str]:
+    """Run one policy group (primary or branch) and return the terminal result."""
+    naming = LedgerNamingService(ledger, pipeline_id, task.id)
+    current_input = seq_input
+    last_step_id = seq[0].id
+
+    for seq_index, step_spec in enumerate(seq, start=1):
+        last_step_id = step_spec.id
+        if branch_name is None:
+            step_dir = workdir.step_dir(primary_index, step_spec.id)
+        else:
+            step_dir = workdir.step_dir(
+                seq_index,
+                step_spec.id,
+                branch=branch_name,
+                branch_no=branch_no,
+            )
+        step_logger = workdir.step_logger(step_dir)
+        params = registry.validate_params(step_spec.id, step_spec.params)
+        ctx = StepContext(
+            task_id=task.id,
+            pipeline_name=playbook.name,
+            source_ref=task.source_ref,
+            ordinal=task.ordinal,
+            input_path=current_input,
+            step_dir=step_dir,
+            logger=step_logger,
+            naming=naming,
+        )
+        started = _utcnow()
+        step_impl = cast(type[Step], registry.get(step_spec.id))
+        result = cast(Any, engine).run_step(step_impl, ctx, params)
+        finished = _utcnow()
+        if step_log is not None:
+            step_log.append(
+                StepLogEntry(
+                    seq=primary_index if branch_name is None else seq_index,
+                    id=step_spec.id,
+                    branch=branch_name,
+                    attempt=attempt_no,
+                    status=result.status,
+                    output=str(result.output_path) if result.output_path else None,
+                    message=result.message,
+                    started_at=started,
+                    finished_at=finished,
+                )
+            )
+        if result.status != "ok":
+            return result, last_step_id
+        current_input = result.output_path if result.output_path is not None else current_input
+
+    return StepResult(status="ok", output_path=current_input), last_step_id
+
+
 class PipelineRunner:
     """Execute playbook steps for claimed ledger tasks."""
 
@@ -161,25 +242,27 @@ class PipelineRunner:
         index: int,
         step_input: Path | None,
     ) -> StepResult:
-        policy = step.on_failure if step.on_failure is not None else self._playbook.on_failure
-        groups: list[tuple[str | None, int, list[StepSpec]]] = [
-            (None, policy.retries, [step]),
-            *[(b.name, b.retries, b.steps) for b in policy.branches],
-        ]
+        groups = failure_policy_groups(step, self._playbook)
         last = StepResult(status="fail", message="no attempts executed")
         last_step_id = step.id
         for branch_no, (branch_name, retries, seq) in enumerate(groups):
             for attempt_no in range(1, retries + 2):
                 attempt_id = self._ledger.start_attempt(task.id, branch_name, attempt_no)
-                last, last_step_id = self._run_sequence(
-                    task,
-                    workdir,
-                    seq,
-                    index,
-                    branch_name,
-                    branch_no,
-                    step_input,
-                    attempt_no,
+                last, last_step_id = execute_step_sequence(
+                    task=task,
+                    workdir=workdir,
+                    seq=seq,
+                    primary_index=index,
+                    branch_name=branch_name,
+                    branch_no=branch_no,
+                    seq_input=step_input,
+                    attempt_no=attempt_no,
+                    ledger=self._ledger,
+                    registry=self._registry,
+                    engine=self._engine,
+                    playbook=self._playbook,
+                    pipeline_id=self._pipeline_id,
+                    step_log=self._step_log,
                 )
                 self._ledger.finish_attempt(
                     attempt_id,
@@ -205,67 +288,6 @@ class PipelineRunner:
                 ),
             )
         return last
-
-    def _run_sequence(
-        self,
-        task: TaskView,
-        workdir: TaskWorkdir,
-        seq: list[StepSpec],
-        primary_index: int,
-        branch_name: str | None,
-        branch_no: int,
-        seq_input: Path | None,
-        attempt_no: int,
-    ) -> tuple[StepResult, str]:
-        naming = LedgerNamingService(self._ledger, self._pipeline_id, task.id)
-        current_input = seq_input
-        last_step_id = seq[0].id
-
-        for seq_index, step_spec in enumerate(seq, start=1):
-            last_step_id = step_spec.id
-            if branch_name is None:
-                step_dir = workdir.step_dir(primary_index, step_spec.id)
-            else:
-                step_dir = workdir.step_dir(
-                    seq_index,
-                    step_spec.id,
-                    branch=branch_name,
-                    branch_no=branch_no,
-                )
-            step_logger = workdir.step_logger(step_dir)
-            params = self._registry.validate_params(step_spec.id, step_spec.params)
-            ctx = StepContext(
-                task_id=task.id,
-                pipeline_name=self._playbook.name,
-                source_ref=task.source_ref,
-                ordinal=task.ordinal,
-                input_path=current_input,
-                step_dir=step_dir,
-                logger=step_logger,
-                naming=naming,
-            )
-            started = _utcnow()
-            step_impl = cast(type[Step], self._registry.get(step_spec.id))
-            result = self._engine.run_step(step_impl, ctx, params)
-            finished = _utcnow()
-            self._step_log.append(
-                StepLogEntry(
-                    seq=primary_index if branch_name is None else seq_index,
-                    id=step_spec.id,
-                    branch=branch_name,
-                    attempt=attempt_no,
-                    status=result.status,
-                    output=str(result.output_path) if result.output_path else None,
-                    message=result.message,
-                    started_at=started,
-                    finished_at=finished,
-                )
-            )
-            if result.status != "ok":
-                return result, last_step_id
-            current_input = result.output_path if result.output_path is not None else current_input
-
-        return StepResult(status="ok", output_path=current_input), last_step_id
 
     def _write_task_json(self, task: TaskView, workdir: Path, *, status: str) -> None:
         payload = self._task_json_payload(task, status)

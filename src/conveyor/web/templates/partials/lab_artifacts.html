@@ -1,0 +1,34 @@
+{% if current_step %}
+<div class="lab-artifacts">
+  <div class="lab-artifact-pane">
+    <h3>Input</h3>
+    {% if input_rel %}
+    {% if input_rel.endswith('.png') or input_rel.endswith('.jpg') or input_rel.endswith('.jpeg') %}
+    <img src="/lab/{{ sid }}/artifacts/{{ input_rel }}" alt="input artifact" />
+    {% else %}
+    <p><a href="/lab/{{ sid }}/artifacts/{{ input_rel }}">{{ input_rel }}</a></p>
+    {% endif %}
+    {% else %}
+    <p class="hint">—</p>
+    {% endif %}
+  </div>
+  <div class="lab-artifact-pane">
+    <h3>Output</h3>
+    {% if output_rel %}
+    {% if output_rel.endswith('.png') or output_rel.endswith('.jpg') or output_rel.endswith('.jpeg') %}
+    <img src="/lab/{{ sid }}/artifacts/{{ output_rel }}" alt="output artifact" />
+    {% else %}
+    <p><a href="/lab/{{ sid }}/artifacts/{{ output_rel }}">{{ output_rel }}</a></p>
+    {% endif %}
+    {% else %}
+    <p class="hint">—</p>
+    {% endif %}
+  </div>
+</div>
+{% if log_tail %}
+<h3>Log tail</h3>
+<pre class="diff">{{ log_tail }}</pre>
+{% endif %}
+{% else %}
+<p class="hint">Run a step to inspect artifacts.</p>
+{% endif %}

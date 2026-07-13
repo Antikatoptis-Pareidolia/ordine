@@ -22,7 +22,9 @@ from conveyor.core.ledger import Ledger
 from conveyor.core.registry import StepRegistry
 from conveyor.web.routes import dashboard as dashboard_routes
 from conveyor.web.routes import editor as editor_routes
+from conveyor.web.routes import lab as lab_routes
 from conveyor.web.routes import router as core_router
+from conveyor.web.routes.lab import LabSessionStore
 from conveyor.web.security import post_is_allowed
 from conveyor.web.services import ServiceManager
 
@@ -40,12 +42,14 @@ def create_app(config: AppConfig) -> FastAPI:
     registry = StepRegistry.load()
     engines = EngineRegistry.load()
     services = ServiceManager(config=config, ledger=ledger, registry=registry, engines=engines)
+    lab_sessions = LabSessionStore()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         pipeline_ids = [summary.id for summary in ledger.list_pipelines()]
         services.autostart_if_configured(pipeline_ids)
         yield
+        lab_sessions.close_all()
         services.shutdown()
 
     app = FastAPI(title="Conveyor", lifespan=lifespan)
@@ -54,6 +58,7 @@ def create_app(config: AppConfig) -> FastAPI:
     app.state.registry = registry
     app.state.engines = engines
     app.state.services = services
+    app.state.lab_sessions = lab_sessions
     app.state.templates_dir = TEMPLATES_DIR
 
     @app.middleware("http")
@@ -69,5 +74,6 @@ def create_app(config: AppConfig) -> FastAPI:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(dashboard_routes.router)
     app.include_router(editor_routes.router)
+    app.include_router(lab_routes.router)
     app.include_router(core_router)
     return app

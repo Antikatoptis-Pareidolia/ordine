@@ -19,6 +19,7 @@ import typer
 from conveyor.cli import output
 from conveyor.core.config import AppConfig, load_config, write_default_config
 from conveyor.core.db import create_engine_for, init_db
+from conveyor.core.dryrun import DryRunSession
 from conveyor.core.engines import EngineRegistry
 from conveyor.core.errors import (
     ConfigError,
@@ -594,6 +595,75 @@ def steps(
         ["id", "engines", "origin"],
         [[str(item["id"]), ",".join(item["engines"]), str(item["origin"])] for item in payload],
     )
+
+
+@app.command("dry-run")
+def dry_run(
+    ctx: typer.Context,
+    playbook_path: Path,
+    sample: Annotated[
+        Path,
+        typer.Option("--sample", exists=True, file_okay=False, dir_okay=True, readable=True),
+    ],
+    glob: Annotated[str, typer.Option("--glob", help="Sample filename glob")] = "*",
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON report to stdout")] = False,
+) -> None:
+    """Run a sandboxed dry-run rehearsal; never touches the production ledger."""
+    import tempfile
+
+    assert isinstance(ctx.obj, AppContext)
+    try:
+        playbook, yaml_text = _load_playbook_text(playbook_path)
+    except (PlaybookSyntaxError, PlaybookValidationError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    problems = _check_playbook(playbook, StepRegistry.load())
+    if problems:
+        for problem in problems:
+            typer.echo(f"{problem['path']}: {problem['message']}", err=True)
+        raise typer.Exit(code=2)
+
+    registry = StepRegistry.load()
+    engines = EngineRegistry.load()
+    sandbox_parent = Path(tempfile.mkdtemp(prefix="conveyor-dry-run-"))
+    session = DryRunSession.create(
+        playbook=playbook,
+        version_public_id="cli-dry-run",
+        sample_dir=sample,
+        glob=glob,
+        registry=registry,
+        engines=engines,
+        sandbox_root=sandbox_parent,
+        yaml_text=yaml_text,
+    )
+    try:
+        session.run_all()
+        report = session.report()
+    finally:
+        session.close()
+
+    if as_json:
+        output.emit_json(report)
+    else:
+        rows: list[list[str]] = []
+        for task in report["tasks"]:
+            for step in task["steps"]:
+                rows.append(
+                    [
+                        str(task["sample"]),
+                        str(step["seq"]),
+                        str(step["id"]),
+                        str(step["status"]),
+                        str(step.get("message") or ""),
+                    ]
+                )
+        output.print_table(["sample", "seq", "step", "status", "message"], rows)
+
+    any_bad = any(
+        step["status"] in ("fail", "skip") for task in report["tasks"] for step in task["steps"]
+    ) or any(task["status"] in ("failed", "skipped") for task in report["tasks"])
+    raise typer.Exit(code=1 if any_bad else 0)
 
 
 @app.command()

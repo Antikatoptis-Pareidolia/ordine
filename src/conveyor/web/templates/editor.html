@@ -13,6 +13,16 @@
 </p>
 {% endif %}
 
+{% if lab_resume_banner %}
+<p class="flash flash-info" role="status">
+  Resume lab with <code>{{ lab_resume_banner.version_id }}</code>
+  <form action="/lab/{{ lab_resume_banner.sid }}/resume" method="post" style="display:inline">
+    <input type="hidden" name="version_id" value="{{ lab_resume_banner.version_id }}" />
+    <button type="submit">Resume lab</button>
+  </form>
+</p>
+{% endif %}
+
 {% if current_version %}
 <p>Current version: <code>{{ current_version }}</code> · editing from <code>{{ base_version }}</code>
   · <a href="/pipelines/{{ pipeline_id }}/versions">History</a></p>
@@ -22,6 +32,7 @@
       action="{% if pipeline_id %}/pipelines/{{ pipeline_id }}/versions{% else %}/pipelines{% endif %}">
   <input type="hidden" name="tab" value="{{ tab }}" />
   <input type="hidden" name="base_version" value="{{ base_version }}" />
+  {% if from_lab %}<input type="hidden" name="from_lab" value="{{ from_lab }}" />{% endif %}
   {% if not pipeline_id %}<input type="hidden" name="editor_save" value="1" />{% endif %}
 
   <p>

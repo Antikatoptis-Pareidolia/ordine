@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Lab setup · {{ pipeline_name }}{% endblock %}
+{% block content %}
+<h1>Dry-run lab — {{ pipeline_name }}</h1>
+<p><a href="/pipelines/{{ pipeline_id }}/edit">Back to editor</a></p>
+
+{% if shell_warning %}
+<p class="flash flash-error" role="alert">
+  This playbook contains <code>shell.run</code> steps. Dry-run still executes them for real —
+  there is no command sandboxing beyond output-path redirection.
+</p>
+{% endif %}
+
+<form method="post" action="/pipelines/{{ pipeline_id }}/lab">
+  <p>
+    <label for="sample_dir">Sample directory</label>
+    <input id="sample_dir" name="sample_dir" required placeholder="~/samples" />
+  </p>
+  <p>
+    <label for="glob">Glob</label>
+    <input id="glob" name="glob" value="*" />
+  </p>
+  <p>
+    <label for="version_id">Playbook version</label>
+    <select id="version_id" name="version_id">
+      {% for version in versions %}
+      <option value="{{ version.public_id }}" {% if version.public_id == current_version %}selected{% endif %}>
+        {{ version.public_id }}{% if version.note %} — {{ version.note }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </p>
+  <p>
+    <label for="max_samples">Max samples</label>
+    <input id="max_samples" name="max_samples" type="number" min="1" max="20" value="20" />
+  </p>
+  <p class="hint">Samples are copied into an isolated sandbox. Production DB and source files are never modified.</p>
+  <button type="submit">Start lab session</button>
+</form>
+{% endblock %}

@@ -1,0 +1,26 @@
+<ol class="lab-timeline">
+  {% for step in steps %}
+  <li>
+    <span class="chip chip-{{ step.status }}">{{ step.status }}</span>
+    Step {{ step.seq }} · <code>{{ step.step_id }}</code>
+    {% if step.message %}<span class="hint">— {{ step.message }}</span>{% endif %}
+    {% if step.branch_results %}
+    <ul>
+      {% for name, status, message in step.branch_results %}
+      <li>branch {{ name }}: {{ status }}{% if message %} — {{ message }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </li>
+  {% else %}
+  <li class="hint">No steps executed yet.</li>
+  {% endfor %}
+</ol>
+{% if failed_ix is not none and fix_anchor %}
+<p>
+  <a href="/pipelines/{{ pipeline_id }}/edit?version={{ version_id }}&amp;anchor={{ fix_anchor }}&amp;from_lab={{ sid }}">
+    Fix from here
+  </a>
+  (step {{ failed_ix + 1 }})
+</p>
+{% endif %}

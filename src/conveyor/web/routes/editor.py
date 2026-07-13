@@ -20,7 +20,7 @@ from conveyor.core.errors import FieldError, PlaybookSyntaxError, PlaybookValida
 from conveyor.core.ledger import Ledger, VersionInfo
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
-from conveyor.web.diffing import side_by_side_rows, summarize_playbook_changes
+from conveyor.web.diffing import ChangeItem, side_by_side_rows, summarize_playbook_changes
 from conveyor.web.forms import (
     branch_step_indices,
     onfail_branch_indices,
@@ -264,6 +264,9 @@ def _editor_context(
     current_version: str | None,
     errors: list[FieldError],
     branch_banner: dict[str, str] | None = None,
+    lab_resume_banner: dict[str, str] | None = None,
+    anchor: str | None = None,
+    from_lab: str | None = None,
     save_error: str | None = None,
 ) -> dict[str, Any]:
     registry = _registry(request)
@@ -288,6 +291,9 @@ def _editor_context(
         "errors_by_path": _errors_by_path(errors),
         "errors": errors,
         "branch_banner": branch_banner,
+        "lab_resume_banner": lab_resume_banner,
+        "anchor": anchor,
+        "from_lab": from_lab,
         "save_error": save_error,
         "rows_base_url": _rows_base_url(pipeline_id),
         **_flash(request),
@@ -298,6 +304,9 @@ def _load_editor_from_version(
     request: Request,
     pipeline_id: int,
     version_public_id: str,
+    *,
+    anchor: str | None = None,
+    from_lab: str | None = None,
 ) -> dict[str, Any]:
     ledger = _ledger(request)
     yaml_text = ledger.get_version_yaml(pipeline_id, version_public_id)
@@ -315,6 +324,8 @@ def _load_editor_from_version(
         base_version=version_public_id,
         current_version=current_version,
         errors=[],
+        anchor=anchor,
+        from_lab=from_lab,
     )
 
 
@@ -381,6 +392,8 @@ async def editor_edit(
     request: Request,
     pipeline_id: int,
     version: Annotated[str | None, Query()] = None,
+    anchor: Annotated[str | None, Query()] = None,
+    from_lab: Annotated[str | None, Query()] = None,
 ) -> HTMLResponse:
     ledger = _ledger(request)
     _pipeline_summary(request, pipeline_id)
@@ -390,7 +403,13 @@ async def editor_edit(
     return templates.TemplateResponse(
         request,
         "editor.html",
-        _load_editor_from_version(request, pipeline_id, version),
+        _load_editor_from_version(
+            request,
+            pipeline_id,
+            version,
+            anchor=anchor,
+            from_lab=from_lab,
+        ),
     )
 
 
@@ -714,8 +733,11 @@ async def save_version(
         "base": base_version,
         "current": current_version,
     }
-    ctx = _load_editor_from_version(request, pipeline_id, saved_id)
+    from_lab = (form.get("from_lab") or "").strip() or None
+    ctx = _load_editor_from_version(request, pipeline_id, saved_id, from_lab=from_lab)
     ctx["branch_banner"] = branch_banner
+    if from_lab:
+        ctx["lab_resume_banner"] = {"sid": from_lab, "version_id": saved_id}
     ctx["form_fields"]["base_version"] = saved_id
     return templates.TemplateResponse(request, "editor.html", ctx)
 
@@ -781,7 +803,7 @@ async def version_diff(
         against_id=against_id,
         version_id=version_id,
     )
-    change_items: list = []
+    change_items: list[ChangeItem] = []
     if formatting_normalized and not metadata_only:
         old_playbook = loads_playbook(against_yaml, source="<diff>")
         new_playbook = loads_playbook(version_yaml, source="<diff>")
