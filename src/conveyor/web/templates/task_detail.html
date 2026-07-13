@@ -77,6 +77,30 @@
 </section>
 {% endif %}
 
+<section aria-labelledby="ai-heading">
+  <h2 id="ai-heading">AI assistance</h2>
+  {% if not llm_configured %}
+  <p>LLM is not configured. <a href="/settings">Open Settings</a>.</p>
+  {% else %}
+  <form hx-post="/tasks/{{ task.id }}/ai/diagnose" hx-target="#ai-diagnosis-panel" hx-swap="innerHTML" hx-indicator="#ai-diagnose-spinner">
+    <label><input type="checkbox" name="include_image" value="on" /> Include input image</label>
+    <button type="submit">Diagnose</button>
+    <span id="ai-diagnose-spinner" class="htmx-indicator">Diagnosing…</span>
+  </form>
+  <form hx-post="/tasks/{{ task.id }}/ai/suggest-branch" hx-target="#ai-branch-panel" hx-swap="innerHTML" hx-indicator="#ai-branch-spinner">
+    <button type="submit">Suggest branch</button>
+    <span id="ai-branch-spinner" class="htmx-indicator">Suggesting…</span>
+  </form>
+  {% endif %}
+  <div id="ai-diagnosis-panel">
+    {% if diagnosis and flags %}
+    {% set flag_id = flags[0].id %}
+    {% include "partials/ai_diagnosis_card.html" %}
+    {% endif %}
+  </div>
+  <div id="ai-branch-panel"></div>
+</section>
+
 <p class="actions">
   {% if can_retry %}
   <form action="/tasks/{{ task.id }}/retry" method="post" style="display:inline">

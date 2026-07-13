@@ -11,15 +11,19 @@ from collections.abc import Mapping
 from typing import Annotated, Any, Literal, cast
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette import status
 
+from conveyor.core.config import AppConfig
 from conveyor.core.errors import FieldError, PlaybookSyntaxError, PlaybookValidationError
 from conveyor.core.ledger import Ledger, VersionInfo
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
+from conveyor.llm.client import build_client
+from conveyor.llm.errors import LLMError, LLMNotConfiguredError
+from conveyor.llm.features.drafting import draft_playbook
 from conveyor.web.diffing import ChangeItem, side_by_side_rows, summarize_playbook_changes
 from conveyor.web.forms import (
     branch_step_indices,
@@ -27,6 +31,7 @@ from conveyor.web.forms import (
     playbook_to_form,
     validate_editor_content,
 )
+from conveyor.web.routes.tasks import BranchSuggestionStore
 from conveyor.web.services import ServiceManager
 from conveyor.web.views import version_label
 
@@ -319,8 +324,26 @@ def _editor_context(
         )
         if current_version
         else None,
+        "draft_url": (
+            f"/pipelines/{pipeline_id}/ai/draft"
+            if pipeline_id is not None
+            else "/pipelines/new/ai/draft"
+        ),
+        "llm_configured": _llm_configured(request),
         **_flash(request),
     }
+
+
+def _llm_configured(request: Request) -> bool:
+    try:
+        build_client(cast(AppConfig, request.app.state.config))
+        return True
+    except LLMNotConfiguredError:
+        return False
+
+
+def _branch_store(request: Request) -> BranchSuggestionStore:
+    return cast(BranchSuggestionStore, request.app.state.branch_suggestions)
 
 
 def _load_editor_from_version(
@@ -418,23 +441,26 @@ async def editor_edit(
     version: Annotated[str | None, Query()] = None,
     anchor: Annotated[str | None, Query()] = None,
     from_lab: Annotated[str | None, Query()] = None,
+    ai_branch_task: Annotated[int | None, Query()] = None,
 ) -> HTMLResponse:
     ledger = _ledger(request)
     _pipeline_summary(request, pipeline_id)
     if version is None:
         version, _yaml = ledger.get_current_playbook(pipeline_id)
     templates = _templates(request)
-    return templates.TemplateResponse(
+    context = _load_editor_from_version(
         request,
-        "editor.html",
-        _load_editor_from_version(
-            request,
-            pipeline_id,
-            version,
-            anchor=anchor,
-            from_lab=from_lab,
-        ),
+        pipeline_id,
+        version,
+        anchor=anchor,
+        from_lab=from_lab,
     )
+    if ai_branch_task is not None:
+        pending = _branch_store(request).get(ai_branch_task)
+        if pending is not None and pending.pipeline_id == pipeline_id:
+            context["yaml_text"] = pending.suggestion.new_yaml
+            context["tab"] = "yaml"
+    return templates.TemplateResponse(request, "editor.html", context)
 
 
 @router.post("/pipelines/new/edit/validate", response_class=HTMLResponse)
@@ -905,4 +931,83 @@ async def revert_version(request: Request, pipeline_id: int, version_id: str) ->
     return _redirect(
         f"/pipelines/{pipeline_id}/versions",
         flash=f"Reverted to {version_id} as {new_id}",
+    )
+
+
+async def _ai_draft_impl(
+    request: Request,
+    *,
+    pipeline_id: int | None,
+    description: str,
+    draft_url: str,
+) -> HTMLResponse:
+    templates = _templates(request)
+    try:
+        client = build_client(cast(AppConfig, request.app.state.config))
+    except LLMNotConfiguredError:
+        return templates.TemplateResponse(
+            request,
+            "partials/ai_draft_form.html",
+            {"request": request, "llm_configured": False, "draft_url": draft_url},
+        )
+    current_yaml = None
+    if pipeline_id is not None:
+        _version, current_yaml = _ledger(request).get_current_playbook(pipeline_id)
+    try:
+        result = draft_playbook(
+            client,
+            _registry(request),
+            description,
+            current_yaml=current_yaml,
+        )
+    except LLMError as exc:
+        return templates.TemplateResponse(
+            request,
+            "partials/ai_draft_form.html",
+            {
+                "request": request,
+                "llm_configured": True,
+                "draft_url": draft_url,
+                "description": description,
+                "error": str(exc),
+            },
+        )
+    return templates.TemplateResponse(
+        request,
+        "partials/ai_draft_result.html",
+        {
+            "request": request,
+            "yaml_text": result.yaml_text,
+            "problems": result.problems,
+            "repaired": result.repaired,
+            "valid": result.playbook is not None,
+            "draft_url": draft_url,
+        },
+    )
+
+
+@router.post("/pipelines/new/ai/draft", response_class=HTMLResponse)
+async def ai_draft_new(
+    request: Request,
+    description: Annotated[str, Form()],
+) -> HTMLResponse:
+    return await _ai_draft_impl(
+        request,
+        pipeline_id=None,
+        description=description,
+        draft_url="/pipelines/new/ai/draft",
+    )
+
+
+@router.post("/pipelines/{pipeline_id}/ai/draft", response_class=HTMLResponse)
+async def ai_draft_existing(
+    request: Request,
+    pipeline_id: int,
+    description: Annotated[str, Form()],
+) -> HTMLResponse:
+    return await _ai_draft_impl(
+        request,
+        pipeline_id=pipeline_id,
+        description=description,
+        draft_url=f"/pipelines/{pipeline_id}/ai/draft",
     )

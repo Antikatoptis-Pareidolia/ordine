@@ -1,0 +1,7 @@
+version: 1
+name: bad
+trigger:
+  type: folder_watch
+  path: ~/in
+steps:
+  - not.a.real.step

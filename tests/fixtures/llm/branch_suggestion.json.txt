@@ -1,0 +1,8 @@
+{
+  "branch": {
+    "name": "ai-fix",
+    "retries": 0,
+    "steps": [{"id": "util.copy"}]
+  },
+  "rationale": "Copy the input past the failing step"
+}

@@ -5,6 +5,10 @@
 
 <h1>{% if pipeline_id %}Edit pipeline{% else %}New pipeline{% endif %}</h1>
 
+<section id="ai-draft-panel">
+  {% include "partials/ai_draft_form.html" %}
+</section>
+
 {% if branch_banner %}
 <p class="flash flash-info" role="status">
   Saved {{ version_label(branch_banner.saved, branch_banner.saved_note, parent_id=branch_banner.base) }}

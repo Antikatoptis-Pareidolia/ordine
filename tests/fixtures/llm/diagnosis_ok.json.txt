@@ -1,0 +1,7 @@
+{
+  "cause": "Step util.fail returned intentional failure",
+  "confidence": "high",
+  "evidence": ["log shows intentional failure"],
+  "suggestions": ["Add a recovery branch"],
+  "fixable_by_branch": true
+}

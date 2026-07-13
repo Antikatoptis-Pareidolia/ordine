@@ -1,0 +1,10 @@
+```yaml
+version: 1
+name: png-cleanup
+trigger:
+  type: folder_watch
+  path: ~/in
+  glob: "*.png"
+steps:
+  - image.white_to_alpha
+```

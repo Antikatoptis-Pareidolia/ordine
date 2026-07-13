@@ -29,8 +29,11 @@ from conveyor.core.errors import (
 from conveyor.core.ledger import Ledger
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
+from conveyor.llm.client import build_client
+from conveyor.llm.errors import LLMNotConfiguredError
 from conveyor.web.forms import validate_editor_content
 from conveyor.web.routes.dashboard import pipeline_cards
+from conveyor.web.routes.tasks import diagnosis_for_task
 from conveyor.web.security import resolve_artifact
 from conveyor.web.services import ServiceManager
 from conveyor.web.views import can_cancel, can_retry
@@ -299,6 +302,14 @@ async def task_detail(request: Request, task_id: int) -> HTMLResponse:
                 source_artifact = None
 
     templates = _templates(request)
+    diagnosis = None
+    if workdir is not None:
+        diagnosis = diagnosis_for_task(ledger, task_id, workdir)
+    try:
+        build_client(_config(request))
+        llm_configured = True
+    except LLMNotConfiguredError:
+        llm_configured = False
     return templates.TemplateResponse(
         request,
         "task_detail.html",
@@ -314,6 +325,8 @@ async def task_detail(request: Request, task_id: int) -> HTMLResponse:
             "last_output_rel": last_output_rel,
             "can_retry": can_retry(task),
             "can_cancel": can_cancel(task),
+            "diagnosis": diagnosis,
+            "llm_configured": llm_configured,
             **_flash(request),
         },
     )

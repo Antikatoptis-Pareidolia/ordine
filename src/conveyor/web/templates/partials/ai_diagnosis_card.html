@@ -1,0 +1,19 @@
+<div id="ai-diagnosis-{{ flag_id }}" class="ai-card">
+  <h3>Diagnosis</h3>
+  {% if diagnosis %}
+  <p>Diagnosed {{ diagnosis.diagnosed_at }} by {{ diagnosis.model or 'model' }}</p>
+  <p><strong>{{ diagnosis.cause }}</strong> (confidence: {{ diagnosis.confidence }})</p>
+  {% if diagnosis.evidence %}
+  <ul>{% for item in diagnosis.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if diagnosis.suggestions %}
+  <p>Suggestions:</p>
+  <ul>{% for item in diagnosis.suggestions %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if diagnosis.fixable_by_branch %}
+  <p class="hint">This failure may be fixable with a recovery branch.</p>
+  {% endif %}
+  {% else %}
+  <p class="hint">No diagnosis yet.</p>
+  {% endif %}
+</div>

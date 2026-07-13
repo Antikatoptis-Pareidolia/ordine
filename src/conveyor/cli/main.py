@@ -36,6 +36,8 @@ from conveyor.core.runner import PipelineRunner, PipelineService
 from conveyor.core.triggers import ManualScanService, ledger_sink
 from conveyor.llm.client import build_client
 from conveyor.llm.errors import LLMAuthError, LLMError, LLMNotConfiguredError
+from conveyor.llm.features.diagnosis import diagnose
+from conveyor.llm.features.drafting import draft_playbook
 from conveyor.llm.types import Message
 
 logger = logging.getLogger(__name__)
@@ -715,6 +717,92 @@ def llm_check(
             f"tokens={response.usage.input_tokens}+{response.usage.output_tokens} "
             f"text={response.text!r}"
         )
+    raise typer.Exit(code=0)
+
+
+@app.command("draft")
+def draft_cmd(
+    ctx: typer.Context,
+    description: str,
+    pipeline_name: Annotated[
+        str | None, typer.Option("--pipeline", help="Revise an existing pipeline by name")
+    ] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Write YAML to file")] = None,
+) -> None:
+    """Draft a playbook from natural language (stdout or --out; never saves)."""
+    assert isinstance(ctx.obj, AppContext)
+    config = ctx.obj.config
+    registry = StepRegistry.load()
+    try:
+        client = build_client(config)
+    except LLMNotConfiguredError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    current_yaml = None
+    if pipeline_name:
+        ledger, _, _ = _open(config)
+        pipeline_id = ledger.find_pipeline_id(pipeline_name)
+        if pipeline_id is None:
+            typer.echo(f"unknown pipeline: {pipeline_name}", err=True)
+            raise typer.Exit(code=2)
+        _version, current_yaml = ledger.get_current_playbook(pipeline_id)
+    try:
+        result = draft_playbook(client, registry, description, current_yaml=current_yaml)
+    except LLMError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    if result.problems:
+        for problem in result.problems:
+            typer.echo(f"{problem.path}: {problem.message}", err=True)
+    destination = out or Path("-")
+    if str(destination) == "-":
+        typer.echo(result.yaml_text)
+    else:
+        destination.write_text(result.yaml_text, encoding="utf-8")
+    raise typer.Exit(code=0 if result.playbook is not None else 1)
+
+
+@app.command("diagnose")
+def diagnose_cmd(
+    ctx: typer.Context,
+    task_id: int,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
+) -> None:
+    """Diagnose a flagged or failed task using LLM context."""
+    assert isinstance(ctx.obj, AppContext)
+    config = ctx.obj.config
+    ledger, _, _ = _open(config)
+    try:
+        client = build_client(config)
+    except LLMNotConfiguredError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    try:
+        result = diagnose(
+            client,
+            StepRegistry.load(),
+            ledger,
+            task_id,
+            config.workdir_root,
+        )
+    except LLMError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    payload = {
+        "cause": result.cause,
+        "confidence": result.confidence,
+        "evidence": result.evidence,
+        "suggestions": result.suggestions,
+        "fixable_by_branch": result.fixable_by_branch,
+    }
+    if as_json:
+        output.emit_json(payload)
+    else:
+        typer.echo(f"cause: {result.cause} ({result.confidence})")
+        for item in result.evidence:
+            typer.echo(f"  evidence: {item}")
+        for item in result.suggestions:
+            typer.echo(f"  suggestion: {item}")
     raise typer.Exit(code=0)
 
 

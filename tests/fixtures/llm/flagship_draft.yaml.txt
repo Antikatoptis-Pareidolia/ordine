@@ -1,0 +1,15 @@
+version: 1
+name: png-cleanup
+trigger:
+  type: folder_watch
+  path: ~/in
+  glob: "*.png"
+  settle_seconds: 2
+dedup: content_hash
+engine: headless
+steps:
+  - image.validate
+  - image.white_to_alpha: { fuzz: 8 }
+  - image.trim: {}
+  - image.export: { dest: ~/out, format: png }
+on_failure: { retries: 1, then: mark_failed }

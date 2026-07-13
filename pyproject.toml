@@ -70,7 +70,10 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --cov=conveyor --cov-report=term-missing"
-markers = ["integration: long-running trigger integration tests (default run)"]
+markers = [
+    "integration: long-running trigger integration tests (default run)",
+    "llm_live: real LLM calls requiring API keys (excluded from default CI)",
+]
 
 [tool.coverage.run]
 source = ["src/conveyor"]

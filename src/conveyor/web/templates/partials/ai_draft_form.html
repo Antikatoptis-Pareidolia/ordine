@@ -1,0 +1,13 @@
+{% if llm_configured is defined and not llm_configured %}
+<div class="ai-card ai-not-configured">
+  <p>LLM is not configured. Set a provider and API key in <a href="/settings">Settings</a> to use AI features.</p>
+</div>
+{% else %}
+<p class="hint">Describe what the pipeline should do. The draft loads into the YAML tab for review — nothing is saved until you click Save.</p>
+<form hx-post="{{ draft_url }}" hx-target="#ai-draft-panel" hx-swap="outerHTML" hx-indicator="#ai-draft-spinner">
+  <label for="ai-description">Description</label>
+  <textarea id="ai-description" name="description" rows="4" required>{{ description or '' }}</textarea>
+  <button type="submit">Draft with AI</button>
+  <span id="ai-draft-spinner" class="htmx-indicator">Drafting…</span>
+</form>
+{% endif %}

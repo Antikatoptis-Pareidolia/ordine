@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured change summary and side-by-side diff view (`web/diffing.py`; Step 10 follow-up 3)
 - Dry-run lab with step-through, sandbox isolation, checkpoint resume, and `conveyor dry-run` CLI (Step 11)
 - Provider-agnostic LLM connector: raw REST adapters (Anthropic/OpenAI/compatible), keyring keys, JSONL audit log, token budget, settings UI, and `conveyor llm check` (Step 12)
+- AI drafting, failure diagnosis, and learned recovery branches with explicit approval only (Step 13)
 
 ### Fixed
 

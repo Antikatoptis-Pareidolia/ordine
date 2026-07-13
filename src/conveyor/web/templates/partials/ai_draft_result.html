@@ -1,0 +1,19 @@
+<div id="ai-draft-panel" class="ai-card">
+  <h2>Draft result</h2>
+  {% if repaired %}<p class="hint">Repaired after one validation pass.</p>{% endif %}
+  {% if valid %}
+  <p class="flash flash-info">Valid playbook draft — review YAML below, then save when ready.</p>
+  {% else %}
+  <p class="error">Draft has validation problems — fix in the YAML tab.</p>
+  {% endif %}
+  {% if problems %}
+  <ul class="problems">
+    {% for problem in problems %}
+    <li><code>{{ problem.path }}</code>: {{ problem.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <textarea id="yaml_text" name="yaml_text" rows="24" hx-swap-oob="true">{{ yaml_text }}</textarea>
+  <input type="hidden" name="tab" value="yaml" hx-swap-oob="true" />
+  <p><a href="{{ draft_url }}">Draft again</a></p>
+</div>

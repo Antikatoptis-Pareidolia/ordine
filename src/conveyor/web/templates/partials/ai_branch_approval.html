@@ -1,0 +1,38 @@
+<div id="ai-branch-panel" class="ai-card">
+  {% if llm_configured is defined and not llm_configured %}
+  <p>LLM is not configured. <a href="/settings">Open Settings</a>.</p>
+  {% elif suggestion and suggestion.new_playbook %}
+  <h3>Suggested recovery branch</h3>
+  <p>{{ suggestion.rationale }}</p>
+  <p>Branch <code>{{ suggestion.branch.name }}</code> on step {{ suggestion.target_step_index }}</p>
+  {% if changes %}
+  <h4>Changes</h4>
+  <ul>
+    {% for change in changes %}
+    <li>{{ change.kind }} {{ change.scope }} {{ change.location }}: {{ change.description }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form action="/tasks/{{ task_id }}/ai/approve-branch" method="post" style="display:inline">
+    <button type="submit">Approve &amp; save</button>
+  </form>
+  <form action="/tasks/{{ task_id }}/ai/open-branch-editor" method="post" style="display:inline">
+    <button type="submit">Open in editor</button>
+  </form>
+  <form action="/tasks/{{ task_id }}/ai/discard-branch" method="post" style="display:inline">
+    <button type="submit">Discard</button>
+  </form>
+  {% else %}
+  <p class="error">Branch suggestion could not be validated.</p>
+  {% if problems %}
+  <ul class="problems">
+    {% for problem in problems %}
+    <li><code>{{ problem.path }}</code>: {{ problem.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form action="/tasks/{{ task_id }}/ai/open-branch-editor" method="post">
+    <button type="submit">Open in editor</button>
+  </form>
+  {% endif %}
+</div>
