@@ -1,22 +1,87 @@
 {% extends "base.html" %}
-{% block title %}Diff {{ version_id }} · {{ pipeline_name }}{% endblock %}
+{% block title %}Diff {{ version.id }} · {{ pipeline_name }}{% endblock %}
 {% block content %}
-<h1>Diff — {{ pipeline_name }}</h1>
-<p>
-  <code>{{ against_id or '(empty)' }}</code> → <code>{{ version_id }}</code>
-  {% if formatting_normalized %}<span class="hint">(formatting normalized)</span>{% endif %}
-  · <a href="/pipelines/{{ pipeline_id }}/versions">Back to history</a>
-</p>
-{% if metadata_only %}
-<p class="flash flash-info" role="status">no content changes (metadata-only version)</p>
-{% else %}
-<pre class="diff">
+<h1><code>{{ against.id }}</code> → <code>{{ version.id }}</code></h1>
+<p><a href="/pipelines/{{ pipeline_id }}/versions">Back to version tree</a></p>
+
+<div class="diff-header-meta">
+  <div class="diff-version-meta card">
+    <h2>{{ against.id }}</h2>
+    {% if against.note %}<p class="hint">Note: {{ against.note }}</p>{% endif %}
+    <p class="hint">Created: {{ against.created_at or "—" }}</p>
+    <p class="hint">Parent: {% if against.parent %}<code>{{ against.parent }}</code>{% else %}—{% endif %}</p>
+  </div>
+  <div class="diff-version-meta card">
+    <h2>{{ version.id }}</h2>
+    {% if version.note %}<p class="hint">Note: {{ version.note }}</p>{% endif %}
+    <p class="hint">Created: {{ version.created_at or "—" }}</p>
+    <p class="hint">Parent: {% if version.parent %}<code>{{ version.parent }}</code>{% else %}—{% endif %}</p>
+  </div>
+</div>
+
+<section class="card">
+  <h2>What changed</h2>
+  {% if change_items %}
+  <ul class="change-summary">
+    {% for item in change_items %}
+    <li class="change-item">
+      <span class="change-badge change-{{ item.kind }}">{{ item.kind }}</span>
+      <div class="change-body">
+        <span class="change-scope">{{ item.scope }}</span>
+        <span class="change-location">{{ item.location }}</span>
+        <span class="change-description">{{ item.description }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif metadata_only %}
+  <p class="flash flash-info" role="status">no content changes (metadata-only version)</p>
+  {% else %}
+  <p class="hint">No structured summary available.</p>
+  {% endif %}
+</section>
+
+{% if not metadata_only %}
+<section class="card">
+  <h2>Raw diff {% if formatting_normalized %}<span class="hint">(formatting normalized)</span>{% endif %}</h2>
+  <p class="diff-view-toggle">
+    {% if diff_view == "side-by-side" %}
+    Side-by-side view · <a href="?view=unified{% if against_query %}&amp;against={{ against_query }}{% endif %}">Unified view</a>
+    {% else %}
+    <a href="{% if against_query %}?against={{ against_query }}{% else %}?{% endif %}">Side-by-side view</a> · Unified view
+    {% endif %}
+  </p>
+  {% if diff_view == "side-by-side" %}
+  <table class="diff-side-by-side">
+    <thead>
+      <tr>
+        <th class="diff-lineno-col"></th>
+        <th>{{ against.id }}</th>
+        <th class="diff-lineno-col"></th>
+        <th>{{ version.id }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in side_by_side_rows %}
+      <tr class="diff-row-{{ row.kind }}">
+        <td class="diff-lineno">{{ row.old_line_no or "" }}</td>
+        <td class="diff-old"><code>{{ row.old_text }}</code></td>
+        <td class="diff-lineno">{{ row.new_line_no or "" }}</td>
+        <td class="diff-new"><code>{{ row.new_text }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <pre class="diff">
 {% for line in diff_lines %}
 {% if line.startswith('+') and not line.startswith('+++') %}<span class="diff-add">{{ line }}</span>
 {% elif line.startswith('-') and not line.startswith('---') %}<span class="diff-del">{{ line }}</span>
 {% else %}{{ line }}
 {% endif %}
 {% endfor %}
-</pre>
+  </pre>
+  {% endif %}
+</section>
 {% endif %}
 {% endblock %}

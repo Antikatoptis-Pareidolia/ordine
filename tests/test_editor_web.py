@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -257,7 +258,7 @@ def test_diff_shows_changed_line(editor_client: tuple[TestClient, Ledger]) -> No
     diff = client.get(f"/pipelines/{pipeline_id}/versions/{v2}/diff")
     assert diff.status_code == 200
     assert "fuzz" in diff.text
-    assert "diff-add" in diff.text or "diff-del" in diff.text
+    assert "diff-row-replace" in diff.text or "diff-row-add" in diff.text
 
 
 def _manual_yaml(name: str, watch: Path) -> str:
@@ -353,9 +354,15 @@ def test_semantic_diff_shows_only_meaningful_changes(
     assert diff.status_code == 200
     assert "(formatting normalized)" in diff.text
     assert "rescue-trim" in diff.text
-    assert "diff-add" in diff.text
-    for needle in ("settle_seconds", "glob:", "{fuzz", "'*.png'"):
-        assert needle not in diff.text
+    assert "diff-row-add" in diff.text
+    changed_rows = re.findall(
+        r'<tr class="diff-row-(?:add|delete|replace)">.*?</tr>',
+        diff.text,
+        flags=re.S,
+    )
+    for row in changed_rows:
+        for needle in ("settle_seconds", "glob:", "{fuzz", "'*.png'"):
+            assert needle not in row
 
 
 def test_diff_metadata_only_version(editor_client: tuple[TestClient, Ledger]) -> None:
@@ -368,7 +375,7 @@ def test_diff_metadata_only_version(editor_client: tuple[TestClient, Ledger]) ->
     diff = client.get(f"/pipelines/{pipeline_id}/versions/{v2}/diff")
     assert diff.status_code == 200
     assert "no content changes (metadata-only version)" in diff.text
-    assert "(formatting normalized)" in diff.text
+    assert "diff-side-by-side" not in diff.text
 
 
 def test_editor_form_labeling_and_empty_note(editor_client: tuple[TestClient, Ledger]) -> None:

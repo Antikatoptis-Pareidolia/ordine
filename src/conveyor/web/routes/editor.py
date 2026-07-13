@@ -20,6 +20,7 @@ from conveyor.core.errors import FieldError, PlaybookSyntaxError, PlaybookValida
 from conveyor.core.ledger import Ledger, VersionInfo
 from conveyor.core.playbook import Playbook, dump_playbook, loads_playbook
 from conveyor.core.registry import StepRegistry
+from conveyor.web.diffing import side_by_side_rows, summarize_playbook_changes
 from conveyor.web.forms import (
     branch_step_indices,
     onfail_branch_indices,
@@ -741,12 +742,29 @@ async def version_history(request: Request, pipeline_id: int) -> HTMLResponse:
     )
 
 
+def _version_meta(row: VersionInfo | None) -> dict[str, str | None]:
+    if row is None:
+        return {
+            "id": "(empty)",
+            "note": None,
+            "parent": None,
+            "created_at": None,
+        }
+    return {
+        "id": row.public_id,
+        "note": row.note,
+        "parent": row.parent_public_id,
+        "created_at": str(row.created_at),
+    }
+
+
 @router.get("/pipelines/{pipeline_id}/versions/{version_id}/diff", response_class=HTMLResponse)
 async def version_diff(
     request: Request,
     pipeline_id: int,
     version_id: str,
     against: Annotated[str | None, Query()] = None,
+    view: Annotated[str | None, Query()] = None,
 ) -> HTMLResponse:
     ledger = _ledger(request)
     name, _current = _pipeline_summary(request, pipeline_id)
@@ -763,6 +781,14 @@ async def version_diff(
         against_id=against_id,
         version_id=version_id,
     )
+    change_items: list = []
+    if formatting_normalized and not metadata_only:
+        old_playbook = loads_playbook(against_yaml, source="<diff>")
+        new_playbook = loads_playbook(version_yaml, source="<diff>")
+        change_items = summarize_playbook_changes(old_playbook, new_playbook)
+    left_text, _left_ok = _canonical_yaml_for_diff(against_yaml)
+    right_text, _right_ok = _canonical_yaml_for_diff(version_yaml)
+    diff_view = "unified" if view == "unified" else "side-by-side"
     templates = _templates(request)
     return templates.TemplateResponse(
         request,
@@ -771,9 +797,16 @@ async def version_diff(
             "request": request,
             "pipeline_id": pipeline_id,
             "pipeline_name": name,
-            "version_id": version_id,
-            "against_id": against_id,
+            "against": _version_meta(versions.get(against_id) if against_id else None),
+            "version": _version_meta(version_row),
+            "against_query": against_id,
+            "change_items": change_items,
             "diff_lines": diff_lines,
+            "side_by_side_rows": side_by_side_rows(
+                left_text.splitlines(),
+                right_text.splitlines(),
+            ),
+            "diff_view": diff_view,
             "formatting_normalized": formatting_normalized,
             "metadata_only": metadata_only,
             **_flash(request),

@@ -42,12 +42,24 @@ The **Version note** field is always empty when the editor loads; it is never pr
 
 `GET .../versions/{pv}/diff` compares versions by **meaning**, not raw text:
 
-1. Each side is parsed with `loads_playbook` and re-serialized with `dump_playbook` before `difflib.unified_diff`.
+1. Each side is parsed with `loads_playbook` and re-serialized with `dump_playbook` before diffing.
 2. The diff view is labeled **(formatting normalized)** when both sides parse successfully.
 3. If a side fails to parse (should not happen for stored versions), that side falls back to raw `yaml_text`.
 4. When canonical content is identical (e.g. metadata-only version rows with the same playbook), the view shows **no content changes (metadata-only version)** instead of an empty diff.
 
 Stored `yaml_text` rows are never rewritten by the diff view — normalization applies only at display time.
+
+### Structured change summary
+
+The **What changed** card lists semantic edits detected by `web/diffing.py` on the parsed `Playbook` models: added/removed/changed badges for steps, params, branches, trigger fields, and pipeline metadata. Because the summary compares models, not raw YAML, compact vs long step serialization produces **no** spurious param items — only real edits appear.
+
+Read the summary first for a quick audit; use the raw diff below for line-level context.
+
+![Diff view with change summary and side-by-side YAML](images/editor-diff-summary.png)
+
+### Side-by-side vs unified raw diff
+
+The default **side-by-side** table aligns canonical YAML lines in two columns with line numbers and row coloring (green add, red delete, amber change). Append `?view=unified` for the classic unified `difflib` pre block. Both views work with JavaScript disabled.
 
 ## Version tree semantics
 
@@ -80,7 +92,7 @@ pv_0001
 | `POST .../edit/rows` | Add/remove step rows (HTMX) |
 | `POST /pipelines/{id}/versions` | Save new version |
 | `GET /pipelines/{id}/versions` | History tree |
-| `GET .../versions/{pv}/diff?against={pv2}` | Unified semantic diff (`difflib` on canonical YAML) |
+| `GET .../versions/{pv}/diff?against={pv2}` | Semantic diff with change summary; side-by-side YAML by default (`?view=unified` for unified) |
 | `POST .../versions/{pv}/make-current` | Point pipeline at version |
 | `POST .../versions/{pv}/revert` | Revert via new version |
 
