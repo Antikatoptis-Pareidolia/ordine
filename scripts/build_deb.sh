@@ -30,7 +30,7 @@ fi
 
 # Rewrite shebangs in /opt/conveyor/bin to the installed venv python.
 while IFS= read -r -d '' script; do
-  if head -n 1 "${script}" | grep -q '^#!'; then
+  if grep -q '^#!' <<<"$(head -n 1 "${script}")"; then
     sed -i "1s|^#!.*python3.*|#!${VENV_PYTHON}|" "${script}"
   fi
 done < <(find "${STAGING_DIR}${VENV_BIN}" -maxdepth 1 -type f -print0)
@@ -63,8 +63,8 @@ if ! command -v dpkg-deb >/dev/null 2>&1; then
   exit 1
 fi
 
-DEB_LIST="$(dpkg-deb -c "${DEB_OUT}")"
-echo "${DEB_LIST}" | grep -q './usr/bin/conveyor'
-echo "${DEB_LIST}" | grep -q './opt/conveyor/bin/conveyor'
+listing="$(dpkg-deb -c "${DEB_OUT}")"
+grep -q './usr/bin/conveyor' <<<"${listing}"
+grep -q './opt/conveyor/bin/conveyor' <<<"${listing}"
 
 echo "Built ${DEB_OUT}"

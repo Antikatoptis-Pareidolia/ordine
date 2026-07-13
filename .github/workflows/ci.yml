@@ -83,7 +83,8 @@ jobs:
           uv run conveyor init --config "$CONFIG"
           uv run conveyor --config "$CONFIG" check "$PLAYBOOK"
           uv run conveyor --config "$CONFIG" run --oneshot "$PLAYBOOK"
-          uv run conveyor --config "$CONFIG" status --json | jq -e '.pipelines[0].counts.done == 5'
+          status_json="$(uv run conveyor --config "$CONFIG" status --json)"
+          jq -e '.pipelines[0].counts.done == 5' <<<"${status_json}"
           for name in goat.png jug.png crown.png ring.png sword.png; do
             test -f "$OUT/$name"
           done
@@ -117,7 +118,8 @@ jobs:
           set -euo pipefail
           apt-get install -y "./dist/conveyor_"*.deb
           echo "=== deb contents (sample) ==="
-          dpkg -L conveyor | head -50
+          deb_listing="$(dpkg -L conveyor)"
+          head -n 50 <<<"${deb_listing}"
           ls -la /usr/bin/conveyor /opt/conveyor/bin/ 2>&1 || true
           DEMO="/tmp/conveyor-demo"
           export XDG_CONFIG_HOME="/tmp/xdg-config"
