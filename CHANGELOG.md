@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Deb build uses fpm `--deb-recommends` (not invalid `--recommends`); deb-smoke CI logs `fpm --version` (Step 15 follow-up)
 - CI deb-smoke container steps use `shell: bash` so `set -euo pipefail` works (Step 15 follow-up 3)
+- `/usr/bin/conveyor` deb symlink uses absolute `/opt/conveyor/bin/conveyor`; build asserts package contents (Step 15 follow-up 4)
 - Lab dry-run ordinals now mirror production trigger semantics (no false pass for ordinal-dependent playbooks)
 - Drafting prompts instruct models to configure ordinal sources when manifest/numbered files are implied
 - Dry-run and lab runner-equivalent paths now report real step failure messages (not "no attempts executed") when the primary attempt fails before branch retries

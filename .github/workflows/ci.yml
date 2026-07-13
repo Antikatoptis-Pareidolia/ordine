@@ -98,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           apt-get update
-          apt-get install -y bash python3 python3-venv python3-pip imagemagick ruby-dev build-essential git curl ca-certificates
+          apt-get install -y bash python3 python3-venv python3-pip imagemagick ruby-dev build-essential git curl ca-certificates dpkg-dev
           gem install fpm
           curl -LsSf https://astral.sh/uv/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
@@ -116,6 +116,9 @@ jobs:
         run: |
           set -euo pipefail
           apt-get install -y "./dist/conveyor_"*.deb
+          echo "=== deb contents (sample) ==="
+          dpkg -L conveyor | head -50
+          ls -la /usr/bin/conveyor /opt/conveyor/bin/ 2>&1 || true
           DEMO="/tmp/conveyor-demo"
           export XDG_CONFIG_HOME="/tmp/xdg-config"
           export XDG_DATA_HOME="/tmp/xdg-data"
