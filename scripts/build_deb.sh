@@ -39,7 +39,7 @@ DEB_OUT="${DIST_DIR}/conveyor_${VERSION}_amd64.deb"
 fpm -s dir -t deb -n conveyor -v "${VERSION}" -p "${DEB_OUT}" \
   -C "${STAGING_DIR}" \
   --depends "python3 (>= 3.11)" \
-  --recommends imagemagick \
+  --deb-recommends imagemagick \
   --description "Local-first automation pipelines" \
   opt usr
 

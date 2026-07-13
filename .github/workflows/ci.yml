@@ -104,6 +104,7 @@ jobs:
       - name: Build deb
         run: |
           export PATH="$HOME/.local/bin:$PATH"
+          fpm --version
           uv sync --locked
           bash scripts/build_deb.sh
       - name: Install deb and run quickstart
