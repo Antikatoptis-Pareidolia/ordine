@@ -123,7 +123,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          apt-get install -y "./dist/ordine_"*.deb
+          apt-get install -y "./deb-dist/ordine_"*.deb
           echo "=== deb contents (sample) ==="
           deb_listing="$(dpkg -L ordine)"
           head -n 50 <<<"${deb_listing}"

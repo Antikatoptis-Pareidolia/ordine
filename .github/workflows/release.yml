@@ -44,9 +44,6 @@ jobs:
           PKG="$(uv run python -c 'import ordine; print(ordine.__version__)')"
           test "${TAG}" = "${PKG}"
 
-      - name: Build deb
-        run: bash scripts/build_deb.sh
-
       - name: Build distributions
         run: uv build
 
@@ -57,6 +54,12 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
+
+      - name: Build deb
+        run: bash scripts/build_deb.sh
 
       - name: Create GitHub Release
         env:
@@ -66,4 +69,4 @@ jobs:
           gh release create "${TAG}" \
             --title "${TAG}" \
             --notes-file release-notes.md \
-            dist/*.whl dist/*.tar.gz dist/*.deb
+            dist/*.whl dist/*.tar.gz deb-dist/*.deb

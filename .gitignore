@@ -4,6 +4,7 @@ __pycache__/
 .venv*/
 venv/
 dist/
+deb-dist/
 build/
 *.egg-info/
 .coverage

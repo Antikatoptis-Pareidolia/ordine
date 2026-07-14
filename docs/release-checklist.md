@@ -8,7 +8,7 @@ Use this for every `vX.Y.Z` tag. CI automates build/test/publish; the VM gate st
 - [ ] `[Unreleased]` in `CHANGELOG.md` has bullets for this release
 - [ ] **Name decision** complete — see [naming-checklist.md](naming-checklist.md) (blocks first `0.1.0` cut)
 - [ ] `uv run pytest -m "not llm_live"` green locally
-- [ ] `bash scripts/build_deb.sh` succeeds; `ls dist/*.deb`
+- [ ] `bash scripts/build_deb.sh` succeeds; `ls deb-dist/*.deb`
 
 ## Version bump
 
@@ -32,7 +32,7 @@ git push origin main --tags
 1. Full lint, mypy, pytest
 2. Assert tag (without `v`) == package version
 3. `uv build` → PyPI via OIDC trusted publishing (no token secrets)
-4. `build_deb.sh` → attach wheel, sdist, `.deb` to GitHub Release
+4. `uv build` → PyPI (`dist/`); `build_deb.sh` → `deb-dist/`; attach wheel, sdist, `.deb` to GitHub Release
 5. Changelog section extracted via `scripts/extract_changelog.py`
 
 ## Manual gates (not CI)

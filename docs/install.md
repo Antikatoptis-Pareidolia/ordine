@@ -22,7 +22,7 @@ Build locally (requires [fpm](https://fpm.readthedocs.io/)):
 
 ```bash
 bash scripts/build_deb.sh
-sudo apt install ./dist/ordine_*_amd64.deb imagemagick
+sudo apt install ./deb-dist/ordine_*_amd64.deb imagemagick
 ```
 
 The package installs a venv under `/opt/ordine`, a `/usr/bin/ordine` symlink, and a systemd user unit at `/usr/lib/systemd/user/ordine.service`.

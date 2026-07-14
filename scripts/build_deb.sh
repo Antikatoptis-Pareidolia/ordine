@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DIST_DIR="${REPO_ROOT}/dist"
+DEB_DIST_DIR="${REPO_ROOT}/deb-dist"
 STAGING_DIR="${REPO_ROOT}/build/deb-staging"
 VERSION="$(cd "${REPO_ROOT}" && uv run python -c "import ordine; print(ordine.__version__)")"
 VENV_ROOT="/opt/ordine"
@@ -17,9 +17,9 @@ STAGED_PYTHON="${STAGING_DIR}${VENV_PYTHON}"
 STAGED_ORDINE="${STAGING_DIR}${VENV_ORDINE}"
 
 rm -rf "${STAGING_DIR}"
-mkdir -p "${DIST_DIR}"
-rm -rf "${DIST_DIR:?}/"*
-mkdir -p "${DIST_DIR}" "${STAGED_ROOT}" "${STAGING_DIR}/usr/bin"
+mkdir -p "${DEB_DIST_DIR}"
+rm -rf "${DEB_DIST_DIR:?}/"*
+mkdir -p "${DEB_DIST_DIR}" "${STAGED_ROOT}" "${STAGING_DIR}/usr/bin"
 mkdir -p "${STAGING_DIR}/usr/lib/systemd/user"
 
 # --copies embeds a real python3 binary (no symlinks to the build machine). Deb size grows by one
@@ -97,7 +97,7 @@ if ! command -v fpm >/dev/null 2>&1; then
   exit 1
 fi
 
-DEB_OUT="${DIST_DIR}/ordine_${VERSION}_amd64.deb"
+DEB_OUT="${DEB_DIST_DIR}/ordine_${VERSION}_amd64.deb"
 fpm -s dir -t deb -n ordine -v "${VERSION}" -p "${DEB_OUT}" \
   -C "${STAGING_DIR}" \
   --url "https://github.com/Antikatoptis-Pareidolia/ordine" \
