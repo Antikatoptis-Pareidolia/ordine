@@ -2,9 +2,15 @@
 
 ## Playbooks are code
 
-A playbook is a program. Steps can read inputs, write outputs, call external tools, and execute arbitrary installed plugin code. A plugin may provide a `shell.run` step, but Ordine 0.1 does not ship one. **Never run playbooks from strangers without reading them.**
+A playbook is a program. Steps can read inputs, write outputs, call external tools, and execute arbitrary installed plugin code. **Never run playbooks from strangers without reading them.**
 
 Treat playbook YAML like shell scripts: review triggers, destinations, and branch steps before `ordine serve` on a shared host.
+
+### `shell.run`
+
+Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are expanded before execution. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
+
+There is no command sandbox in the dry-run lab — only declared output paths are redirected. Playbooks containing `shell.run` show a warning on the lab setup page.
 
 ## Web UI posture
 

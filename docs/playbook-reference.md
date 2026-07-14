@@ -81,6 +81,19 @@ Same fields as `folder_watch` except `type: manual` and no `settle_seconds`.
 | `path` | string | Job manifest file (.csv / .json / .txt) |
 | `poll_seconds` | float ≥ 0 | Re-read interval (default `30`); `0` = scan once at start |
 
+## Built-in steps
+
+### `shell.run`
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `cmd` | string | (required) | Shell command; placeholders `{input}`, `{step_dir}`, `{ordinal}`, `{source}` |
+| `timeout_seconds` | float > 0 | `120` | Wall-clock timeout |
+| `expect_exit` | int | `0` | Required exit code |
+| `output` | string | absent | Basename under `step_dir` that the command must create; becomes `output_path` |
+
+When `output` is omitted, the step passes through `input_path`. See [security.md](security.md#shellrun).
+
 ## PlaybookMeta
 
 | Field | Type | Description |

@@ -55,16 +55,17 @@ watch the task appear, process, and land — or flag, diagnose, and heal.
 
 ## Why Ordine
 
-You have a CSV of asset names and prompts. You want images generated for
+Any watch → transform → deliver workflow fits Ordine: shell commands, scripts, documents, images — steps are plugins.
+
+Our founding example is a CSV of asset names and prompts. You want images generated for
 each row, cleaned up (white background → transparent, cropped to
 content), named **exactly** by their row — even when rows 3–6 fail — and
 delivered to your game folder. Unattended. Resumable after a crash.
 Fixable from the browser when something breaks at 2 AM.
 
-That workflow is Ordine's founding use case, and it ships as the
-built-in example. But nothing in the engine knows about images: any
-watch-a-folder → transform → deliver workflow fits.
+That workflow ships as the built-in example and in `examples/chain/`. Nothing in the engine is image-specific.
 
+- **Universal steps** — `shell.run` runs any command; write custom steps as tiny Python plugins (see [docs/plugin-guide.md](docs/plugin-guide.md))
 - **Ordinal guarantee** — file 7 gets row 7's name, always. Failures in
   between never shift names (*ordine* is Italian for order; it's the
   soul of the tool).
@@ -95,6 +96,9 @@ mock provider:
 uv run ordine run examples/chain/gen-images.yml --oneshot   # CSV rows → images
 uv run ordine run examples/chain/png-cleanup.yml --oneshot  # images → named, transparent assets
 ```
+
+A document-only variant (shell commands, no image steps) lives in
+`examples/docs-pipeline/`.
 
 Edit a prompt in `assets.csv` and rerun both: exactly one image
 regenerates, flows through cleanup, and replaces its predecessor —

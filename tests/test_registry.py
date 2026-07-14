@@ -28,7 +28,7 @@ def registry() -> StepRegistry:
 
 def test_discovery_finds_builtins(registry: StepRegistry) -> None:
     ids = set(registry.ids())
-    assert {"util.noop", "util.fail", "util.copy"} <= ids
+    assert {"util.noop", "util.fail", "util.copy", "shell.run"} <= ids
 
 
 @pytest.mark.skipif(not PLUGIN_INSTALLED, reason="ordine_test_plugin not installed")

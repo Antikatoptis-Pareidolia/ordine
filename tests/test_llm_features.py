@@ -85,6 +85,7 @@ def test_step_catalog_contains_registered_ids_and_schemas(registry: StepRegistry
     for step_id in registry.ids():
         assert step_id in payload
         assert "params_schema" in payload[step_id]
+    assert "shell.run" in payload
 
 
 def test_step_catalog_stays_under_cap_with_many_fake_steps() -> None:

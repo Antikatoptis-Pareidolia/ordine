@@ -1,0 +1,17 @@
+version: 1
+name: docs-pipeline
+description: Stamp markdown drafts and publish under manifest names (no image steps)
+trigger:
+  type: manual
+  path: examples/docs-pipeline/samples
+  glob: "*.md"
+  ordinal_regex: 'doc_(\d+)\.md'
+steps:
+  - id: shell.run
+    params:
+      cmd: 'printf "%s\n" "# Published" | cat - "{input}" > "{step_dir}/stamped.md"'
+      output: stamped.md
+  - file.rename_from_manifest:
+      manifest: examples/docs-pipeline/manifest.csv
+  - file.move:
+      dest: examples/docs-pipeline/publish

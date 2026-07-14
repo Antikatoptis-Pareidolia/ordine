@@ -234,6 +234,26 @@ steps:
     assert "file.rename_from_manifest" in setup.text
 
 
+def test_lab_setup_warns_on_shell_run(
+    lab_client: tuple[TestClient, Ledger, Path],
+) -> None:
+    client, ledger, _tmp_path = lab_client
+    yaml_text = """version: 1
+name: lab-shell-warning
+trigger:
+  type: manual
+  path: ~/in
+steps:
+  - shell.run:
+      cmd: echo hello
+"""
+    pipeline_id, _ = ledger.register_pipeline(loads_playbook(yaml_text), yaml_text)
+    setup = client.get(f"/pipelines/{pipeline_id}/lab")
+    assert setup.status_code == 200
+    assert "shell.run" in setup.text
+    assert "Dry-run still executes them for real" in setup.text
+
+
 def test_lab_run_all_shows_no_ordinal_failure_message(
     lab_client: tuple[TestClient, Ledger, Path],
 ) -> None:

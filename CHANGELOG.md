@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `shell.run` built-in step — arbitrary shell commands with template placeholders, captured stdout/stderr, and optional declared output files
+- `examples/docs-pipeline/` — document stamping chain (shell → manifest rename → move)
 - `ordine --version` prints the installed package version and exits 0
 - README demo GIF (`demo/demo.gif`) recorded from `demo/demo.tape`
 
 ### Changed
 
+- README reframes Ordine as a universal watch → transform → deliver engine; image/CSV workflow remains the founding example
 - README quickstart correctly describes six sample images in the built-in example
 
 ## [0.1.0] - 2026-07-14
