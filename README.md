@@ -125,6 +125,8 @@ for writing your own steps.
 
 ## Contributing
 
+Built by Constantin Vlad with an AI plan/audit/implement workflow —
+see CONTRIBUTING.md for how plans, audits, and reviews drive every commit.
 Dev setup, conventions, and the plan/audit workflow live in
 [CONTRIBUTING.md](CONTRIBUTING.md). CI runs lint, types, 390+ tests, and
 installs the built `.deb` on a clean Ubuntu container for every push.
