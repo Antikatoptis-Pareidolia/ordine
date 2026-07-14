@@ -1,5 +1,7 @@
 # Demo terminal recording script (vhs). Recording the GIF is a manual release step.
 Output demo/demo.gif
+Output demo/demo.mp4
+Output demo/demo.mp4
 Set Shell bash
 Set FontSize 16
 Set Width 1200
