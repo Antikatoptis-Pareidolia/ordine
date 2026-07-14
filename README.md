@@ -12,7 +12,7 @@ pipelines, and — when a step fails — recovers through the branches you
 (or an AI you approve) taught it. Every task is exactly-once, every
 output name is ordinal-true, and everything runs locally.
 
-<!-- DEMO GIF: demo/demo.tape recording goes here -->
+![Ordine demo](demo/demo.gif)
 
 ## Install
 
@@ -41,7 +41,7 @@ uv run ordine example ~/ordine-demo
 uv run ordine run ~/ordine-demo/png-cleanup.yml --oneshot
 ```
 
-Five sample images are validated, made transparent, trimmed, renamed
+Six sample images are validated, made transparent, trimmed, renamed
 from `assets.csv`, and exported to `exports/`. Then start the web UI:
 
 ```bash

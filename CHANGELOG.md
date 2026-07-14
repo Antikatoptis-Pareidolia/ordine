@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ordine --version` prints the installed package version and exits 0
+- README demo GIF (`demo/demo.gif`) recorded from `demo/demo.tape`
+
+### Changed
+
+- README quickstart correctly describes six sample images in the built-in example
+
 ## [0.1.0] - 2026-07-14
 
 ### Added

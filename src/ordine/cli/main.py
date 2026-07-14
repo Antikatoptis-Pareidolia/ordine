@@ -11,6 +11,8 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Annotated, Any, cast
 
@@ -65,6 +67,21 @@ class AppContext:
     """Shared CLI state loaded from global options."""
 
     config: AppConfig
+
+
+def _package_version() -> str:
+    try:
+        return pkg_version("ordine")
+    except PackageNotFoundError:
+        from ordine import __version__
+
+        return __version__
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"ordine {_package_version()}")
+        raise typer.Exit()
 
 
 def _configure_logging(config: AppConfig, verbose: bool) -> None:
@@ -172,6 +189,15 @@ def _build_runner(
 @app.callback()
 def cli(
     ctx: typer.Context,
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show version and exit",
+        ),
+    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Path to config TOML"),

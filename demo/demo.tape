@@ -1,27 +1,24 @@
 # Demo terminal recording script (vhs). Recording the GIF is a manual release step.
-Output demo.gif
+Output demo/demo.gif
 Set Shell bash
-Set FontSize 14
+Set FontSize 16
 Set Width 1200
 Set Height 700
 
-Type "pipx install ordine"
+Hide
+Type "rm -rf /tmp/ordine-demo /tmp/ordine-demo-data && export XDG_DATA_HOME=/tmp/ordine-demo-data XDG_CONFIG_HOME=/tmp/ordine-demo-data && clear"
 Enter
-Sleep 2s
-Type "sudo apt install -y imagemagick"
-Enter
-Sleep 2s
-Type "ordine example ~/ordine-demo"
-Enter
-Sleep 2s
-Type "cd ~/ordine-demo"
-Enter
-Type "ordine check png-cleanup.yml"
-Enter
-Sleep 2s
-Type "ordine run png-cleanup.yml --oneshot"
+Show
+
+Type "ordine example /tmp/ordine-demo"
 Enter
 Sleep 3s
-Type "ordine serve"
+Type "cd /tmp/ordine-demo"
 Enter
-Sleep 2s
+Sleep 1s
+Type "ordine run png-cleanup.yml --oneshot"
+Enter
+Sleep 4s
+Type "ls exports/"
+Enter
+Sleep 4s

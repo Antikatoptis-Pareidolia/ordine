@@ -73,6 +73,12 @@ def _write_manifest(path: Path, names: list[str]) -> None:
     path.write_text(f"name\n{rows}\n", encoding="utf-8")
 
 
+def test_version_flag() -> None:
+    result = RUNNER.invoke(app, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == "ordine 0.1.0"
+
+
 def test_init_creates_config_and_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
