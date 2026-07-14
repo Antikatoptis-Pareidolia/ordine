@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-14
+
 ### Added
 
 - `shell.run` built-in step — arbitrary shell commands with template placeholders, captured stdout/stderr, and optional declared output files
