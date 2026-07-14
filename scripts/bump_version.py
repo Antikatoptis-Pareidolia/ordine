@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -68,6 +69,9 @@ def main() -> int:
     new_section = f"## [{version}] - {today}\n\n"
     updated = text.replace("## [Unreleased]\n\n", f"## [Unreleased]\n\n{new_section}", 1)
     changelog.write_text(updated, encoding="utf-8")
+
+    subprocess.run(["uv", "lock"], cwd=root, check=True)
+    print("lockfile updated")
     print(f"bumped to {version}")
     return 0
 

@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import pytest
@@ -74,9 +75,10 @@ def _write_manifest(path: Path, names: list[str]) -> None:
 
 
 def test_version_flag() -> None:
+    expected = f"ordine {pkg_version('ordine')}"
     result = RUNNER.invoke(app, ["--version"])
     assert result.exit_code == 0, result.output
-    assert result.stdout.strip() == "ordine 0.1.0"
+    assert result.stdout.strip() == expected
 
 
 def test_init_creates_config_and_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

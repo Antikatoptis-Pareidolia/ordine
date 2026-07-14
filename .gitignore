@@ -15,3 +15,4 @@ htmlcov/
 .env
 *.sqlite3
 workdirs/
+examples/docs-pipeline/publish/

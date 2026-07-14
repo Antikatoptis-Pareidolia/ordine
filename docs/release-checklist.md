@@ -8,13 +8,14 @@ Use this for every `vX.Y.Z` tag. CI automates build/test/publish; the VM gate st
 - [ ] `[Unreleased]` in `CHANGELOG.md` has bullets for this release
 - [ ] **Name decision** complete — see [naming-checklist.md](naming-checklist.md) (blocks first `0.1.0` cut)
 - [ ] `uv run pytest -m "not llm_live"` green locally
+- [ ] Run the full local gate before pushing the release commit (`ruff check .`, `ruff format --check .`, `mypy`, `pytest -m "not llm_live"` with coverage floor)
 - [ ] `bash scripts/build_deb.sh` succeeds; `ls deb-dist/*.deb`
 
 ## Version bump
 
 ```bash
-uv run python scripts/bump_version.py X.Y.Z   # refuses empty Unreleased
-git add pyproject.toml src/ordine/__init__.py CHANGELOG.md
+uv run python scripts/bump_version.py X.Y.Z   # refuses empty Unreleased; refreshes uv.lock
+git add pyproject.toml src/ordine/__init__.py CHANGELOG.md uv.lock
 git commit -m "chore: release vX.Y.Z"
 ```
 
