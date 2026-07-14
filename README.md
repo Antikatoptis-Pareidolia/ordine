@@ -14,6 +14,45 @@ output name is ordinal-true, and everything runs locally.
 
 <!-- DEMO GIF: demo/demo.tape recording goes here -->
 
+## Install
+
+```bash
+pipx install ordine
+```
+
+Image pipelines work best with ImageMagick installed (`sudo apt install imagemagick`).
+
+Or install the `.deb` from [Releases](https://github.com/Antikatoptis-Pareidolia/ordine/releases):
+
+```bash
+sudo apt install ./ordine_*_amd64.deb imagemagick
+```
+
+See [docs/install.md](docs/install.md) for upgrades, systemd, and development setup.
+
+## Quickstart
+
+From a clone — also the contributor path (~3 minutes):
+
+```bash
+git clone https://github.com/Antikatoptis-Pareidolia/ordine.git
+cd ordine && uv sync
+uv run ordine example ~/ordine-demo
+uv run ordine run ~/ordine-demo/png-cleanup.yml --oneshot
+```
+
+Five sample images are validated, made transparent, trimmed, renamed
+from `assets.csv`, and exported to `exports/`. Then start the web UI:
+
+```bash
+uv run ordine serve   # → http://127.0.0.1:8484
+```
+
+With `pipx` or the `.deb`, drop the `uv run` prefix (`ordine example`, `ordine run`, `ordine serve`).
+
+Press **Start** on a pipeline, drop a file into its watch folder, and
+watch the task appear, process, and land — or flag, diagnose, and heal.
+
 ## Why Ordine
 
 You have a CSV of asset names and prompts. You want images generated for
@@ -45,29 +84,6 @@ watch-a-folder → transform → deliver workflow fits.
   key, too.
 - **Local and quiet** — no telemetry, ever. No accounts. Your files,
   your machine, your keys.
-
-## Quickstart (from source, ~3 minutes)
-
-```bash
-git clone https://github.com/Antikatoptis-Pareidolia/ordine.git
-cd ordine && uv sync
-uv run ordine example ~/ordine-demo
-uv run ordine run ~/ordine-demo/png-cleanup.yml --oneshot
-```
-
-Five sample images are validated, made transparent, trimmed, renamed
-from `assets.csv`, and exported to `exports/`. Then start the web UI:
-
-```bash
-uv run ordine serve   # → http://127.0.0.1:8484
-```
-
-Press **Start** on a pipeline, drop a file into its watch folder, and
-watch the task appear, process, and land — or flag, diagnose, and heal.
-
-> After the first release: `pipx install ordine` or the `.deb` from
-> [Releases](https://github.com/Antikatoptis-Pareidolia/ordine/releases)
-> replace the clone.
 
 ## The chain example
 
