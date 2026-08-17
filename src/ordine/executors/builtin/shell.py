@@ -6,6 +6,7 @@ Owns shell.run. Must never import ledger, web, cli, or llm.
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
 from typing import ClassVar
 
@@ -105,6 +106,33 @@ def _as_text(value: object) -> str:
     return str(value)
 
 
+def _quote_context(template: str, offset: int) -> str | None:
+    """Return the active shell quote at *offset* for ordinary command strings."""
+    quote: str | None = None
+    escaped = False
+    for char in template[:offset]:
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            continue
+        if char == "'" and quote != '"':
+            quote = None if quote == "'" else "'"
+        elif char == '"' and quote != "'":
+            quote = None if quote == '"' else '"'
+    return quote
+
+
+def _shell_escape(value: str, quote: str | None) -> str:
+    if quote == "'":
+        return value.replace("'", "'\"'\"'")
+    if quote == '"':
+        # These characters retain special meaning inside POSIX double quotes.
+        return re.sub(r'([\\$`"])', r"\\\1", value)
+    return shlex.quote(value)
+
+
 def _substitute_cmd(template: str, ctx: StepContext) -> str | StepResult:
     unknown: set[str] = set()
     for match in _PLACEHOLDER.finditer(template):
@@ -117,13 +145,19 @@ def _substitute_cmd(template: str, ctx: StepContext) -> str | StepResult:
             message=f"unknown template placeholders: {', '.join(sorted(unknown))}",
         )
 
-    values = {
+    values: dict[str, str] = {
         "input": str(ctx.input_path) if ctx.input_path is not None else "",
         "step_dir": str(ctx.step_dir),
         "ordinal": "" if ctx.ordinal is None else str(ctx.ordinal),
         "source": ctx.source_ref,
     }
-    try:
-        return template.format(**values)
-    except (KeyError, ValueError) as exc:
-        return StepResult(status="fail", message=f"invalid command template: {exc}")
+    pieces: list[str] = []
+    cursor = 0
+    for match in _PLACEHOLDER.finditer(template):
+        pieces.append(template[cursor : match.start()])
+        pieces.append(
+            _shell_escape(values[match.group(1)], _quote_context(template, match.start()))
+        )
+        cursor = match.end()
+    pieces.append(template[cursor:])
+    return "".join(pieces)

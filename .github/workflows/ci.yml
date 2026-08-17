@@ -9,8 +9,8 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
       - name: Install Python ${{ matrix.python-version }}
@@ -100,24 +100,22 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Install build tooling
         shell: bash
         run: |
           set -euo pipefail
           apt-get update
-          apt-get install -y bash python3 python3-venv python3-pip imagemagick ruby-dev build-essential git curl ca-certificates dpkg-dev
-          gem install fpm
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          apt-get install -y bash python3 python3-venv python3-pip imagemagick ruby-dev build-essential git ca-certificates dpkg-dev
+          gem install fpm -v 1.17.0
       - name: Build deb
         shell: bash
         run: |
           set -euo pipefail
-          export PATH="$HOME/.local/bin:$PATH"
           fpm --version
           uv sync --locked
+          uv build
           bash scripts/build_deb.sh
       - name: Install deb and run quickstart
         shell: bash

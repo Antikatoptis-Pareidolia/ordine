@@ -125,13 +125,15 @@ class MoveStep:
         try:
             write_tmp = dest_dir / f".tmp-{uuid.uuid4().hex}"
             tmp = write_tmp
-            try:
-                os.replace(ctx.input_path, write_tmp)
-            except OSError:
-                shutil.copy2(ctx.input_path, write_tmp)
-                ctx.input_path.unlink()
+            # Keep the source intact until the destination has been atomically published.
+            # A failed final rename must never turn a recoverable step failure into data loss.
+            shutil.copy2(ctx.input_path, write_tmp)
             os.replace(write_tmp, final)
             tmp = None
+            try:
+                ctx.input_path.unlink()
+            except OSError as exc:
+                ctx.logger.warning("move published %s but could not remove source: %s", final, exc)
             return StepResult(status="ok", output_path=final)
         except OSError as exc:
             return StepResult(status="fail", message=str(exc))

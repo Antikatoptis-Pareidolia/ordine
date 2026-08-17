@@ -28,7 +28,7 @@ db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
-host = "127.0.0.1"
+host = "testserver"
 port = 8484
 
 [llm]

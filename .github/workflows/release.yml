@@ -9,11 +9,11 @@ permissions:
 
 jobs:
   verify-and-publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
       - name: Install Python 3.12
@@ -25,7 +25,7 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y imagemagick jq ruby-dev build-essential
       - name: Install fpm
-        run: sudo gem install fpm
+        run: sudo gem install fpm -v 1.17.0
 
       - name: Sync dev environment
         run: |
@@ -47,26 +47,31 @@ jobs:
       - name: Build distributions
         run: uv build
 
+      - name: Build deb from tested wheel and lock
+        run: bash scripts/build_deb.sh
+
       - name: Extract changelog section
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           uv run python scripts/extract_changelog.py "${TAG}" CHANGELOG.md > release-notes.md
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
-          skip-existing: true
-
-      - name: Build deb
-        run: bash scripts/build_deb.sh
-
-      - name: Create GitHub Release
+      - name: Create draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
           gh release create "${TAG}" \
+            --draft \
             --title "${TAG}" \
             --notes-file release-notes.md \
             dist/*.whl dist/*.tar.gz deb-dist/*.deb
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: dist/
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false

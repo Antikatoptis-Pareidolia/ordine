@@ -64,7 +64,7 @@ Logging failures are reported to stderr and do not fail the call.
 
 Image-generation records use the same file with fields `ts`, `provider`, `model`, `purpose` (`generate_image`), `ordinal`, `prompt`, `image_bytes`, and `duration_s`; generated image bytes are not embedded in JSONL.
 
-Audit logs have no automatic retention knob in 0.1. They remain local and must be reviewed or removed manually from `$DATA_DIR/llm_log/` when no longer needed.
+Audit logs have no automatic retention knob in 0.2. They remain local and must be reviewed or removed manually from `$DATA_DIR/llm_log/` when no longer needed.
 
 Diagnosis results are also stored locally at `{task_workdir}/_diagnosis/flag_{flag_id}.json`. That file includes the provider's raw diagnosis response alongside parsed fields, so workdir retention governs its lifetime.
 

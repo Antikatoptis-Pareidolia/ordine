@@ -1,6 +1,6 @@
 # Ledger
 
-SQLite-backed ledger for exactly-once task processing, branch-attempt audit, flags, and
+SQLite-backed ledger for durable task deduplication, branch-attempt audit, flags, and
 position-keyed name reservations.
 
 ## State machine
@@ -37,7 +37,7 @@ user transitions.
 
 ## Invariants
 
-1. **Exactly-once:** `(pipeline_id, dedup_key)` is unique; duplicate `create_task` returns
+1. **At-most-once admission:** `(pipeline_id, dedup_key)` is unique; duplicate `create_task` returns
    `None` forever, even after the first task is `done`.
 2. **Single claim:** `claim_next` uses `BEGIN IMMEDIATE` so only one worker claims a pending
    task.
@@ -49,12 +49,20 @@ user transitions.
 
 ## Concurrency posture
 
-`claim_next` uses `BEGIN IMMEDIATE`, so cross-process double-claims are impossible. Other transitions use
-plain sessions; until a later hardening pass (Step 15), the supported mode is **one writer process per
+`claim_next` uses `BEGIN IMMEDIATE`, so simultaneous claims of a pending row are impossible. Other transitions use
+plain sessions; the supported mode is **one writer process per
 pipeline at a time** — for example, do not run `ordine run --oneshot` against a pipeline that
-`ordine serve` is actively serving. WAL mode and dedup unique constraints keep exactly-once intact
-regardless; the only risk without single-writer discipline is benign status-update races between
-concurrent writers.
+`ordine serve` is actively serving. Running two writers can cause status races, stale-task replay,
+and duplicate external side effects.
+
+## Delivery semantics
+
+Deduplication provides at-most-once task admission, not exactly-once step side effects. With the default
+`reconcile_policy = "retry"`, a crash leaves a task in `processing`; after the stale timeout it is
+returned to `pending` and its pipeline runs again from the first step. Execution is therefore
+**at-least-once after crash recovery**. Built-in exports publish atomically, but custom plugins and
+`shell.run` commands should be idempotent. Use `reconcile_policy = "fail"` when automatic replay is
+less safe than manual recovery.
 
 ## Flag escalation
 

@@ -1,4 +1,4 @@
-"""Crash-injection property tests for ledger durability and exactly-once invariants."""
+"""Crash-injection property tests for ledger durability and admission-dedup invariants."""
 
 from __future__ import annotations
 

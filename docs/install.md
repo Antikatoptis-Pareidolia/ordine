@@ -16,9 +16,10 @@ ordine --help
 
 Upgrade: `pipx upgrade ordine`
 
-## `.deb` (self-contained venv)
+## `.deb` (isolated venv)
 
-Build locally (requires [fpm](https://fpm.readthedocs.io/)):
+Build locally (requires [uv](https://docs.astral.sh/uv/) and
+[fpm](https://fpm.readthedocs.io/), release-tested at `1.17.0`):
 
 ```bash
 bash scripts/build_deb.sh
@@ -26,6 +27,10 @@ sudo apt install ./deb-dist/ordine_*_amd64.deb imagemagick
 ```
 
 The package installs a venv under `/opt/ordine`, a `/usr/bin/ordine` symlink, and a systemd user unit at `/usr/lib/systemd/user/ordine.service`.
+Release builds install the already-tested wheel with the exact runtime versions exported from
+`uv.lock`; the `.deb` does not resolve a fresh dependency set during packaging. The package
+declares the same Python minor version used to build its compiled wheels and uses that system
+interpreter on the target.
 
 ## From source (development)
 
@@ -67,9 +72,9 @@ Optional retention at startup: set `on_serve_start = true` under `[retention]` i
 
 ## Dependency notes
 
-- **httpx** is a single runtime dependency (also used by Starlette's test client in dev); it is not duplicated in `[dev]`.
+- **httpx** is the runtime HTTP client; development uses **httpx2** for Starlette's test transport.
 - **typer** (full package) is kept over `typer-slim` because the CLI uses subcommand groups (`llm`, etc.); slim would not reduce installed surface meaningfully.
 
-## Future packaging (not in 0.1)
+## Future packaging
 
-Windows/macOS installers, Flatpak/Snap/AppImage, and hosted docs site are out of scope for 0.1. Track via GitHub issues if needed.
+Windows/macOS installers, Flatpak/Snap/AppImage, and a hosted docs site are not currently shipped. Track them via GitHub issues if needed.
