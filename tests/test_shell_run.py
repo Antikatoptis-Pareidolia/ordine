@@ -78,6 +78,24 @@ def test_shell_run_substitutes_placeholders_and_passthrough(tmp_path: Path) -> N
     assert (ctx.step_dir / "stderr.txt").exists()
 
 
+@pytest.mark.parametrize("quote", [None, '"', "'"])
+def test_shell_run_placeholder_cannot_inject_shell_syntax(
+    tmp_path: Path, quote: str | None
+) -> None:
+    source = tmp_path / "input'; touch PWNED; echo $(touch PWNED_SUB) `touch PWNED_TICK` \""
+    source.write_text("body", encoding="utf-8")
+    ctx = _ctx(tmp_path, input_path=source, source_ref=str(source))
+    placeholder = "{input}" if quote is None else f"{quote}{{input}}{quote}"
+    params = ShellRunStep.Params(cmd=f"test -f {placeholder}")
+
+    result = ShellRunStep().run(ctx, params)
+
+    assert result.status == "ok"
+    assert not (ctx.step_dir / "PWNED").exists()
+    assert not (ctx.step_dir / "PWNED_SUB").exists()
+    assert not (ctx.step_dir / "PWNED_TICK").exists()
+
+
 def test_shell_run_produces_output_file(tmp_path: Path) -> None:
     source = tmp_path / "in.md"
     source.write_text("content", encoding="utf-8")

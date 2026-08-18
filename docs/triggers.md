@@ -108,8 +108,8 @@ Ordinals are 1-based row indices. Each candidate carries an `mrow:{ordinal}:{sha
 dedup key independent of the playbook `dedup:` field.
 
 `build_trigger_service` for manifest triggers **does not accept a caller sink** — it always
-constructs `manifest_sink`, which wraps `ledger_sink` and calls `reserve_name` immediately after
-each successful `create_task`. Pass `ledger` and `pipeline_id` only.
+constructs `manifest_sink`, which calls `create_manifest_task` to insert the task and its name
+reservation in one `BEGIN IMMEDIATE` transaction. Pass `ledger` and `pipeline_id` only.
 
 When `poll_seconds > 0`, a background poller re-scans on mtime change. Unreadable manifests raise one
 `manifest_unreadable` pipeline flag per bad mtime; the service keeps polling.
@@ -148,5 +148,5 @@ service.stop()
 print(ledger.counts(pipeline_id))
 ```
 
-Kill the process mid-copy, restart the snippet — rescan picks up the completed file exactly once.
+Kill the process mid-copy, restart the snippet — rescan admits the completed content only once.
 Drop `partial.tmp-notused` and `.hidden.png` — ignored when glob is `*`.

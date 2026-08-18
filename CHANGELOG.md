@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-18
+
+The security and reliability issues addressed in this release were identified during an
+audit performed with OpenAI Codex, then reproduced, highlighted, and resolved with
+Codex-assisted analysis and implementation.
+
+### Fixed
+
+- Shell placeholders now preserve existing quoted/unquoted playbooks while preventing watched filenames and source references from injecting shell syntax.
+- All web requests reject untrusted Host headers, and mutations additionally enforce same-origin
+  checks, closing read and write paths through localhost DNS rebinding.
+- `file.move` keeps its source until the destination is atomically published, preventing data loss when the final rename fails.
+- Manifest tasks and ordinal-name reservations are now committed in one SQLite transaction.
+- Debian packages are built from the tested wheel and exact locked runtime dependencies, require
+  the Python minor version they were built for, and no longer embed a build-host interpreter;
+  release artifacts are built before any publication begins.
+- The locked transitive `cryptography` dependency is updated to 50.0.0, resolving
+  `PYSEC-2026-3552` in the Linux keyring dependency path.
+- The vendored HTMX browser dependency is updated from 2.0.4 to 2.0.10.
+
+### Changed
+
+- Public documentation now distinguishes at-most-once task admission from at-least-once crash replay and marks `0.2.x` as the supported security line.
+- Runtime dependencies have compatible-major upper bounds; Starlette tests use the maintained `httpx2` transport path.
+- GitHub Actions dependencies and the Debian packaging tool are pinned to reviewed versions.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added

@@ -68,7 +68,7 @@ db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
-host = "127.0.0.1"
+host = "testserver"
 port = 8484
 
 [llm]
@@ -213,6 +213,8 @@ def test_web_not_configured_card(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     config = AppConfig(
         db_path=config.db_path,
         workdir_root=config.workdir_root,
+        web_host=config.web_host,
+        web_port=config.web_port,
         llm_provider="none",
         config_file=config_path,
     )

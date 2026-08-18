@@ -30,7 +30,7 @@ db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
-host = "127.0.0.1"
+host = "testserver"
 port = 8484
 autostart_pipelines = false
 """,
@@ -311,6 +311,14 @@ def test_post_forbidden_without_hx_or_foreign_origin(
         ).status_code
         == 403
     )
+    assert web_client.get("/", headers={"Host": "evil.example"}).status_code == 403
+    assert (
+        web_client.post(
+            f"/tasks/{done_id}/retry",
+            headers={"Host": "evil.example", "Origin": "http://evil.example"},
+        ).status_code
+        == 403
+    )
     assert (
         web_client.post(
             f"/tasks/{done_id}/retry",
@@ -345,7 +353,7 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "20",
             "reconcile_policy": "retry",
-            "web_host": "127.0.0.1",
+            "web_host": "testserver",
             "web_port": "8484",
         },
         headers=POST_HEADERS,
@@ -360,7 +368,7 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "0",
             "reconcile_policy": "retry",
-            "web_host": "127.0.0.1",
+            "web_host": "testserver",
             "web_port": "8484",
         },
         headers=POST_HEADERS,

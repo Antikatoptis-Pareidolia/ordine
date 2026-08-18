@@ -8,17 +8,17 @@ Treat playbook YAML like shell scripts: review triggers, destinations, and branc
 
 ### `shell.run`
 
-Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are expanded before execution. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
+Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are shell-escaped according to their quote context before execution, so filenames cannot add shell syntax. Static command text remains fully trusted code. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
 
 There is no command sandbox in the dry-run lab — only declared output paths are redirected. Playbooks containing `shell.run` show a warning on the lab setup page.
 
 ## Web UI posture
 
 - **Default bind:** `127.0.0.1:8484` — localhost only
-- **No authentication** in 0.1 — anyone who can reach the port can control pipelines
+- **No authentication** in 0.2 — anyone who can reach the port can control pipelines
 - Binding to `0.0.0.0` prints a CLI warning; do not expose without a reverse proxy and auth
 
-### Step 9 mitigations (still required)
+### Current mitigations
 
 | Control | Purpose |
 |---------|---------|
@@ -58,9 +58,10 @@ See [SECURITY.md](../SECURITY.md) in the repo root.
 
 ## Hardening roadmap
 
-- **CSRF tokens:** deferred because `HX-Request` is a non-simple header that a cross-origin browser cannot send without a successful CORS preflight, and Ordine enables no CORS while remaining localhost-first.
+- **CSRF tokens:** deferred because every request requires an allowed Host, POSTs additionally
+  require same-origin Origin/Referer or the non-simple `HX-Request` header, and Ordine enables no
+  CORS while remaining localhost-first.
 - **`base_url` SSRF gating:** deferred because the endpoint is user-owned configuration; provider data flow and credential forwarding are documented above and in [llm.md](llm.md).
 - **Artifact-serving TOCTOU hardening:** deferred because the symlink-swap window requires a concurrent local actor in the current single-user threat model.
-- **JSONL retention configuration:** deferred to avoid expanding retention semantics late in 0.1; [llm.md](llm.md) documents manual cleanup in the meantime.
+- **JSONL retention configuration:** deferred; [llm.md](llm.md) documents manual cleanup in the meantime.
 - **Dedicated CI integration job:** deferred because the current full matrix remains within the release budget; splitting it changes workflow topology rather than product correctness.
-- **Starlette/httpx deprecation:** deferred until the upstream FastAPI/Starlette transition stabilizes; the current pinned-compatible stack passes the full suite.

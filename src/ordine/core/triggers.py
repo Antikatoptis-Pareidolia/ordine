@@ -163,8 +163,7 @@ def manifest_row_dedup_key(row: ManifestRow) -> str:
 
 
 def manifest_sink(ledger: Ledger, pipeline_id: int, manifest_path: Path) -> Sink:
-    """Sink that reserves ordinal→name bindings immediately after task creation."""
-    inner = ledger_sink(ledger, pipeline_id)
+    """Sink that atomically creates tasks with their ordinal→name bindings."""
     resolved = manifest_path.expanduser().resolve()
     row_cache: dict[tuple[Path, float], list[ManifestRow]] = {}
 
@@ -183,21 +182,25 @@ def manifest_sink(ledger: Ledger, pipeline_id: int, manifest_path: Path) -> Sink
         return rows
 
     def sink(candidate: TaskCandidate) -> int | None:
-        task_id = inner(candidate)
-        if task_id is None or candidate.ordinal is None:
-            return task_id
+        if candidate.ordinal is None or candidate.dedup_key is None:
+            return None
         try:
             rows = _cached_rows()
             row = rows[candidate.ordinal - 1]
-            ledger.reserve_name(pipeline_id, candidate.ordinal, row.name, task_id)
         except (ManifestError, IndexError) as exc:
             logger.warning(
-                "manifest reservation skipped for task %s ordinal %s: %s",
-                task_id,
+                "manifest task skipped for ordinal %s: %s",
                 candidate.ordinal,
                 exc,
             )
-        return task_id
+            return None
+        return ledger.create_manifest_task(
+            pipeline_id,
+            candidate.source_ref,
+            candidate.dedup_key,
+            candidate.ordinal,
+            row.name,
+        )
 
     return sink
 

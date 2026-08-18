@@ -9,7 +9,7 @@
 
 Ordine watches folders and manifests, runs your files through step
 pipelines, and — when a step fails — recovers through the branches you
-(or an AI you approve) taught it. Every task is exactly-once, every
+(or an AI you approve) taught it. Every input is deduplicated, every
 output name is ordinal-true, and everything runs locally.
 
 ![Ordine demo](demo/demo.gif)
@@ -72,8 +72,8 @@ That workflow ships as the built-in example and in `examples/chain/`. Nothing in
 - **Recovery branches** — declare fallback step sequences per step.
   Primary fails → branches run → flags escalate by ladder level when
   everything is exhausted.
-- **Exactly-once** — a SQLite ledger dedups by content hash or manifest
-  row. Rerun anything, anytime: nothing double-processes.
+- **Durable deduplication** — a SQLite ledger admits each content hash or manifest
+  row once. Crash retries may replay a step, so externally visible steps should be idempotent.
 - **Dry-run lab** — rehearse playbooks on copied samples in a sandbox
   that never touches production data, step through execution, fix from
   the failing step, resume with the validated prefix replayed.
@@ -109,7 +109,7 @@ for `openai` when you want real generations.
 
 ```
 trigger (folder_watch / manifest / manual)
-   └─ task (ordinal, exactly-once dedup)
+   └─ task (ordinal, durable dedup)
         └─ steps: validate → transform → rename_from_manifest → export
              └─ on_failure: retries → recovery branches → escalating flags
 ```

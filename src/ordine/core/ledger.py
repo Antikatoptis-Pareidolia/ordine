@@ -1,4 +1,4 @@
-"""Ledger API: task state machine, exactly-once guarantees, and audit trail.
+"""Ledger API: task state machine, durable admission deduplication, and audit trail.
 
 Owns all database mutations for pipelines, tasks, branch attempts, flags, and name
 reservations. Must never execute steps, watch folders, or import from executors/web/cli/llm.
@@ -402,6 +402,61 @@ class Ledger:
                 status="pending",
             )
             session.add(task)
+            session.commit()
+            return task.id
+        except IntegrityError:
+            session.rollback()
+            return None
+        finally:
+            session.close()
+
+    def create_manifest_task(
+        self,
+        pipeline_id: int,
+        source_ref: str,
+        dedup_key: str,
+        ordinal: int,
+        name: str,
+    ) -> int | None:
+        """Atomically create a manifest task and its ordinal-name reservation."""
+        session = self._session_factory()
+        try:
+            session.execute(text("BEGIN IMMEDIATE"))
+            pipeline = self._get_pipeline(session, pipeline_id)
+            if pipeline.current_version_id is None:
+                raise LedgerError(f"pipeline {pipeline_id} has no current version")
+            task = Task(
+                pipeline_id=pipeline_id,
+                playbook_version_id=pipeline.current_version_id,
+                source_ref=source_ref,
+                ordinal=ordinal,
+                dedup_key=dedup_key,
+                status="pending",
+            )
+            session.add(task)
+            session.flush()
+            existing = session.scalar(
+                select(NameReservation).where(
+                    NameReservation.pipeline_id == pipeline_id,
+                    NameReservation.ordinal == ordinal,
+                )
+            )
+            if existing is None:
+                session.add(
+                    NameReservation(
+                        pipeline_id=pipeline_id,
+                        ordinal=ordinal,
+                        name=name,
+                        task_id=task.id,
+                    )
+                )
+            elif existing.name != name:
+                logger.warning(
+                    "ordinal %s already reserved as %r; ignoring new name %r",
+                    ordinal,
+                    existing.name,
+                    name,
+                )
             session.commit()
             return task.id
         except IntegrityError:

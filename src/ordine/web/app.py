@@ -29,7 +29,7 @@ from ordine.web.routes import settings as settings_routes
 from ordine.web.routes import tasks as tasks_routes
 from ordine.web.routes.lab import LabSessionStore
 from ordine.web.routes.tasks import BranchSuggestionStore
-from ordine.web.security import post_is_allowed
+from ordine.web.security import post_is_allowed, request_host_is_allowed
 from ordine.web.services import ServiceManager
 
 logger = logging.getLogger(__name__)
@@ -78,11 +78,16 @@ def create_app(config: AppConfig) -> FastAPI:
     app.state.templates_dir = TEMPLATES_DIR
 
     @app.middleware("http")
-    async def post_guard(
+    async def request_guard(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        if request.method == "POST" and not post_is_allowed(request):
+        current_config = request.app.state.config
+        if not request_host_is_allowed(request, configured_host=current_config.web_host):
+            return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        if request.method == "POST" and not post_is_allowed(
+            request, configured_host=current_config.web_host
+        ):
             return JSONResponse({"detail": "Forbidden"}, status_code=403)
         response = await call_next(request)
         return response

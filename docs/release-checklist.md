@@ -32,9 +32,10 @@ git push origin main --tags
 
 1. Full lint, mypy, pytest
 2. Assert tag (without `v`) == package version
-3. `uv build` → PyPI via OIDC trusted publishing (no token secrets)
-4. `uv build` → PyPI (`dist/`); `build_deb.sh` → `deb-dist/`; attach wheel, sdist, `.deb` to GitHub Release
-5. Changelog section extracted via `scripts/extract_changelog.py`
+3. Build wheel/sdist and build the `.deb` from that wheel plus `uv.lock`
+4. Extract the changelog and create a draft GitHub Release with all artifacts
+5. Publish wheel/sdist to PyPI via OIDC trusted publishing (no token secrets)
+6. Publish the prepared GitHub Release
 
 ## Manual gates (not CI)
 

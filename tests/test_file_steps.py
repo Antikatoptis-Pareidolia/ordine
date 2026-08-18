@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import errno
 import os
 from pathlib import Path
 
@@ -87,7 +86,7 @@ def test_file_move_collision_fail(tmp_path: Path) -> None:
     assert src.exists()
 
 
-def test_file_move_cross_device_copy_fallback(
+def test_file_move_final_publish_failure_preserves_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     src = tmp_path / "inbox" / "artifact.bin"
@@ -95,19 +94,14 @@ def test_file_move_cross_device_copy_fallback(
     src.write_bytes(b"payload")
     dest = tmp_path / "out"
     ctx = _ctx(tmp_path, input_path=src)
-    real_replace = os.replace
-    calls = {"count": 0}
 
     def fake_replace(src_path: str | os.PathLike[str], dst_path: str | os.PathLike[str]) -> None:
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise OSError(errno.EXDEV, "cross-device move")
-        real_replace(src_path, dst_path)
+        del src_path, dst_path
+        raise OSError("simulated final rename failure")
 
     monkeypatch.setattr(os, "replace", fake_replace)
     result = MoveStep().run(ctx, MoveStep.Params(dest=str(dest)))
-    assert result.status == "ok"
-    assert result.output_path == dest / "artifact.bin"
-    assert result.output_path.read_bytes() == b"payload"
-    assert not src.exists()
-    assert calls["count"] == 2
+    assert result.status == "fail"
+    assert src.read_bytes() == b"payload"
+    assert not (dest / "artifact.bin").exists()
+    assert list(dest.glob(".tmp-*")) == []

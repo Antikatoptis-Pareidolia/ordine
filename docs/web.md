@@ -44,7 +44,10 @@ Illegal transitions redirect back with a flash message — never HTTP 500.
 ## Security posture (v1)
 
 - **Bind address:** `127.0.0.1` default. Non-local `--host` prints a warning; there is no authentication.
-- **POST hardening:** Each POST must either carry `HX-Request: true` (HTMX) or include a same-origin `Origin`/`Referer`. Requests with a foreign origin, or with no HX-Request and no Origin/Referer (e.g. bare `curl`), receive **403**.
+- **Request hardening:** Every request Host must match the configured bind host (loopback aliases
+  are equivalent; wildcard binds accept IP hosts). Each POST must then either carry
+  `HX-Request: true` (HTMX) or include a same-origin `Origin`/`Referer`. Foreign/rebound hosts,
+  foreign origins, and bare POSTs receive **403**.
 - **Artifacts:** `GET /artifacts/{task_id}/{rel_path}` resolves `(workdir / rel_path)` and rejects paths that escape the task workdir (404). Some malformed paths (e.g. a leading slash) are rejected by FastAPI routing with **422** before the handler runs — defense-in-depth; no file is served either way. Images served inline; `log.txt` as `text/plain`; other files as download.
 - **Templates:** Jinja2 autoescape enabled; user content (YAML, messages, filenames) is never marked safe.
 - **Current hardening:** Full same-origin comparison (scheme, host, and port), HTMX eval/script insertion disabled, and localhost-only default. Deferred items are tracked in [security.md](security.md#hardening-roadmap).

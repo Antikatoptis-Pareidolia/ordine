@@ -193,6 +193,29 @@ def test_rule_5_reserve_name_idempotent(ledger: Ledger) -> None:
     assert ledger.reserved_name(pipeline_id, 7) == "goat.png"
 
 
+def test_manifest_task_and_name_reservation_are_atomic(ledger: Ledger) -> None:
+    pipeline_id, _ = _register(ledger)
+    task_id = ledger.create_manifest_task(
+        pipeline_id,
+        "manifest:/tmp/assets.csv#row1",
+        "mrow:1:first",
+        1,
+        "goat.png",
+    )
+    assert task_id is not None
+    assert ledger.reserved_name(pipeline_id, 1) == "goat.png"
+
+    duplicate = ledger.create_manifest_task(
+        pipeline_id,
+        "manifest:/tmp/assets.csv#row1",
+        "mrow:1:first",
+        1,
+        "other.png",
+    )
+    assert duplicate is None
+    assert ledger.reserved_name(pipeline_id, 1) == "goat.png"
+
+
 def test_rule_6_reconcile(ledger: Ledger) -> None:
     pipeline_id, _ = _register(ledger)
     stale_id = ledger.create_task(pipeline_id, "/stale.png", "stale")

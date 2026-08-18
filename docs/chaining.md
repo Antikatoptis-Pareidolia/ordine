@@ -19,12 +19,12 @@ assets.csv  →  [gen pipeline]  →  ~/renders/img_NNNN.png  →  [cleanup pipe
 |----------|----------|
 | Unchanged row | `dedup_key` matches an existing task → no new work (done forever) |
 | Edited prompt | New `dedup_key`, same ordinal → regeneration task; reservation name unchanged |
-| Edited name | New `dedup_key`, same ordinal → regeneration; `reserve_name` logs mismatch warning and keeps original name (documented limitation) |
+| Edited name | New `dedup_key`, same ordinal → regeneration; atomic task creation logs the reservation mismatch and keeps the original name (documented limitation) |
 | Appended row | New ordinal → new task + reservation |
 
-Reservations are created **at task creation** (manifest sink wrapper), before any step runs.
+Reservations are created in the **same transaction as task creation**, before any step runs.
 
-Manifest triggers always enforce row-level exactly-once via the `mrow:` dedup keys on each
+Manifest triggers always enforce at-most-once row admission via the `mrow:` dedup keys on each
 `TaskCandidate`, regardless of the playbook `dedup:` field. The chain example sets `dedup: none`
 because file-hash or filename dedup does not apply — there is no watched file per row, only a
 manifest row identity. Row unchanged ⇒ same `mrow:` key ⇒ `create_task` returns `None` and the row

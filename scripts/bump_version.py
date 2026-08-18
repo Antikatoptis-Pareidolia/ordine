@@ -21,21 +21,14 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     changelog = root / "CHANGELOG.md"
     text = changelog.read_text(encoding="utf-8")
-    unreleased_match = re.search(
-        r"## \[Unreleased\]\n\n(### Added\n(?:.*?\n)*?)(?=\n### |\n## |\Z)",
-        text,
-        re.DOTALL,
-    )
-    if unreleased_match is None:
+    try:
+        unreleased = text.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    except IndexError:
         print("CHANGELOG missing [Unreleased] section", file=sys.stderr)
         return 1
-    body = unreleased_match.group(1).strip()
-    if not body or body == "### Added" or body.endswith("### Added"):
-        # check if any bullets under Added/Changed/Fixed
-        section = text.split("## [Unreleased]", 1)[1].split("## [", 1)[0]
-        if not re.search(r"^- ", section, re.MULTILINE):
-            print("refusing bump: [Unreleased] has no bullet entries", file=sys.stderr)
-            return 1
+    if not re.search(r"^- ", unreleased, re.MULTILINE):
+        print("refusing bump: [Unreleased] has no bullet entries", file=sys.stderr)
+        return 1
 
     pyproject = root / "pyproject.toml"
     py_text = pyproject.read_text(encoding="utf-8")
