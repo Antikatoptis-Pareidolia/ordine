@@ -51,8 +51,8 @@ def _resolve_key(provider: str) -> tuple[str | None, str | None]:
         stored = keyring.get_password(SERVICE, provider)
         if stored:
             return stored, "keyring"
-    except KeyringError as exc:
-        raise LLMError(_keyring_error_message(provider)) from exc
+    except KeyringError:
+        logger.warning("%s; continuing with configured fallbacks", _keyring_error_message(provider))
 
     env_name = ENV_NAMES.get(provider)
     if env_name:

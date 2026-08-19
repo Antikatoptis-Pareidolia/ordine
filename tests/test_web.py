@@ -375,3 +375,41 @@ def test_settings_write_back(tmp_path: Path) -> None:
     )
     assert "at least 1" in invalid.text
     assert "20" in config_path.read_text(encoding="utf-8")
+
+    invalid_port = client.post(
+        "/settings",
+        data={
+            "stale_after_minutes": "20",
+            "reconcile_policy": "retry",
+            "web_host": "testserver",
+            "web_port": "65536",
+        },
+        headers=POST_HEADERS,
+    )
+    assert "between 1 and 65535" in invalid_port.text
+    assert "65536" not in config_path.read_text(encoding="utf-8")
+
+    invalid_host = client.post(
+        "/settings",
+        data={
+            "stale_after_minutes": "20",
+            "reconcile_policy": "retry",
+            "web_host": " ",
+            "web_port": "8484",
+        },
+        headers=POST_HEADERS,
+    )
+    assert "web.host must not be empty" in invalid_host.text
+
+    invalid_provider = client.post(
+        "/settings",
+        data={
+            "stale_after_minutes": "20",
+            "reconcile_policy": "retry",
+            "web_host": "testserver",
+            "web_port": "8484",
+            "llm_provider": "unexpected",
+        },
+        headers=POST_HEADERS,
+    )
+    assert "invalid LLM provider" in invalid_provider.text

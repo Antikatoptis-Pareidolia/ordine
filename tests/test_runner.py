@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import ClassVar
 
@@ -400,11 +401,21 @@ def test_runner_error_continues_worker(
         raise RuntimeError("boom")
 
     monkeypatch.setattr(HeadlessEngine, "run_step", boom)
-    runner = _runner(ledger, registry, engines, playbook, pipeline_id, tmp_path / "work")
+    work_root = tmp_path / "work"
+    runner = _runner(ledger, registry, engines, playbook, pipeline_id, work_root)
     assert runner.run_until_idle() == 2
     assert ledger.counts(pipeline_id)["failed"] == 2
     flags = ledger.open_flags(pipeline_id)
     assert all(f.kind == "runner_error" for f in flags)
+    leaked = [
+        handler
+        for candidate in logging.Logger.manager.loggerDict.values()
+        if isinstance(candidate, logging.Logger)
+        for handler in candidate.handlers
+        if isinstance(handler, logging.FileHandler)
+        and Path(handler.baseFilename).is_relative_to(work_root)
+    ]
+    assert leaked == []
 
 
 def test_startup_validation_unknown_step(

@@ -25,7 +25,8 @@ Precedence (highest first):
 
 Set or clear keys from the settings page (stored in keyring). The UI shows **key present: yes/no** only — never the secret.
 
-If keyring is unavailable, use the env var named in the error message.
+If keyring is unavailable, Ordine warns and automatically continues to the environment variable
+and `.env` sources. Keyring set/clear operations still report the relevant environment variable.
 
 `openai_compatible` may run without a key (local Ollama); requests use `Bearer none`.
 
@@ -47,7 +48,7 @@ ordine llm check
 
 ## Token budget
 
-`session_token_cap` is a **process-wide** cumulative limit (thread-safe). Before each call, the client reserves `max_tokens` output tokens; after a successful call, actual `input_tokens + output_tokens` are charged. Exceeding the cap raises `LLMBudgetError` before any HTTP request.
+`session_token_cap` is a cumulative guard shared by clients using the same application data directory in one process. Before each call, the client atomically reserves `max_tokens` output capacity; concurrent calls cannot reserve the same capacity. Successful calls replace that reservation with actual `input_tokens + output_tokens` usage, while failed calls release it. A call is rejected before HTTP when its output reservation would exceed the remaining cap. Because input-token usage is known only after a provider responds, one successful call can take recorded usage above the configured cap; later calls are then rejected. Treat this as a concurrency-safe usage guard, not a strict billing ceiling.
 
 `session_image_cap` is a separate process-wide count for `llm.generate_image`; a generation reserves one image before contacting the provider.
 

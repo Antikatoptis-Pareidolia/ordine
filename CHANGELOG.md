@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-19
+
+The issues addressed here were identified, reproduced, and resolved during a follow-up audit with
+OpenAI Codex.
+
+### Fixed
+
+- `shell.run` passes placeholder values through the subprocess environment instead of embedding
+  their contents into shell source; commands combining placeholders and heredocs are rejected.
+- The LLM token cap is shared per application data directory, reserves capacity atomically across
+  concurrent calls, and releases reservations after failed calls.
+- Environment and `.env` API-key fallbacks remain usable when the operating-system keyring backend
+  is unavailable.
+- Cross-format image export creates new nested destination directories before conversion.
+- Concurrent file moves and image exports using `suffix` or `fail` collision handling publish
+  without overwriting a path another worker created after the collision check.
+- Step log file handlers are closed after every engine attempt, including exceptional exits.
+- Direct TOML loading and the Settings UI consistently reject invalid hosts, ports, providers,
+  recovery intervals, and non-positive LLM limits.
+- CI uses read-only repository permissions and non-persistent checkout credentials; publishing
+  disables dependency caching to reduce credential and cache-poisoning exposure. Release reruns
+  safely refresh an existing draft and tolerate artifacts already published to PyPI.
+
 ## [0.2.1] - 2026-08-18
 
 The security and reliability issues addressed in this release were identified during an
@@ -15,7 +38,7 @@ Codex-assisted analysis and implementation.
 
 ### Fixed
 
-- Shell placeholders now preserve existing quoted/unquoted playbooks while preventing watched filenames and source references from injecting shell syntax.
+- Shell placeholders received initial quote-aware escaping for ordinary command arguments.
 - All web requests reject untrusted Host headers, and mutations additionally enforce same-origin
   checks, closing read and write paths through localhost DNS rebinding.
 - `file.move` keeps its source until the destination is atomically published, preventing data loss when the final rename fails.

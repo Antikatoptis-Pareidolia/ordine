@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +13,7 @@ import pytest
 from PIL import Image
 
 from ordine.core.registry import StepRegistry
-from ordine.core.steps import StepContext
+from ordine.core.steps import StepContext, StepResult
 from ordine.core.workdir import TaskWorkdir
 from ordine.executors.headless.backends import find_imagemagick, pick_backend, run_im
 from ordine.executors.headless.steps import (
@@ -322,6 +325,23 @@ def test_export_reserved_name(tmp_path: Path) -> None:
     assert list(dest.glob(".tmp-*")) == []
 
 
+def test_export_cross_format_creates_destination_directory(tmp_path: Path) -> None:
+    src = make_test_image(tmp_path / "in.png")
+    dest = tmp_path / "new" / "nested" / "out"
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.export")
+
+    result = ExportStep().run(
+        ctx,
+        ExportStep.Params(dest=str(dest), format="webp", filename="converted.webp"),
+    )
+
+    assert result.status == "ok", result.message
+    assert result.output_path == dest / "converted.webp"
+    with Image.open(result.output_path) as exported:
+        assert exported.format == "WEBP"
+    assert list(dest.glob(".tmp-*")) == []
+
+
 @pytest.mark.parametrize("unsafe_name", ["../x", "/tmp/x", "a/b"])
 def test_export_rejects_unsafe_output_names(tmp_path: Path, unsafe_name: str) -> None:
     src = make_test_image(tmp_path / "in.png")
@@ -386,6 +406,105 @@ def test_export_collision_fail(tmp_path: Path) -> None:
     )
     assert result.status == "fail"
     assert "destination exists" in (result.message or "")
+
+
+def test_export_concurrent_suffix_never_overwrites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sources = [make_test_image(tmp_path / f"source-{index}.png") for index in range(2)]
+    contexts = [
+        _ctx(tmp_path / f"work-{index}", input_path=source, step_id="image.export")
+        for index, source in enumerate(sources)
+    ]
+    dest = tmp_path / "out"
+
+    real_link = os.link
+    barrier = threading.Barrier(2)
+    call_lock = threading.Lock()
+    calls = 0
+
+    def synchronized_link(src: os.PathLike[str], dst: os.PathLike[str]) -> None:
+        nonlocal calls
+        with call_lock:
+            calls += 1
+            should_wait = calls <= 2
+        if should_wait:
+            barrier.wait(timeout=5)
+        real_link(src, dst)
+
+    monkeypatch.setattr(os, "link", synchronized_link)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(
+                lambda ctx: ExportStep().run(
+                    ctx,
+                    ExportStep.Params(dest=str(dest), format="png", filename="asset.png"),
+                ),
+                contexts,
+            )
+        )
+
+    assert {result.status for result in results} == {"ok"}
+    assert {result.output_path.name for result in results if result.output_path} == {
+        "asset.png",
+        "asset-2.png",
+    }
+    assert len(list(dest.glob("*.png"))) == 2
+    assert list(dest.glob(".tmp-*")) == []
+
+
+def test_export_late_fail_collision_preserves_existing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = make_test_image(tmp_path / "source.png")
+    dest = tmp_path / "out"
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.export")
+
+    def collide(_tmp: Path, final: Path, *, replace: bool) -> None:
+        assert not replace
+        final.write_bytes(b"other-worker")
+        raise FileExistsError
+
+    monkeypatch.setattr("ordine.executors.headless.steps._publish", collide)
+    result = ExportStep().run(
+        ctx,
+        ExportStep.Params(dest=str(dest), format="png", filename="asset.png", on_collision="fail"),
+    )
+
+    assert result.status == "fail"
+    assert (dest / "asset.png").read_bytes() == b"other-worker"
+    assert list(dest.glob(".tmp-*")) == []
+
+
+def test_export_late_suffix_rejects_unsafe_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = make_test_image(tmp_path / "source.png")
+    dest = tmp_path / "out"
+    ctx = _ctx(tmp_path, input_path=src, step_id="image.export")
+    calls = 0
+
+    def collision(*_args: object) -> Path | StepResult:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return dest / "asset.png"
+        return StepResult(status="fail", flag_kind="unsafe_name", message="unsafe")
+
+    def collide(_tmp: Path, _final: Path, *, replace: bool) -> None:
+        assert not replace
+        raise FileExistsError
+
+    monkeypatch.setattr("ordine.executors.headless.steps._collision_path", collision)
+    monkeypatch.setattr("ordine.executors.headless.steps._publish", collide)
+    result = ExportStep().run(
+        ctx,
+        ExportStep.Params(dest=str(dest), format="png", filename="asset.png"),
+    )
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert list(dest.glob(".tmp-*")) == []
 
 
 def test_export_no_tmp_leftover_on_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

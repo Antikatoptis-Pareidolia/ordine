@@ -40,6 +40,13 @@ def safe_output_path(declared_dir: Path, name: str) -> Path | None:
     return target
 
 
+def close_step_logger(logger: logging.Logger) -> None:
+    """Close and detach every handler owned by a task-scoped step logger."""
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
+
+
 def _sanitize_step_id(step_id: str) -> str:
     """Keep dots; replace anything outside [a-z0-9._-] with underscore."""
     return "".join(

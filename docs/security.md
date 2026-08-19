@@ -8,7 +8,7 @@ Treat playbook YAML like shell scripts: review triggers, destinations, and branc
 
 ### `shell.run`
 
-Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are shell-escaped according to their quote context before execution, so filenames cannot add shell syntax. Static command text remains fully trusted code. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
+Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are supplied through subprocess environment variables and expanded as quoted data, so their contents are not reparsed as shell source. Commands that combine placeholders with heredocs are rejected because heredoc quoting follows different shell grammar; static heredocs remain available. Static command text remains fully trusted code. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
 
 There is no command sandbox in the dry-run lab — only declared output paths are redirected. Playbooks containing `shell.run` show a warning on the lab setup page.
 
@@ -47,6 +47,9 @@ Purpose tags are `draft_playbook`, `revise_playbook`, `repair_playbook`, `diagno
 1. OS keyring (`keyring` package) via Settings UI or `ordine` key helpers
 2. Environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …)
 3. `~/.config/ordine/.env` as a plaintext fallback; never commit it
+
+If the keyring backend is unavailable for reads, Ordine logs a warning and continues through the
+environment and `.env` fallbacks. Keyring write/delete operations still report an actionable error.
 
 ## Telemetry
 

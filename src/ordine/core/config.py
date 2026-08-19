@@ -116,8 +116,8 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     workdir_root = Path(str(paths.get("workdir_root", defaults.workdir_root))).expanduser()
 
     stale_after = runner.get("stale_after_minutes", defaults.stale_after_minutes)
-    if not isinstance(stale_after, int):
-        raise ConfigError("runner.stale_after_minutes must be an integer")
+    if not isinstance(stale_after, int) or isinstance(stale_after, bool) or stale_after < 1:
+        raise ConfigError("runner.stale_after_minutes must be a positive integer")
 
     reconcile = runner.get("reconcile_policy", defaults.reconcile_policy)
     if reconcile not in ("retry", "fail"):
@@ -128,20 +128,27 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         raise ConfigError("log.level must be a string")
 
     web_host = web.get("host", defaults.web_host)
-    if not isinstance(web_host, str):
-        raise ConfigError("web.host must be a string")
+    if not isinstance(web_host, str) or not web_host.strip():
+        raise ConfigError("web.host must be a non-empty string")
 
     web_port = web.get("port", defaults.web_port)
-    if not isinstance(web_port, int):
-        raise ConfigError("web.port must be an integer")
+    if not isinstance(web_port, int) or isinstance(web_port, bool) or not 1 <= web_port <= 65535:
+        raise ConfigError("web.port must be an integer between 1 and 65535")
 
     autostart = web.get("autostart_pipelines", defaults.autostart_pipelines)
     if not isinstance(autostart, bool):
         raise ConfigError("web.autostart_pipelines must be a boolean")
 
     llm_provider = llm.get("provider", defaults.llm_provider)
-    if not isinstance(llm_provider, str):
-        raise ConfigError("llm.provider must be a string")
+    if not isinstance(llm_provider, str) or llm_provider not in {
+        "none",
+        "anthropic",
+        "openai",
+        "openai_compatible",
+    }:
+        raise ConfigError(
+            "llm.provider must be 'none', 'anthropic', 'openai', or 'openai_compatible'"
+        )
 
     llm_model = llm.get("model", defaults.llm_model)
     if not isinstance(llm_model, str):
@@ -152,19 +159,35 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         raise ConfigError("llm.base_url must be a string")
 
     llm_max_tokens = llm.get("max_tokens", defaults.llm_max_tokens)
-    if not isinstance(llm_max_tokens, int):
-        raise ConfigError("llm.max_tokens must be an integer")
+    if (
+        not isinstance(llm_max_tokens, int)
+        or isinstance(llm_max_tokens, bool)
+        or llm_max_tokens < 1
+    ):
+        raise ConfigError("llm.max_tokens must be a positive integer")
 
     llm_session_token_cap = llm.get("session_token_cap", defaults.llm_session_token_cap)
-    if not isinstance(llm_session_token_cap, int):
-        raise ConfigError("llm.session_token_cap must be an integer")
+    if (
+        not isinstance(llm_session_token_cap, int)
+        or isinstance(llm_session_token_cap, bool)
+        or llm_session_token_cap < 1
+    ):
+        raise ConfigError("llm.session_token_cap must be a positive integer")
 
     llm_session_image_cap = llm.get("session_image_cap", defaults.llm_session_image_cap)
-    if not isinstance(llm_session_image_cap, int):
-        raise ConfigError("llm.session_image_cap must be an integer")
+    if (
+        not isinstance(llm_session_image_cap, int)
+        or isinstance(llm_session_image_cap, bool)
+        or llm_session_image_cap < 1
+    ):
+        raise ConfigError("llm.session_image_cap must be a positive integer")
 
     retention_days = retention.get("days", defaults.retention_days)
-    if not isinstance(retention_days, int) or retention_days < 0:
+    if (
+        not isinstance(retention_days, int)
+        or isinstance(retention_days, bool)
+        or retention_days < 0
+    ):
         raise ConfigError("retention.days must be a non-negative integer")
 
     retention_keep_failed = retention.get("keep_failed", defaults.retention_keep_failed)
@@ -246,6 +269,7 @@ def save_web_runner_settings(
     web["autostart_pipelines"] = autostart_pipelines
     raw["runner"] = runner
     raw["web"] = web
+    _parse_config(raw, config_file=expanded)
     tmp = expanded.with_suffix(".toml.tmp")
     tmp.write_text(tomli_w.dumps(raw), encoding="utf-8")
     tmp.replace(expanded)
@@ -277,6 +301,7 @@ def save_llm_settings(
     llm["max_tokens"] = llm_max_tokens
     llm["session_token_cap"] = llm_session_token_cap
     raw["llm"] = llm
+    _parse_config(raw, config_file=expanded)
     tmp = expanded.with_suffix(".toml.tmp")
     tmp.write_text(tomli_w.dumps(raw), encoding="utf-8")
     tmp.replace(expanded)

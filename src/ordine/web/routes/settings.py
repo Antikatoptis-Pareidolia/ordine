@@ -93,6 +93,27 @@ async def settings_post(
             _settings_context(request, error="stale_after_minutes must be at least 1"),
             status_code=200,
         )
+    if not web_host.strip():
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(request, error="web.host must not be empty"),
+            status_code=200,
+        )
+    if not 1 <= web_port <= 65535:
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(request, error="web.port must be between 1 and 65535"),
+            status_code=200,
+        )
+    if llm_provider not in {"none", "anthropic", "openai", "openai_compatible"}:
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(request, error="invalid LLM provider"),
+            status_code=200,
+        )
     if llm_max_tokens < 1:
         return templates.TemplateResponse(
             request,

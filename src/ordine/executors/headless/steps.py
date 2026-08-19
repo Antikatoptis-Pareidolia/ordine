@@ -211,6 +211,15 @@ def _collision_path(dest_dir: Path, name: str, on_collision: str) -> Path | Step
         n += 1
 
 
+def _publish(tmp: Path, final: Path, *, replace: bool) -> None:
+    """Atomically publish *tmp*, optionally refusing to replace an existing path."""
+    if replace:
+        os.replace(tmp, final)
+        return
+    os.link(tmp, final)
+    tmp.unlink()
+
+
 class ValidateStep:
     id = "image.validate"
     engines = frozenset({"headless"})
@@ -366,6 +375,7 @@ class ExportStep:
 
         tmp: Path | None = None
         try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
             with Image.open(input_path) as img:
                 input_fmt = (img.format or "").lower()
             target_fmt = params.format.lower()
@@ -385,11 +395,20 @@ class ExportStep:
                 buf_path.unlink()
                 tmp = None
 
-            dest_dir.mkdir(parents=True, exist_ok=True)
             write_tmp = dest_dir / f".tmp-{uuid.uuid4().hex}"
             tmp = write_tmp
             write_tmp.write_bytes(data)
-            os.replace(write_tmp, final)
+            while True:
+                try:
+                    _publish(write_tmp, final, replace=params.on_collision == "replace")
+                    break
+                except FileExistsError:
+                    if params.on_collision == "fail":
+                        return StepResult(status="fail", message=f"destination exists: {final}")
+                    collision = _collision_path(dest_dir, name, "suffix")
+                    if isinstance(collision, StepResult):
+                        return collision
+                    final = collision
             tmp = None
             return StepResult(status="ok", output_path=final)
         except OSError as exc:

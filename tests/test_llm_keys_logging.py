@@ -103,13 +103,32 @@ def test_missing_key_message_is_specific_and_not_duplicated(
     assert "LLM is not configured" not in message
 
 
-def test_keyring_error_includes_env_name(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_keyring_error_falls_back_to_environment(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     def boom(*_args: object, **_kwargs: object) -> None:
         raise KeyringError("no backend")
 
     monkeypatch.setattr("ordine.llm.keys.keyring.get_password", boom)
-    with pytest.raises(Exception, match=ENV_NAMES["openai"]):
-        get_key("openai")
+    monkeypatch.setenv(ENV_NAMES["openai"], "from-environment")
+
+    assert get_key("openai") == "from-environment"
+    assert ENV_NAMES["openai"] in caplog.text
+    assert "from-environment" not in caplog.text
+
+
+def test_keyring_error_falls_back_to_dotenv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise KeyringError("no backend")
+
+    monkeypatch.setattr("ordine.llm.keys.keyring.get_password", boom)
+    monkeypatch.delenv(ENV_NAMES["openai"], raising=False)
+    monkeypatch.setattr("ordine.llm.keys.DEFAULT_CONFIG_DIR", tmp_path)
+    (tmp_path / ".env").write_text(f'{ENV_NAMES["openai"]}="from-dotenv"\n', encoding="utf-8")
+
+    assert get_key("openai") == "from-dotenv"
 
 
 def test_set_and_clear_key(monkeypatch: pytest.MonkeyPatch) -> None:

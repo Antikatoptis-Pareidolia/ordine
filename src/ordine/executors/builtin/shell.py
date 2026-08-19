@@ -5,8 +5,8 @@ Owns shell.run. Must never import ledger, web, cli, or llm.
 
 from __future__ import annotations
 
+import os
 import re
-import shlex
 import subprocess
 from typing import ClassVar
 
@@ -17,6 +17,8 @@ from ordine.core.workdir import is_safe_output_name, safe_output_path
 
 _PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 _ALLOWED_KEYS = frozenset({"input", "step_dir", "ordinal", "source"})
+_HEREDOC = re.compile(r"(?<!<)<<-?(?!<)")
+_ENV_PREFIX = "ORDINE_SHELL_"
 _STDERR_TAIL = 300
 
 
@@ -49,18 +51,20 @@ class ShellRunStep:
         substituted = _substitute_cmd(params.cmd, ctx)
         if isinstance(substituted, StepResult):
             return substituted
+        command, placeholder_env = substituted
 
         stdout_path = ctx.step_dir / "stdout.txt"
         stderr_path = ctx.step_dir / "stderr.txt"
 
         try:
             completed = subprocess.run(
-                substituted,
+                command,
                 shell=True,
                 cwd=ctx.step_dir,
                 capture_output=True,
                 text=True,
                 timeout=params.timeout_seconds,
+                env={**os.environ, **placeholder_env},
             )
         except subprocess.TimeoutExpired as exc:
             stdout_path.write_text(_as_text(exc.stdout), encoding="utf-8")
@@ -124,16 +128,16 @@ def _quote_context(template: str, offset: int) -> str | None:
     return quote
 
 
-def _shell_escape(value: str, quote: str | None) -> str:
+def _environment_reference(key: str, quote: str | None) -> str:
+    reference = f"${{{_ENV_PREFIX}{key.upper()}}}"
     if quote == "'":
-        return value.replace("'", "'\"'\"'")
+        return f"'\"{reference}\"'"
     if quote == '"':
-        # These characters retain special meaning inside POSIX double quotes.
-        return re.sub(r'([\\$`"])', r"\\\1", value)
-    return shlex.quote(value)
+        return reference
+    return f'"{reference}"'
 
 
-def _substitute_cmd(template: str, ctx: StepContext) -> str | StepResult:
+def _substitute_cmd(template: str, ctx: StepContext) -> tuple[str, dict[str, str]] | StepResult:
     unknown: set[str] = set()
     for match in _PLACEHOLDER.finditer(template):
         key = match.group(1)
@@ -143,6 +147,12 @@ def _substitute_cmd(template: str, ctx: StepContext) -> str | StepResult:
         return StepResult(
             status="fail",
             message=f"unknown template placeholders: {', '.join(sorted(unknown))}",
+        )
+
+    if _PLACEHOLDER.search(template) and _HEREDOC.search(template):
+        return StepResult(
+            status="fail",
+            message="shell placeholders are not supported in commands containing heredocs",
         )
 
     values: dict[str, str] = {
@@ -156,8 +166,9 @@ def _substitute_cmd(template: str, ctx: StepContext) -> str | StepResult:
     for match in _PLACEHOLDER.finditer(template):
         pieces.append(template[cursor : match.start()])
         pieces.append(
-            _shell_escape(values[match.group(1)], _quote_context(template, match.start()))
+            _environment_reference(match.group(1), _quote_context(template, match.start()))
         )
         cursor = match.end()
     pieces.append(template[cursor:])
-    return "".join(pieces)
+    environment = {f"{_ENV_PREFIX}{key.upper()}": value for key, value in values.items()}
+    return "".join(pieces), environment

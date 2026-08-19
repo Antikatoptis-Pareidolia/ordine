@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ordine.core.workdir import TaskWorkdir
+from ordine.core.workdir import TaskWorkdir, close_step_logger
 
 
 def test_create_is_idempotent(tmp_path: Path) -> None:
@@ -50,3 +50,19 @@ def test_step_logger_writes_once(tmp_path: Path) -> None:
     assert len(lines) == 2
     assert "first line" in lines[0]
     assert "second line" in lines[1]
+
+
+def test_close_step_logger_releases_handler_and_can_reopen(tmp_path: Path) -> None:
+    workdir = TaskWorkdir.create(tmp_path, "demo", 1)
+    step_dir = workdir.step_dir(1, "util.noop")
+    logger = workdir.step_logger(step_dir)
+    handler = logger.handlers[0]
+
+    close_step_logger(logger)
+
+    assert logger.handlers == []
+    assert getattr(handler, "stream", None) is None
+    reopened = workdir.step_logger(step_dir)
+    reopened.info("after reopen")
+    close_step_logger(reopened)
+    assert "after reopen" in (step_dir / "log.txt").read_text(encoding="utf-8")

@@ -96,6 +96,57 @@ def test_shell_run_placeholder_cannot_inject_shell_syntax(
     assert not (ctx.step_dir / "PWNED_TICK").exists()
 
 
+@pytest.mark.parametrize("quote", [None, '"', "'"])
+@pytest.mark.parametrize(
+    "source_ref",
+    [
+        "line one\nline two; false",
+        "${IFS}$(false)`false`*?[abc]",
+        "quote'\" backslash\\ dollar$ semicolon; ampersand&",
+        "unicode-λ-文件",
+    ],
+)
+def test_shell_run_placeholder_round_trips_as_data(
+    tmp_path: Path, quote: str | None, source_ref: str
+) -> None:
+    source = tmp_path / "in.md"
+    source.write_text("body", encoding="utf-8")
+    ctx = _ctx(tmp_path, input_path=source, source_ref=source_ref)
+    placeholder = "{source}" if quote is None else f"{quote}{{source}}{quote}"
+    params = ShellRunStep.Params(cmd=f"printf %s {placeholder} > round-trip.txt")
+
+    result = ShellRunStep().run(ctx, params)
+
+    assert result.status == "ok", result.message
+    assert (ctx.step_dir / "round-trip.txt").read_text(encoding="utf-8") == source_ref
+
+
+@pytest.mark.parametrize("operator", ["cat <<EOF", "cat<<EOF", "cat 3<<EOF", "cat <<-EOF"])
+def test_shell_run_rejects_placeholders_in_heredoc_commands(tmp_path: Path, operator: str) -> None:
+    source = tmp_path / "$(touch PWNED)"
+    source.write_text("body", encoding="utf-8")
+    ctx = _ctx(tmp_path, input_path=source, source_ref=str(source))
+    params = ShellRunStep.Params(cmd=f"{operator}\n{{source}}\nEOF")
+
+    result = ShellRunStep().run(ctx, params)
+
+    assert result.status == "fail"
+    assert result.message == "shell placeholders are not supported in commands containing heredocs"
+    assert not (ctx.step_dir / "PWNED").exists()
+
+
+def test_shell_run_allows_static_heredoc_commands(tmp_path: Path) -> None:
+    source = tmp_path / "in.md"
+    source.write_text("body", encoding="utf-8")
+    ctx = _ctx(tmp_path, input_path=source)
+    params = ShellRunStep.Params(cmd="cat <<'EOF'\nstatic $(printf safe)\nEOF")
+
+    result = ShellRunStep().run(ctx, params)
+
+    assert result.status == "ok"
+    assert (ctx.step_dir / "stdout.txt").read_text(encoding="utf-8") == "static $(printf safe)\n"
+
+
 def test_shell_run_produces_output_file(tmp_path: Path) -> None:
     source = tmp_path / "in.md"
     source.write_text("content", encoding="utf-8")

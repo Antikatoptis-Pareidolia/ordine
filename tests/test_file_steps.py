@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
-from ordine.core.steps import StepContext
+from ordine.core.steps import StepContext, StepResult
 from ordine.core.workdir import TaskWorkdir
 from ordine.executors.builtin.file_steps import MoveStep
 
@@ -86,6 +88,108 @@ def test_file_move_collision_fail(tmp_path: Path) -> None:
     assert src.exists()
 
 
+def test_file_move_concurrent_suffix_never_overwrites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sources = []
+    contexts = []
+    for index, payload in enumerate((b"first", b"second"), start=1):
+        src = tmp_path / f"inbox-{index}" / "artifact.txt"
+        src.parent.mkdir()
+        src.write_bytes(payload)
+        sources.append(src)
+        contexts.append(_ctx(tmp_path / f"work-{index}", input_path=src))
+    dest = tmp_path / "out"
+
+    real_link = os.link
+    barrier = threading.Barrier(2)
+    call_lock = threading.Lock()
+    calls = 0
+
+    def synchronized_link(src: os.PathLike[str], dst: os.PathLike[str]) -> None:
+        nonlocal calls
+        with call_lock:
+            calls += 1
+            should_wait = calls <= 2
+        if should_wait:
+            barrier.wait(timeout=5)
+        real_link(src, dst)
+
+    monkeypatch.setattr(os, "link", synchronized_link)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(
+                lambda ctx: MoveStep().run(
+                    ctx, MoveStep.Params(dest=str(dest), on_collision="suffix")
+                ),
+                contexts,
+            )
+        )
+
+    assert {result.status for result in results} == {"ok"}
+    assert {result.output_path.name for result in results if result.output_path} == {
+        "artifact.txt",
+        "artifact-2.txt",
+    }
+    assert {path.read_bytes() for path in dest.iterdir()} == {b"first", b"second"}
+    assert all(not source.exists() for source in sources)
+
+
+def test_file_move_late_fail_collision_preserves_both_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = tmp_path / "inbox" / "artifact.txt"
+    src.parent.mkdir()
+    src.write_bytes(b"new")
+    dest = tmp_path / "out"
+    ctx = _ctx(tmp_path, input_path=src)
+
+    def collide(_tmp: Path, final: Path, *, replace: bool) -> None:
+        assert not replace
+        final.write_bytes(b"other-worker")
+        raise FileExistsError
+
+    monkeypatch.setattr("ordine.executors.builtin.file_steps._publish", collide)
+    result = MoveStep().run(ctx, MoveStep.Params(dest=str(dest), on_collision="fail"))
+
+    assert result.status == "fail"
+    assert (dest / "artifact.txt").read_bytes() == b"other-worker"
+    assert src.read_bytes() == b"new"
+    assert list(dest.glob(".tmp-*")) == []
+
+
+def test_file_move_late_suffix_rejects_unsafe_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = tmp_path / "inbox" / "artifact.txt"
+    src.parent.mkdir()
+    src.write_bytes(b"new")
+    dest = tmp_path / "out"
+    ctx = _ctx(tmp_path, input_path=src)
+    calls = 0
+
+    def collision(*_args: object) -> Path | StepResult:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return dest / "artifact.txt"
+        return StepResult(status="fail", flag_kind="unsafe_name", message="unsafe")
+
+    def collide(_tmp: Path, _final: Path, *, replace: bool) -> None:
+        assert not replace
+        raise FileExistsError
+
+    monkeypatch.setattr("ordine.executors.builtin.file_steps._collision_path", collision)
+    monkeypatch.setattr("ordine.executors.builtin.file_steps._publish", collide)
+
+    result = MoveStep().run(ctx, MoveStep.Params(dest=str(dest), on_collision="suffix"))
+
+    assert result.status == "fail"
+    assert result.flag_kind == "unsafe_name"
+    assert src.read_bytes() == b"new"
+    assert list(dest.glob(".tmp-*")) == []
+
+
 def test_file_move_final_publish_failure_preserves_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -95,11 +199,11 @@ def test_file_move_final_publish_failure_preserves_source(
     dest = tmp_path / "out"
     ctx = _ctx(tmp_path, input_path=src)
 
-    def fake_replace(src_path: str | os.PathLike[str], dst_path: str | os.PathLike[str]) -> None:
+    def fake_link(src_path: str | os.PathLike[str], dst_path: str | os.PathLike[str]) -> None:
         del src_path, dst_path
         raise OSError("simulated final rename failure")
 
-    monkeypatch.setattr(os, "replace", fake_replace)
+    monkeypatch.setattr(os, "link", fake_link)
     result = MoveStep().run(ctx, MoveStep.Params(dest=str(dest)))
     assert result.status == "fail"
     assert src.read_bytes() == b"payload"

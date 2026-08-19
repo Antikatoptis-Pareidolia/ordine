@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,7 @@ from ordine.llm.errors import (
     LLMResponseError,
     LLMTimeoutError,
 )
-from ordine.llm.types import ImagePart, Message, TextPart
+from ordine.llm.types import ImagePart, LLMResponse, Message, TextPart, Usage
 
 
 def _anthropic_ok() -> dict[str, Any]:
@@ -190,6 +191,93 @@ def test_budget_refuses_before_http() -> None:
     with pytest.raises(LLMBudgetError):
         wrapped.complete([Message(role="user", content="b")], purpose="second", max_tokens=80)
     assert calls["n"] == 1
+
+
+def test_budget_reservation_is_atomic_across_concurrent_calls() -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingClient:
+        provider = "mock"
+        model = "mock"
+
+        def complete(self, *_args: object, **_kwargs: object) -> LLMResponse:
+            entered.set()
+            assert release.wait(timeout=2)
+            return LLMResponse(
+                text="ok",
+                usage=Usage(input_tokens=5, output_tokens=5),
+                model="mock",
+                duration_s=0.0,
+            )
+
+    budget = TokenBudget(100)
+    wrapped = _BudgetClient(inner=BlockingClient(), budget=budget, default_max_tokens=80)
+    first_error: list[BaseException] = []
+
+    def first_call() -> None:
+        try:
+            wrapped.complete([Message(role="user", content="a")], purpose="first")
+        except BaseException as exc:
+            first_error.append(exc)
+
+    thread = threading.Thread(target=first_call)
+    thread.start()
+    assert entered.wait(timeout=2)
+    with pytest.raises(LLMBudgetError):
+        wrapped.complete([Message(role="user", content="b")], purpose="second")
+    release.set()
+    thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert first_error == []
+    assert budget.used == 10
+
+
+def test_budget_releases_reservation_after_failed_call() -> None:
+    class FailingClient:
+        provider = "mock"
+        model = "mock"
+
+        def complete(self, *_args: object, **_kwargs: object) -> LLMResponse:
+            raise RuntimeError("failed")
+
+    budget = TokenBudget(100)
+    wrapped = _BudgetClient(inner=FailingClient(), budget=budget, default_max_tokens=100)
+    with pytest.raises(RuntimeError, match="failed"):
+        wrapped.complete([Message(role="user", content="a")], purpose="first")
+    with pytest.raises(RuntimeError, match="failed"):
+        wrapped.complete([Message(role="user", content="b")], purpose="second")
+
+
+def test_budget_reset_clears_usage_and_outstanding_reservations() -> None:
+    budget = TokenBudget(100)
+    budget.reserve(100)
+
+    budget.reset()
+    budget.reserve(100)
+    budget.settle(100, Usage(input_tokens=1, output_tokens=2))
+
+    assert budget.used == 3
+
+
+def test_build_client_reuses_process_budget_for_same_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("ordine.llm.client.get_key", lambda _provider: "test-key")
+    config = AppConfig(
+        db_path=tmp_path / "ordine.sqlite3",
+        workdir_root=tmp_path / "work",
+        llm_provider="openai",
+        llm_model="gpt-test",
+    )
+
+    first = build_client(config)
+    second = build_client(config)
+
+    assert isinstance(first, _BudgetClient)
+    assert isinstance(second, _BudgetClient)
+    assert first.budget is second.budget
 
 
 def test_switch_provider_config_only(monkeypatch: pytest.MonkeyPatch) -> None:

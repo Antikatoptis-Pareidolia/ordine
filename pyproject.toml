@@ -1,6 +1,6 @@
 [project]
 name = "ordine"
-version = "0.2.1"
+version = "0.2.2"
 description = "Ordine — self-healing task pipelines for your desktop."
 readme = "README.md"
 requires-python = ">=3.11"

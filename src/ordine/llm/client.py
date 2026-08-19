@@ -29,6 +29,7 @@ class TokenBudget:
     def __init__(self, cap: int) -> None:
         self._cap = cap
         self._used = 0
+        self._reserved = 0
         self._lock = threading.Lock()
 
     @property
@@ -43,15 +44,23 @@ class TokenBudget:
     def reset(self) -> None:
         with self._lock:
             self._used = 0
+            self._reserved = 0
 
-    def check_reservation(self, reservation: int) -> None:
+    def configure_cap(self, cap: int) -> None:
         with self._lock:
-            if self._used + reservation > self._cap:
+            self._cap = cap
+
+    def reserve(self, reservation: int) -> None:
+        with self._lock:
+            if self._used + self._reserved + reservation > self._cap:
                 raise LLMBudgetError(used=self._used, cap=self._cap, reservation=reservation)
+            self._reserved += reservation
 
-    def charge(self, usage: Usage) -> None:
+    def settle(self, reservation: int, usage: Usage | None) -> None:
         with self._lock:
-            self._used += usage.input_tokens + usage.output_tokens
+            self._reserved -= reservation
+            if usage is not None:
+                self._used += usage.input_tokens + usage.output_tokens
 
 
 @dataclass
@@ -80,15 +89,19 @@ class _BudgetClient:
         timeout: float = 60.0,
     ) -> LLMResponse:
         reservation = max_tokens if max_tokens is not None else self.default_max_tokens
-        self.budget.check_reservation(reservation)
-        response = self.inner.complete(
-            messages,
-            purpose=purpose,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=timeout,
-        )
-        self.budget.charge(response.usage)
+        self.budget.reserve(reservation)
+        try:
+            response = self.inner.complete(
+                messages,
+                purpose=purpose,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
+        except BaseException:
+            self.budget.settle(reservation, None)
+            raise
+        self.budget.settle(reservation, response.usage)
         return response
 
 
@@ -141,6 +154,22 @@ def _data_dir_for(config: AppConfig) -> Path:
     return config.db_path.parent
 
 
+_process_budgets: dict[Path, TokenBudget] = {}
+_process_budgets_lock = threading.Lock()
+
+
+def _process_budget_for(config: AppConfig) -> TokenBudget:
+    scope = _data_dir_for(config).expanduser().resolve()
+    with _process_budgets_lock:
+        budget = _process_budgets.get(scope)
+        if budget is None:
+            budget = TokenBudget(config.llm_session_token_cap)
+            _process_budgets[scope] = budget
+        else:
+            budget.configure_cap(config.llm_session_token_cap)
+        return budget
+
+
 def build_client(config: AppConfig, *, budget: TokenBudget | None = None) -> LLMClient:
     """Build a configured LLM client with logging and budget decorators."""
     provider = (config.llm_provider or "").strip().lower()
@@ -164,7 +193,7 @@ def build_client(config: AppConfig, *, budget: TokenBudget | None = None) -> LLM
         )
 
     bearer = api_key or "none"
-    token_budget = budget or TokenBudget(config.llm_session_token_cap)
+    token_budget = budget or _process_budget_for(config)
     data_dir = _data_dir_for(config)
 
     if provider == "anthropic":

@@ -51,6 +51,15 @@ def _collision_path(dest_dir: Path, name: str, on_collision: str) -> Path | Step
         n += 1
 
 
+def _publish(tmp: Path, final: Path, *, replace: bool) -> None:
+    """Atomically publish *tmp*, optionally refusing to replace an existing path."""
+    if replace:
+        os.replace(tmp, final)
+        return
+    os.link(tmp, final)
+    tmp.unlink()
+
+
 class RenameFromManifestStep:
     id = "file.rename_from_manifest"
     engines = frozenset({"headless"})
@@ -128,7 +137,17 @@ class MoveStep:
             # Keep the source intact until the destination has been atomically published.
             # A failed final rename must never turn a recoverable step failure into data loss.
             shutil.copy2(ctx.input_path, write_tmp)
-            os.replace(write_tmp, final)
+            while True:
+                try:
+                    _publish(write_tmp, final, replace=params.on_collision == "replace")
+                    break
+                except FileExistsError:
+                    if params.on_collision == "fail":
+                        return StepResult(status="fail", message=f"destination exists: {final}")
+                    collision = _collision_path(dest_dir, ctx.input_path.name, "suffix")
+                    if isinstance(collision, StepResult):
+                        return collision
+                    final = collision
             tmp = None
             try:
                 ctx.input_path.unlink()

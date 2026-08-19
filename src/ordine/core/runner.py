@@ -28,7 +28,7 @@ from ordine.core.triggers import (
     build_trigger_service,
     ledger_sink,
 )
-from ordine.core.workdir import TaskWorkdir
+from ordine.core.workdir import TaskWorkdir, close_step_logger
 
 logger = logging.getLogger(__name__)
 
@@ -99,20 +99,23 @@ def execute_step_sequence(
                 branch_no=branch_no,
             )
         step_logger = workdir.step_logger(step_dir)
-        params = registry.validate_params(step_spec.id, step_spec.params)
-        ctx = StepContext(
-            task_id=task.id,
-            pipeline_name=playbook.name,
-            source_ref=task.source_ref,
-            ordinal=task.ordinal,
-            input_path=current_input,
-            step_dir=step_dir,
-            logger=step_logger,
-            naming=naming,
-        )
-        started = _utcnow()
-        step_impl = cast(type[Step], registry.get(step_spec.id))
-        result = cast(Any, engine).run_step(step_impl, ctx, params)
+        try:
+            params = registry.validate_params(step_spec.id, step_spec.params)
+            ctx = StepContext(
+                task_id=task.id,
+                pipeline_name=playbook.name,
+                source_ref=task.source_ref,
+                ordinal=task.ordinal,
+                input_path=current_input,
+                step_dir=step_dir,
+                logger=step_logger,
+                naming=naming,
+            )
+            started = _utcnow()
+            step_impl = cast(type[Step], registry.get(step_spec.id))
+            result = cast(Any, engine).run_step(step_impl, ctx, params)
+        finally:
+            close_step_logger(step_logger)
         finished = _utcnow()
         if step_log is not None:
             step_log.append(

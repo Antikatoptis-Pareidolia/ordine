@@ -93,6 +93,7 @@ Same fields as `folder_watch` except `type: manual` and no `settle_seconds`.
 | `output` | string | absent | Basename under `step_dir` that the command must create; becomes `output_path` |
 
 When `output` is omitted, the step passes through `input_path`. See [security.md](security.md#shellrun).
+Commands containing heredocs may use static shell text but cannot contain Ordine placeholders.
 
 ## PlaybookMeta
 
