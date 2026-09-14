@@ -6,9 +6,10 @@
 <p><a href="/pipelines/{{ pipeline_id }}/edit">Back to editor</a></p>
 
 {% if shell_warning %}
-<p class="flash flash-error" role="alert">
-  This playbook contains <code>shell.run</code> steps. Dry-run still executes them for real —
-  there is no command sandboxing beyond output-path redirection.
+<p class="flash flash-info" role="status">
+  This playbook contains <code>shell.run</code>. By default the lab <strong>stubs</strong> those
+  steps (no subprocess). Check <em>Allow real shell.run</em> below only if you intentionally want
+  commands to execute — there is still no command sandbox beyond output-path redirection.
 </p>
 {% endif %}
 
@@ -56,10 +57,16 @@
     <input id="max_samples" name="max_samples" type="number" min="1" max="20" value="{{ max_samples or 20 }}" />
   </p>
   {% if shell_warning %}
+  <p>
+    <label>
+      <input type="checkbox" name="allow_shell_execution" value="on"{% if allow_shell_execution %} checked{% endif %} />
+      Allow real <code>shell.run</code> execution in this lab session (default is stub)
+    </label>
+  </p>
   <p class="flash flash-error" role="alert">
     <label>
-      <input type="checkbox" name="acknowledge_shell_run" value="on" required />
-      I understand <code>shell.run</code> will execute for real in this lab session
+      <input type="checkbox" name="acknowledge_shell_run" value="on" />
+      I understand enabling real <code>shell.run</code> executes arbitrary shell commands with my environment
     </label>
   </p>
   {% endif %}

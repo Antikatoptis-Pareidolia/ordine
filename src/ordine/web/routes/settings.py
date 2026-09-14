@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from ordine.core.config import (
     AppConfig,
+    is_loopback_bind,
     is_wildcard_host,
     load_config,
     normalize_allowed_hosts,
@@ -91,10 +92,12 @@ async def settings_post(
     llm_max_tokens: Annotated[int, Form()] = 1024,
     llm_session_token_cap: Annotated[int, Form()] = 200_000,
     autostart_pipelines: Annotated[str | None, Form()] = None,
+    i_understand_no_auth: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse:
     config = _config(request)
     templates = _templates(request)
     autostart = autostart_pipelines == "on"
+    no_auth_ack = i_understand_no_auth == "on"
     if reconcile_policy not in ("retry", "fail"):
         return templates.TemplateResponse(
             request,
@@ -175,6 +178,20 @@ async def settings_post(
             _settings_context(request, error="No config file on disk; create one with ordine init"),
             status_code=200,
         )
+    if not is_loopback_bind(web_bind.strip()) and not no_auth_ack:
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(
+                request,
+                error=(
+                    "Refusing non-loopback bind without i_understand_no_auth. "
+                    "Ordine has no authentication — check the acknowledgment box to record "
+                    "that you accept exposing the control plane."
+                ),
+            ),
+            status_code=200,
+        )
     bind_changed = web_bind.strip() != config.web_bind or web_port != config.web_port
     try:
         save_web_runner_settings(
@@ -185,6 +202,7 @@ async def settings_post(
             web_allowed_hosts=allowed,
             web_port=web_port,
             autostart_pipelines=autostart,
+            i_understand_no_auth=no_auth_ack,
         )
         save_llm_settings(
             config.config_file,

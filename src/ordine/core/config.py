@@ -33,7 +33,9 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
     "paths": frozenset({"db", "workdir_root"}),
     "runner": frozenset({"stale_after_minutes", "reconcile_policy"}),
     "log": frozenset({"level"}),
-    "web": frozenset({"host", "bind", "allowed_hosts", "port", "autostart_pipelines"}),
+    "web": frozenset(
+        {"host", "bind", "allowed_hosts", "port", "autostart_pipelines", "i_understand_no_auth"}
+    ),
     "llm": frozenset(
         {"provider", "model", "base_url", "max_tokens", "session_token_cap", "session_image_cap"}
     ),
@@ -43,6 +45,19 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
 
 WILDCARD_BIND_ADDRESSES = frozenset({"0.0.0.0", "::"})
 LOOPBACK_HOST_ALIASES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def is_loopback_bind(value: str) -> bool:
+    """Return True when *value* is a loopback listen address (incl. IPv6 bracket form)."""
+    normalized = value.strip().lower().strip("[]")
+    if normalized in LOOPBACK_HOST_ALIASES:
+        return True
+    try:
+        from ipaddress import ip_address
+
+        return ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 def is_wildcard_host(value: str) -> bool:
@@ -85,6 +100,7 @@ class AppConfig:
     web_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost")
     web_port: int = 8484
     autostart_pipelines: bool = False
+    i_understand_no_auth: bool = False
     llm_provider: str = "none"
     llm_model: str = ""
     llm_base_url: str = ""
@@ -257,6 +273,10 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     if not isinstance(retention_on_serve_start, bool):
         raise ConfigError("retention.on_serve_start must be a boolean")
 
+    i_understand = web.get("i_understand_no_auth", defaults.i_understand_no_auth)
+    if not isinstance(i_understand, bool):
+        raise ConfigError("web.i_understand_no_auth must be a boolean")
+
     return AppConfig(
         db_path=db_path,
         workdir_root=workdir_root,
@@ -267,6 +287,7 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         web_allowed_hosts=web_allowed_hosts,
         web_port=web_port,
         autostart_pipelines=autostart,
+        i_understand_no_auth=i_understand,
         llm_provider=llm_provider,
         llm_model=llm_model,
         llm_base_url=llm_base_url,
@@ -310,6 +331,7 @@ def save_web_runner_settings(
     web_allowed_hosts: list[str] | tuple[str, ...] | str,
     web_port: int,
     autostart_pipelines: bool,
+    i_understand_no_auth: bool = False,
 ) -> None:
     """Atomically update runner and web sections in the config TOML."""
     import tomli_w
@@ -331,6 +353,7 @@ def save_web_runner_settings(
     web.pop("host", None)  # drop legacy key once split fields are written
     web["port"] = web_port
     web["autostart_pipelines"] = autostart_pipelines
+    web["i_understand_no_auth"] = i_understand_no_auth
     raw["runner"] = runner
     raw["web"] = web
     _parse_config(raw, config_file=expanded)
@@ -398,6 +421,8 @@ bind = "127.0.0.1"
 allowed_hosts = ["127.0.0.1", "localhost"]
 port = 8484
 autostart_pipelines = false
+# Required to bind non-loopback (no auth in 0.2/0.3). Keep false unless you accept the risk.
+i_understand_no_auth = false
 
 [llm]
 provider = "none"

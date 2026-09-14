@@ -247,7 +247,12 @@ async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse | H
     else:
         yaml_text = ledger.get_version_yaml(pipeline_id, version_id)
     playbook = loads_playbook(yaml_text)
-    if playbook_contains_shell_run(playbook) and form.get("acknowledge_shell_run") != "on":
+    allow_shell = form.get("allow_shell_execution") == "on"
+    if (
+        playbook_contains_shell_run(playbook)
+        and allow_shell
+        and form.get("acknowledge_shell_run") != "on"
+    ):
         registry = _registry(request)
         versions = ledger.list_versions(pipeline_id)
         sandbox_preview = _sandbox_root(request) / "preview"
@@ -263,12 +268,16 @@ async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse | H
                 "current_version": version_id,
                 "versions": versions,
                 "shell_warning": True,
+                "allow_shell_execution": True,
                 "ordinal_warnings": lab_ordinal_warnings(playbook),
                 "output_redirections": output_redirections,
                 "sample_dir": sample_dir_raw,
                 "glob": glob_pattern,
                 "max_samples": max_samples,
-                "error": "Acknowledge the shell.run warning before starting the lab session.",
+                "error": (
+                    "Acknowledge the shell.run danger callout before enabling real "
+                    "shell execution in the lab."
+                ),
                 "flash": None,
                 "flash_level": "info",
             },
@@ -289,6 +298,7 @@ async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse | H
             sandbox_root=sandbox_root,
             yaml_text=yaml_text,
             max_samples=max_samples,
+            allow_shell=allow_shell,
         )
     except (RunnerError, OSError) as exc:
         return _redirect(

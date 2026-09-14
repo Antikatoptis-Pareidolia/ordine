@@ -1,7 +1,7 @@
-"""SQLite engine factory, pragmas, and schema initialization.
+"""SQLite engine factory, pragmas, schema initialization, and migrations.
 
-Owns database connectivity and schema bootstrap. Must never contain business logic
-or import from executors/web/cli/llm.
+Owns database connectivity and schema bootstrap/upgrade. Must never contain
+business logic or import from executors/web/cli/llm.
 """
 
 from __future__ import annotations
@@ -9,13 +9,25 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from ordine.core.errors import SchemaVersionError
+from ordine.core.migrations import (
+    SCHEMA_VERSION,
+    apply_migrations,
+    get_user_version,
+    set_user_version,
+)
 from ordine.core.models import Base
 
-SCHEMA_VERSION = 1
+# Re-export so existing ``from ordine.core.db import SCHEMA_VERSION`` keeps working.
+__all__ = [
+    "SCHEMA_VERSION",
+    "create_engine_for",
+    "init_db",
+    "session_factory",
+]
 
 
 def _set_sqlite_pragmas(dbapi_connection: object, _connection_record: object) -> None:
@@ -36,19 +48,33 @@ def create_engine_for(path: Path) -> Engine:
 
 
 def init_db(engine: Engine) -> None:
-    """Create tables and verify or set the schema user_version."""
+    """Create tables and migrate ``user_version`` up to ``SCHEMA_VERSION``.
+
+    Fresh databases (``user_version == 0``) receive ``create_all`` then jump to
+    the latest version after applying any post-bootstrap migrations. Existing
+    databases apply each N→N+1 migration in order. Unsupported (newer) versions
+    hard-fail.
+    """
     with engine.connect() as conn:
-        current = conn.execute(text("PRAGMA user_version")).scalar_one()
-        if current not in (0, SCHEMA_VERSION):
+        current = get_user_version(conn)
+        if current > SCHEMA_VERSION:
             raise SchemaVersionError(
-                f"unsupported database schema version {current} (expected {SCHEMA_VERSION})"
+                f"unsupported database schema version {current} "
+                f"(expected 0..{SCHEMA_VERSION}; this build cannot open newer DBs)"
             )
+
     Base.metadata.create_all(engine)
-    with engine.connect() as conn:
-        current = conn.execute(text("PRAGMA user_version")).scalar_one()
+
+    with engine.begin() as conn:
+        current = get_user_version(conn)
         if current == 0:
-            conn.execute(text(f"PRAGMA user_version = {SCHEMA_VERSION}"))
-            conn.commit()
+            # Fresh install: apply migrations that add non-ORM artifacts, then stamp latest.
+            apply_migrations(conn, from_version=0, to_version=SCHEMA_VERSION)
+            set_user_version(conn, SCHEMA_VERSION)
+        elif current < SCHEMA_VERSION:
+            apply_migrations(conn, from_version=current, to_version=SCHEMA_VERSION)
+            set_user_version(conn, SCHEMA_VERSION)
+        # current == SCHEMA_VERSION: nothing to do
 
 
 def session_factory(engine: Engine) -> sessionmaker[Session]:

@@ -10,16 +10,17 @@ Treat playbook YAML like shell scripts: review triggers, destinations, and branc
 
 Ordine ships `shell.run`, which executes arbitrary shell commands **by design** (`subprocess.run(..., shell=True)` with `cwd` set to the step directory). Template placeholders in `cmd` (`{input}`, `{step_dir}`, `{ordinal}`, `{source}`) are supplied through subprocess environment variables and expanded as quoted data, so their contents are not reparsed as shell source. Commands that combine placeholders with heredocs are rejected because heredoc quoting follows different shell grammar; static heredocs remain available. Static command text remains fully trusted code. Stdout and stderr are always captured to `stdout.txt` / `stderr.txt` in the step directory for the task-detail view.
 
-**Environment inheritance:** the child process receives the operator's full environment (`os.environ`) plus placeholder values. API keys and other secrets present in the environment are visible to the command. Treat playbook `cmd` text accordingly.
+**Environment inheritance:** by default the child process receives the operator's full environment (`os.environ`) plus placeholder values. API keys and other secrets present in the environment are visible to the command. Opt in to `env_mode: allowlist` with `env_allowlist: [...]` on the step to pass only listed variables (plus Ordine placeholders). Treat playbook `cmd` text accordingly.
 
-There is no command sandbox in the dry-run lab — only declared output paths are redirected. Playbooks containing `shell.run` show a warning on the lab setup page and require an explicit acknowledgment before a lab session can start. Dashboard register and AI Approve similarly surface a danger callout (with a second confirm when Approve would save `shell.run`).
+**Lab / dry-run:** `shell.run` is **stubbed by default** (no subprocess). Pass CLI `--allow-shell` or enable “Allow real shell.run” in the lab UI (with the danger acknowledgment) to execute for real. Only declared output paths are redirected — there is still no command sandbox when execution is allowed. Dashboard register and AI Approve continue to surface a danger callout (with a second confirm when Approve would save `shell.run`).
 
 ## Web UI posture
 
 - **Default bind:** `127.0.0.1:8484` — localhost only (`web.bind`)
 - **Host allowlist:** `web.allowed_hosts` (separate from bind). Wildcards `0.0.0.0` / `::` are refused as allowlist entries — they are listen addresses, not Host names. CLI `--host` overrides bind only.
 - **No authentication** in 0.2 — anyone who can reach the port can control pipelines
-- Binding to a non-loopback address prints a CLI warning; do not expose without a reverse proxy and auth. Bind/port changes require restarting `ordine serve`; allowlist changes from Settings apply on save.
+- **Non-loopback bind is refused** unless `web.i_understand_no_auth = true` or `ordine serve --i-understand-no-auth` (recorded acknowledgment). Do not expose without a reverse proxy and auth. Bind/port changes require restarting `ordine serve`; allowlist changes from Settings apply on save.
+- **Single writer per DB:** `serve` / `run` take an exclusive lock; a second writer exits non-zero. `status` is read-only (no write lock).
 
 ### Current mitigations
 
@@ -29,7 +30,9 @@ There is no command sandbox in the dry-run lab — only declared output paths ar
 | POST Origin / Host guard | Blocks drive-by form posts from arbitrary websites |
 | HX-Request check | HTMX mutations require the HX header |
 | Artifact path canonicalization | Prevents `..` escapes when serving task files |
-| Shell trust UX | Lab / register / AI Approve require ack when `shell.run` is present |
+| Shell trust UX | Lab stubs `shell.run` by default; real execution needs allow-shell + ack; register / AI Approve still require ack |
+| Non-loopback bind ack | `i_understand_no_auth` config / CLI flag required to listen off-loopback |
+| Single-instance lock | Exclusive flock on `{db}.lock` for writers |
 
 See `src/ordine/web/security.py` and [web.md](web.md).
 

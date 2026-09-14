@@ -12,6 +12,10 @@
     · last ran {{ card.running_version_label or card.running_version }}
     {% endif %}
     · service <span class="chip chip-{{ card.service_status }}">{{ card.service_status }}</span>
+    {% if card.worker_alive is defined %}
+    · worker {% if card.worker_alive %}<span class="chip chip-running">alive</span>{% else %}<span class="chip">stopped</span>{% endif %}
+    {% if card.last_activity %}<span class="hint">last={{ card.last_activity }}</span>{% endif %}
+    {% endif %}
   </p>
   <p class="counts">
     {% for status, count in card.counts.items() if count > 0 %}

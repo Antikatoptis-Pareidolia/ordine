@@ -30,19 +30,20 @@ All human-readable output is **plain text by design** (fixed-width tables and si
 | `example [DIR]` | `DIR=~/ordine-demo` |
 | `check PLAYBOOK` | `--json=false` |
 | `run PLAYBOOK` | `--oneshot=false`, `--note=None`, `--json=false` |
-| `status` | `--json=false` |
 | `tasks PIPELINE` | `--status=None`, `--limit=100`, `--json=false` |
 | `task ID` | `--json=false` |
 | `retry ID` | `--json=false` |
 | `flags` | `--pipeline=None`, `--min-level=0`, `--json=false` |
 | `resolve-flag ID` | `--note TEXT` (required), `--json=false` |
 | `steps` | `--json=false` |
-| `dry-run PLAYBOOK` | `--sample DIR` (required), `--glob='*'`, `--json=false` |
+| `dry-run PLAYBOOK` | `--sample DIR` (required), `--glob='*'`, `--allow-shell=false`, `--json=false` |
 | `draft DESCRIPTION` | `--pipeline=None`, `--out=None` |
 | `diagnose TASK_ID` | `--json=false` |
+| `approve-branch TASK_ID` | `--apply=false`, `--yes=false`, `--json=false` |
 | `llm check` | `--json=false` |
 | `cleanup` | `--days` from config (default `30`), `--include-failed=false`, `--dry-run=false`, `--json=false` |
-| `serve` | `--host`/`--port` from config (defaults `127.0.0.1:8484`) |
+| `serve` | `--host`/`--port` from config (defaults `127.0.0.1:8484`), `--i-understand-no-auth=false` |
+| `status` | `--json=false` (includes `workers` heartbeats; does **not** take the write lock) |
 
 ### `ordine init [--config PATH]`
 

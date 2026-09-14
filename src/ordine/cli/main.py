@@ -20,18 +20,21 @@ import typer
 
 from ordine.cli import output
 from ordine.cli.example_scaffold import scaffold_example
-from ordine.core.config import AppConfig, load_config, write_default_config
+from ordine.core.config import AppConfig, is_loopback_bind, load_config, write_default_config
 from ordine.core.db import create_engine_for, init_db
-from ordine.core.dryrun import DryRunSession
+from ordine.core.dryrun import DryRunSession, playbook_contains_shell_run
 from ordine.core.engines import EngineRegistry
 from ordine.core.errors import (
     ConfigError,
     IllegalTransitionError,
+    InstanceLockError,
     LedgerError,
     PlaybookSyntaxError,
     PlaybookValidationError,
     RunnerError,
 )
+from ordine.core.heartbeat import pid_is_alive, read_heartbeats
+from ordine.core.instance_lock import InstanceLock
 from ordine.core.ledger import Ledger, PipelineSummary, TaskStatus, TaskView
 from ordine.core.playbook import (
     FolderWatchTrigger,
@@ -51,6 +54,7 @@ from ordine.core.triggers import (
 )
 from ordine.llm.client import build_client
 from ordine.llm.errors import LLMAuthError, LLMError, LLMNotConfiguredError
+from ordine.llm.features.branches import apply_branch, suggest_branch
 from ordine.llm.features.diagnosis import diagnose
 from ordine.llm.features.drafting import draft_playbook
 from ordine.llm.types import Message
@@ -99,6 +103,37 @@ def _open(config: AppConfig) -> tuple[Ledger, StepRegistry, EngineRegistry]:
     engine = create_engine_for(config.db_path)
     init_db(engine)
     return Ledger(engine), StepRegistry.load(), EngineRegistry.load()
+
+
+def _acquire_writer_lock(config: AppConfig) -> InstanceLock:
+    """Acquire the single-writer lock for serve/run; exit on contention."""
+    lock = InstanceLock(config.db_path)
+    try:
+        lock.acquire()
+    except InstanceLockError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    return lock
+
+
+def _refuse_non_loopback(bind_host: str, *, acknowledged: bool) -> None:
+    """Exit if binding off-loopback without an explicit no-auth acknowledgment."""
+    if is_loopback_bind(bind_host):
+        return
+    if acknowledged:
+        typer.echo(
+            "WARNING: binding to a non-local host with i_understand_no_auth — "
+            "anyone who can reach the port can control pipelines (no authentication).",
+            err=True,
+        )
+        return
+    typer.echo(
+        f"Refusing to bind {bind_host!r}: Ordine has no authentication. "
+        "Pass --i-understand-no-auth or set web.i_understand_no_auth = true in config "
+        "to acknowledge the risk. Prefer a reverse proxy with auth for non-local access.",
+        err=True,
+    )
+    raise typer.Exit(code=2)
 
 
 def _load_playbook_text(path: Path) -> tuple[Playbook, str]:
@@ -298,75 +333,82 @@ def run(
         typer.echo("internal error: missing CLI context", err=True)
         raise typer.Exit(code=2)
     config = ctx.obj.config
-    ledger, registry, engines = _open(config)
+    writer_lock = _acquire_writer_lock(config)
     try:
-        playbook, yaml_text = _load_playbook_text(playbook_path)
-    except (PlaybookSyntaxError, PlaybookValidationError, OSError) as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(code=2) from exc
-    problems = _check_playbook(playbook, registry)
-    if problems:
-        if as_json:
-            output.emit_json({"valid": False, "problems": problems})
-        else:
-            for problem in problems:
-                typer.echo(f"{problem['path']}: {problem['message']}", err=True)
-        raise typer.Exit(code=1)
-    try:
-        pipeline_id, version = _ensure_registered(ledger, playbook, yaml_text, note=note)
-        stale_after = timedelta(minutes=config.stale_after_minutes)
-        ledger.reconcile(pipeline_id, stale_after=stale_after, policy=config.reconcile_policy)
-        runner = _build_runner(
-            ledger, registry, engines, playbook, pipeline_id, version, config.workdir_root
-        )
-        if oneshot:
-            scanned = _scan_playbook(ledger, pipeline_id, playbook)
-            processed = runner.run_until_idle()
-            summary = {
-                "pipeline": playbook.name,
-                "version": version,
-                "scanned": scanned,
-                "processed": processed,
-            }
+        ledger, registry, engines = _open(config)
+        try:
+            playbook, yaml_text = _load_playbook_text(playbook_path)
+        except (PlaybookSyntaxError, PlaybookValidationError, OSError) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+        problems = _check_playbook(playbook, registry)
+        if problems:
             if as_json:
-                output.emit_json(summary)
+                output.emit_json({"valid": False, "problems": problems})
             else:
-                output.print_line(
-                    f"{playbook.name} ({version}): scanned {scanned}, processed {processed}"
+                for problem in problems:
+                    typer.echo(f"{problem['path']}: {problem['message']}", err=True)
+            raise typer.Exit(code=1)
+        try:
+            pipeline_id, version = _ensure_registered(ledger, playbook, yaml_text, note=note)
+            stale_after = timedelta(minutes=config.stale_after_minutes)
+            ledger.reconcile(pipeline_id, stale_after=stale_after, policy=config.reconcile_policy)
+            runner = _build_runner(
+                ledger, registry, engines, playbook, pipeline_id, version, config.workdir_root
+            )
+            if oneshot:
+                scanned = _scan_playbook(ledger, pipeline_id, playbook)
+                processed = runner.run_until_idle()
+                summary = {
+                    "pipeline": playbook.name,
+                    "version": version,
+                    "scanned": scanned,
+                    "processed": processed,
+                }
+                if as_json:
+                    output.emit_json(summary)
+                else:
+                    output.print_line(
+                        f"{playbook.name} ({version}): scanned {scanned}, processed {processed}"
+                    )
+                return
+            service = PipelineService(
+                ledger=ledger,
+                runner=runner,
+                playbook=playbook,
+                pipeline_id=pipeline_id,
+                stale_after=stale_after,
+                reconcile_policy=config.reconcile_policy,
+                db_path=config.db_path,
+            )
+            shutting_down = False
+            running = True
+
+            def _handle_signal(_signum: int, _frame: object) -> None:
+                nonlocal shutting_down, running
+                if shutting_down:
+                    raise SystemExit(130)
+                shutting_down = True
+                running = False
+                logger.info("shutdown requested; finishing in-flight task")
+                service.stop()
+
+            signal.signal(signal.SIGINT, _handle_signal)
+            signal.signal(signal.SIGTERM, _handle_signal)
+            service.start()
+            while running:
+                time.sleep(0.2)
+            if as_json:
+                output.emit_json(
+                    {"pipeline": playbook.name, "version": version, "status": "stopped"}
                 )
-            return
-        service = PipelineService(
-            ledger=ledger,
-            runner=runner,
-            playbook=playbook,
-            pipeline_id=pipeline_id,
-            stale_after=stale_after,
-            reconcile_policy=config.reconcile_policy,
-        )
-        shutting_down = False
-        running = True
-
-        def _handle_signal(_signum: int, _frame: object) -> None:
-            nonlocal shutting_down, running
-            if shutting_down:
-                raise SystemExit(130)
-            shutting_down = True
-            running = False
-            logger.info("shutdown requested; finishing in-flight task")
-            service.stop()
-
-        signal.signal(signal.SIGINT, _handle_signal)
-        signal.signal(signal.SIGTERM, _handle_signal)
-        service.start()
-        while running:
-            time.sleep(0.2)
-        if as_json:
-            output.emit_json({"pipeline": playbook.name, "version": version, "status": "stopped"})
-        else:
-            output.print_line(f"stopped {playbook.name} ({version})")
-    except (RunnerError, LedgerError) as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(code=2) from exc
+            else:
+                output.print_line(f"stopped {playbook.name} ({version})")
+        except (RunnerError, LedgerError) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+    finally:
+        writer_lock.release()
 
 
 @app.command()
@@ -385,6 +427,18 @@ def status(
         flags = ledger.list_open_flags(pipeline_id=summary.id)
         max_level = max((flag.level for flag in flags), default=0)
         summaries.append((summary, counts, len(flags), max_level))
+    heartbeats = read_heartbeats(ctx.obj.config.db_path)
+    workers = [
+        {
+            "pipeline_id": hb.pipeline_id,
+            "pipeline_name": hb.pipeline_name,
+            "pid": hb.pid,
+            "alive": hb.alive and pid_is_alive(hb.pid),
+            "stop_failed": hb.stop_failed,
+            "last_activity": hb.last_activity.isoformat(),
+        }
+        for hb in heartbeats
+    ]
     if as_json:
         output.emit_json(
             {
@@ -397,7 +451,8 @@ def status(
                         "max_flag_level": max_level,
                     }
                     for summary, counts, open_flags, max_level in summaries
-                ]
+                ],
+                "workers": workers,
             }
         )
         return
@@ -409,6 +464,13 @@ def status(
         output.print_line(
             f"{summary.name} {summary.current_version or '-'} "
             f"{count_text} flags={open_flags} max_level={max_level}"
+        )
+    for worker in workers:
+        alive = "alive" if worker["alive"] else "stale"
+        output.print_line(
+            f"worker pipeline={worker['pipeline_name'] or worker['pipeline_id']} "
+            f"pid={worker['pid']} {alive} stop_failed={worker['stop_failed']} "
+            f"last={worker['last_activity']}"
         )
 
 
@@ -690,6 +752,13 @@ def dry_run(
         typer.Option("--sample", exists=True, file_okay=False, dir_okay=True, readable=True),
     ],
     glob: Annotated[str, typer.Option("--glob", help="Sample filename glob")] = "*",
+    allow_shell: Annotated[
+        bool,
+        typer.Option(
+            "--allow-shell",
+            help="Execute shell.run for real (default: stub / no-op in dry-run)",
+        ),
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON report to stdout")] = False,
 ) -> None:
     """Run a sandboxed dry-run rehearsal; never touches the production ledger."""
@@ -713,6 +782,11 @@ def dry_run(
     registry = StepRegistry.load()
     engines = EngineRegistry.load()
     sandbox_parent = Path(tempfile.mkdtemp(prefix="ordine-dry-run-"))
+    if playbook_contains_shell_run(playbook) and not allow_shell:
+        typer.echo(
+            "NOTE: shell.run will be stubbed; pass --allow-shell to execute commands.",
+            err=True,
+        )
     session = DryRunSession.create(
         playbook=playbook,
         version_public_id="cli-dry-run",
@@ -722,6 +796,7 @@ def dry_run(
         engines=engines,
         sandbox_root=sandbox_parent,
         yaml_text=yaml_text,
+        allow_shell=allow_shell,
     )
     try:
         session.run_all()
@@ -891,6 +966,101 @@ def diagnose_cmd(
     raise typer.Exit(code=0)
 
 
+@app.command("approve-branch")
+def approve_branch_cmd(
+    ctx: typer.Context,
+    task_id: int,
+    apply: Annotated[
+        bool,
+        typer.Option("--apply", help="Apply the suggestion as a new current version"),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", help="Skip interactive confirm when applying"),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON to stdout")] = False,
+) -> None:
+    """Suggest (and optionally apply) an AI recovery branch for a task.
+
+    Parity with the web AI Approve flow: suggest_branch then apply_branch.
+    """
+    if not isinstance(ctx.obj, AppContext):
+        typer.echo("internal error: missing CLI context", err=True)
+        raise typer.Exit(code=2)
+    config = ctx.obj.config
+    ledger, registry, _engines = _open(config)
+    try:
+        client = build_client(config)
+    except LLMNotConfiguredError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    try:
+        suggestion = suggest_branch(client, registry, ledger, task_id, config.workdir_root)
+    except (LLMError, LedgerError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    shell_risk = bool(
+        suggestion.new_playbook is not None and playbook_contains_shell_run(suggestion.new_playbook)
+    )
+    payload = {
+        "task_id": task_id,
+        "branch": suggestion.branch.name,
+        "rationale": suggestion.rationale,
+        "target_step_index": suggestion.target_step_index,
+        "problems": [{"path": p.path, "message": p.message} for p in suggestion.problems],
+        "diff": suggestion.diff,
+        "valid": suggestion.new_playbook is not None,
+        "shell_run": shell_risk,
+        "applied": False,
+        "version": None,
+    }
+    if not apply:
+        if as_json:
+            output.emit_json(payload)
+        else:
+            typer.echo(f"branch: {suggestion.branch.name}")
+            typer.echo(f"rationale: {suggestion.rationale}")
+            if suggestion.problems:
+                for problem in suggestion.problems:
+                    typer.echo(f"problem: {problem.path}: {problem.message}", err=True)
+            else:
+                typer.echo(suggestion.diff or "(no diff)")
+            if shell_risk:
+                typer.echo("WARNING: suggested playbook includes shell.run", err=True)
+            typer.echo("Re-run with --apply [--yes] to register as current version.", err=True)
+        raise typer.Exit(code=0 if suggestion.new_playbook is not None else 1)
+
+    if suggestion.new_playbook is None:
+        typer.echo("cannot apply invalid branch suggestion", err=True)
+        raise typer.Exit(code=1)
+
+    if shell_risk and not yes:
+        typer.echo(
+            "Suggested branch includes shell.run; pass --yes to confirm apply.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    if not yes:
+        typer.echo("Pass --yes to apply the suggested branch without a TTY confirm.", err=True)
+        raise typer.Exit(code=1)
+
+    task = ledger.get_task(task_id)
+    note = f"AI branch: {suggestion.branch.name}"
+    try:
+        version = apply_branch(ledger, task.pipeline_id, suggestion, note=note)
+    except (ValueError, LedgerError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    payload["applied"] = True
+    payload["version"] = version
+    if as_json:
+        output.emit_json(payload)
+    else:
+        typer.echo(f"approved {suggestion.branch.name} as {version}")
+    raise typer.Exit(code=0)
+
+
 @app.command()
 def cleanup(
     ctx: typer.Context,
@@ -972,6 +1142,13 @@ def serve(
         ),
     ] = None,
     port: Annotated[int | None, typer.Option("--port", help="Bind port")] = None,
+    i_understand_no_auth: Annotated[
+        bool,
+        typer.Option(
+            "--i-understand-no-auth",
+            help="Acknowledge binding off-loopback with no authentication",
+        ),
+    ] = False,
 ) -> None:
     """Start the web UI and pipeline service manager."""
     import uvicorn
@@ -982,31 +1159,33 @@ def serve(
         typer.echo("internal error: missing CLI context", err=True)
         raise typer.Exit(code=2)
     config = ctx.obj.config
+    writer_lock = _acquire_writer_lock(config)
     # --host/--port override the listen address only; Host allowlisting stays in config.
     bind_host = host if host is not None else config.web_bind
     bind_port = port if port is not None else config.web_port
-    if bind_host not in ("127.0.0.1", "localhost", "::1"):
-        typer.echo(
-            "WARNING: binding to a non-local host without authentication — "
-            "anyone on the network can control pipelines. "
-            "Host allowlisting uses web.allowed_hosts (not this bind override).",
-            err=True,
-        )
-    if config.retention_on_serve_start:
-        typer.echo(
-            "NOTE: retention cleanup runs at web startup when retention.on_serve_start is true.",
-            err=True,
-        )
-    app = create_app(config)
     try:
-        uvicorn.run(app, host=bind_host, port=bind_port, log_level="info")
-    except SystemExit as exc:
-        if exc.code:
+        _refuse_non_loopback(
+            bind_host,
+            acknowledged=i_understand_no_auth or config.i_understand_no_auth,
+        )
+        if config.retention_on_serve_start:
             typer.echo(
-                f"Could not bind {bind_host}:{bind_port}; try ordine serve --port PORT.",
+                "NOTE: retention cleanup runs at web startup when "
+                "retention.on_serve_start is true.",
                 err=True,
             )
-        raise typer.Exit(code=int(exc.code or 0)) from exc
+        app = create_app(config)
+        try:
+            uvicorn.run(app, host=bind_host, port=bind_port, log_level="info")
+        except SystemExit as exc:
+            if exc.code:
+                typer.echo(
+                    f"Could not bind {bind_host}:{bind_port}; try ordine serve --port PORT.",
+                    err=True,
+                )
+            raise typer.Exit(code=int(exc.code or 0)) from exc
+    finally:
+        writer_lock.release()
 
 
 def main() -> None:

@@ -501,3 +501,250 @@ def test_folder_watch_100_files_with_restart(tmp_path: Path) -> None:
     refs = {Path(t.source_ref).name for t in tasks}
     assert ".hidden.png" not in refs
     assert ".tmp-decoy" not in refs
+
+
+def test_should_ignore_directory_and_hidden(tmp_path: Path) -> None:
+    from ordine.core.triggers import should_ignore
+
+    directory = tmp_path / "subdir"
+    directory.mkdir()
+    assert should_ignore(directory) is True
+    visible = tmp_path / "ok.png"
+    visible.write_bytes(b"x")
+    assert should_ignore(visible) is False
+    hidden = tmp_path / ".secret.png"
+    hidden.write_bytes(b"x")
+    assert should_ignore(hidden) is True
+
+
+def test_extract_ordinal_none_regex_and_nondigit_group() -> None:
+    assert extract_ordinal("anything.png", None) is None
+    # Match succeeds but capture group is non-digit -> None (isdigit branch).
+    assert extract_ordinal("img_abc.png", r"img_(.+)\.png") is None
+
+
+def test_ordinal_for_trigger_regex_arrival_and_none() -> None:
+    from ordine.core.triggers import ordinal_for_trigger
+
+    with_regex = ManualTrigger(
+        type="manual", path="/tmp", glob="*", ordinal_regex=r"img_(\d+)\.png"
+    )
+    assert ordinal_for_trigger("img_0009.png", with_regex, arrival_index=0) == 9
+    arrival = FolderWatchTrigger(
+        type="folder_watch",
+        path="/tmp",
+        glob="*",
+        settle_seconds=0.1,
+        arrival_order_ordinals=True,
+    )
+    assert ordinal_for_trigger("a.png", arrival, arrival_index=2) == 3
+    plain = ManualTrigger(type="manual", path="/tmp", glob="*")
+    assert ordinal_for_trigger("a.png", plain, arrival_index=0) is None
+
+
+def test_scan_directory_missing_path_and_unmatched_ordinal(tmp_path: Path) -> None:
+    from ordine.core.triggers import scan_directory
+
+    missing = tmp_path / "no-such-dir"
+    assert scan_directory(missing, "*", "filename", None, lambda c: 1) == 0
+
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    (watch / "photo.png").write_bytes(b"x")
+    emitted: list[TaskCandidate] = []
+
+    def capture(candidate: TaskCandidate) -> int | None:
+        emitted.append(candidate)
+        return 1
+
+    count = scan_directory(
+        watch, "*.png", "filename", r"img_(\d+)\.png", capture, settle_seconds=0.0
+    )
+    assert count == 0
+    assert emitted == []
+
+
+def test_build_trigger_service_error_paths(tmp_path: Path, ledger: Ledger) -> None:
+    from ordine.core.errors import TriggerError
+
+    manual = ManualTrigger(type="manual", path=str(tmp_path), glob="*")
+    with pytest.raises(TriggerError, match="sink is required"):
+        build_trigger_service(manual, "none")
+
+    manifest = ManifestTrigger(type="manifest", path=str(tmp_path / "m.csv"))
+    with pytest.raises(TriggerError, match="requires ledger and pipeline_id"):
+        build_trigger_service(manifest, "none")
+
+    class _Unsupported:
+        pass
+
+    with pytest.raises(TriggerError, match="unsupported trigger type"):
+        build_trigger_service(_Unsupported(), "none", sink=lambda c: None)  # type: ignore[arg-type]
+
+
+def test_folder_watch_start_stop_idempotent(tmp_path: Path, ledger: Ledger) -> None:
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    sink = ledger_sink(ledger, pipeline_id)
+    spec = FolderWatchTrigger(type="folder_watch", path=str(watch), glob="*", settle_seconds=0.1)
+    service = FolderWatchService(spec, "filename", sink, poll_interval=0.05, enable_poller=False)
+    service.stop()  # not started
+    service.start()
+    service.start()  # already started
+    service.stop()
+    service.stop()  # idempotent
+
+
+def test_watch_handler_on_moved_and_bytes_path(tmp_path: Path, ledger: Ledger) -> None:
+    from ordine.core.triggers import _WatchHandler
+
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    sink = ledger_sink(ledger, pipeline_id)
+    spec = FolderWatchTrigger(
+        type="folder_watch", path=str(watch), glob="*.bin", settle_seconds=0.05
+    )
+    service = FolderWatchService(spec, "filename", sink, poll_interval=0.05, enable_poller=False)
+    handler = _WatchHandler(service)
+
+    src = watch / "old.bin"
+    dest = watch / "new.bin"
+    src.write_bytes(b"payload")
+    dest.write_bytes(b"payload")
+
+    class _Evt:
+        def __init__(self, src_path, dest_path=None):
+            self.src_path = src_path
+            self.dest_path = dest_path
+
+    # bytes path exercises _as_path decode branch
+    handler.on_created(_Evt(str(src).encode()))
+    assert src.resolve() in service._settle
+
+    handler.on_moved(_Evt(str(src), str(dest)))
+    assert src.resolve() not in service._settle
+    assert dest.resolve() in service._settle
+
+    handler.on_modified(_Evt(None))  # ignored None path
+
+
+def test_manifest_sink_skips_incomplete_and_oob_ordinal(tmp_path: Path, ledger: Ledger) -> None:
+    from ordine.core.triggers import manifest_sink
+
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name,prompt\na.png,one\n", encoding="utf-8")
+    pipeline_id = _register_pipeline(ledger)
+    sink = manifest_sink(ledger, pipeline_id, manifest)
+
+    assert sink(TaskCandidate(source_ref="x", dedup_key=None, ordinal=1)) is None
+    assert sink(TaskCandidate(source_ref="x", dedup_key="k", ordinal=None)) is None
+    assert sink(TaskCandidate(source_ref="x", dedup_key="k", ordinal=99)) is None
+
+
+def test_manifest_sink_missing_path_stat(tmp_path: Path, ledger: Ledger) -> None:
+    from ordine.core.triggers import manifest_sink
+
+    missing = tmp_path / "gone.csv"
+    pipeline_id = _register_pipeline(ledger)
+    sink = manifest_sink(ledger, pipeline_id, missing)
+    # OSError on stat -> mtime -1; load_manifest fails -> ManifestError path
+    assert sink(TaskCandidate(source_ref="x", dedup_key="k", ordinal=1)) is None
+
+
+def test_build_candidate_unreadable_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import logging
+
+    from ordine.core.triggers import _build_candidate
+
+    path = tmp_path / "gone.bin"
+    path.write_bytes(b"x")
+
+    def boom(*_a, **_k):
+        raise OSError("unreadable")
+
+    monkeypatch.setattr(
+        "ordine.core.triggers.compute_dedup_key",
+        boom,
+    )
+    assert _build_candidate(path, "filename", None, log=logging.getLogger("t")) is None
+
+
+def test_poller_stops_after_repeated_crashes(
+    tmp_path: Path, ledger: Ledger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import ordine.core.triggers as triggers_mod
+
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    sink = ledger_sink(ledger, pipeline_id)
+    spec = FolderWatchTrigger(type="folder_watch", path=str(watch), glob="*", settle_seconds=0.05)
+    monkeypatch.setattr(triggers_mod, "_MAX_POLLER_CRASHES", 2)
+    service = FolderWatchService(spec, "filename", sink, poll_interval=0.01)
+
+    def boom() -> None:
+        raise RuntimeError("poll boom")
+
+    stopped: list[bool] = []
+
+    def fake_stop() -> None:
+        stopped.append(True)
+        service._stop.set()
+        service._started = False
+
+    monkeypatch.setattr(service, "_poll_once", boom)
+    monkeypatch.setattr(service, "stop", fake_stop)
+    service._started = True
+    service._poller_loop()
+    assert stopped == [True]
+    assert service._poller_crashes >= 2
+
+
+def test_manifest_service_start_stop_idempotent(tmp_path: Path, ledger: Ledger) -> None:
+    manifest = tmp_path / "assets.csv"
+    manifest.write_text("name,prompt\na.png,one\n", encoding="utf-8")
+    pipeline_id = _register_pipeline(ledger)
+    service = build_trigger_service(
+        ManifestTrigger(type="manifest", path=str(manifest), poll_seconds=0),
+        "none",
+        ledger=ledger,
+        pipeline_id=pipeline_id,
+    )
+    assert isinstance(service, ManifestTriggerService)
+    service.stop()
+    service.start()
+    service.start()
+    service.stop()
+    service.stop()
+
+
+def test_rescan_skips_ignored_dotfiles(tmp_path: Path, ledger: Ledger) -> None:
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    (watch / "ok.png").write_bytes(b"x")
+    (watch / ".hidden.png").write_bytes(b"x")
+    pipeline_id = _register_pipeline(ledger)
+    sink = ledger_sink(ledger, pipeline_id)
+    spec = FolderWatchTrigger(type="folder_watch", path=str(watch), glob="*", settle_seconds=0.1)
+    service = FolderWatchService(spec, "filename", sink, poll_interval=0.05, enable_poller=False)
+    seeded = service.rescan()
+    assert seeded == 1
+    assert any(p.name == "ok.png" for p in service._settle)
+    assert all(not p.name.startswith(".") for p in service._settle)
+
+
+def test_drain_timeout_clears_started_flag(tmp_path: Path, ledger: Ledger) -> None:
+    watch = tmp_path / "watch"
+    watch.mkdir()
+    pipeline_id = _register_pipeline(ledger)
+    sink = ledger_sink(ledger, pipeline_id)
+    spec = FolderWatchTrigger(type="folder_watch", path=str(watch), glob="*", settle_seconds=5.0)
+    service = FolderWatchService(spec, "filename", sink, poll_interval=0.05, enable_poller=False)
+    service._started = True
+    target = watch / "slow.bin"
+    target.write_bytes(b"x")
+    service._note_path(target)
+    service.drain(timeout=0.15)
+    assert service._started is False

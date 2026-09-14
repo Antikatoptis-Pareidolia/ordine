@@ -46,7 +46,7 @@ def test_db_smoke_init(tmp_path: Path) -> None:
     init_db(engine)
     with engine.connect() as conn:
         version = conn.execute(text("PRAGMA user_version")).scalar_one()
-        assert version == 1
+        assert version == 2
         journal = conn.execute(text("PRAGMA journal_mode")).scalar_one()
         assert str(journal).lower() == "wal"
 

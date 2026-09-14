@@ -41,6 +41,7 @@ jobs:
         run: |
           uv run pytest -m "not llm_live" --cov-report=term-missing --cov-report=json:coverage.json
           uv run python scripts/check_core_coverage.py coverage.json
+          uv run python scripts/check_secondary_coverage.py coverage.json
 
       - name: Assert tag matches package version
         run: |

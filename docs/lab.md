@@ -57,11 +57,13 @@ When the rehearsed version is ready for production, open **History** (`/pipeline
 ## CLI
 
 ```bash
-ordine dry-run PLAYBOOK --sample ./samples [--glob '*'] [--json]
+ordine dry-run PLAYBOOK --sample ./samples [--glob '*'] [--allow-shell] [--json]
 ```
 
 Runs `run_all()` in a temp sandbox, prints a table or JSON `report()`, then closes. Exit `0` means all ok; `1` means a rehearsed step failed/skipped; `2` means CLI usage, sample-directory validation, unreadable/invalid playbook YAML, or static step/engine validation failed. Never touches the production database.
 
-## shell.run warning
+## shell.run stub (default)
 
-Playbooks containing `shell.run` show a loud warning on the lab setup page and require an explicit checkbox acknowledgment before the session can start. Dry-run still executes those commands for real — only output paths are redirected, not command execution.
+Playbooks containing `shell.run` show a warning on the lab setup page. **By default the lab stubs those steps** (no subprocess; a `shell_stubbed.txt` note is written). To execute for real, check **Allow real shell.run** and the danger acknowledgment.
+
+CLI dry-run mirrors this: stub by default, `--allow-shell` to execute. Only output paths are redirected — there is still no command sandbox when execution is allowed.

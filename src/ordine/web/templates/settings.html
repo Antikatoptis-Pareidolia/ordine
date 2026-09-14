@@ -39,6 +39,8 @@
     <label for="web_port">port</label>
     <input id="web_port" name="web_port" type="number" min="1" max="65535" value="{{ config.web_port }}" required />
     <label><input type="checkbox" name="autostart_pipelines"{% if config.autostart_pipelines %} checked{% endif %} /> autostart_pipelines</label>
+    <label><input type="checkbox" name="i_understand_no_auth"{% if config.i_understand_no_auth %} checked{% endif %} /> i_understand_no_auth (required to bind non-loopback — Ordine has no auth)</label>
+    <p class="hint">Non-loopback binds are refused unless this flag is set. Anyone who can reach the port can control pipelines.</p>
   </section>
   <section aria-labelledby="llm-heading">
     <h2 id="llm-heading">LLM</h2>
