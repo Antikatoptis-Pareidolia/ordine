@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
 ### Added
 
 - Schema migration framework with SQLite `user_version` N→N+1 runner; trivial `1→2` meta-table migration; fresh installs stamp latest (A2).
@@ -29,10 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `PipelineService.stop()` no longer drops a live worker thread after the join timeout; ServiceManager surfaces `degraded` / `stop_failed` instead of claiming a clean pause (A1).
-
-### Notes
-
-- Package version remains `0.2.2` in this PR; the `0.3.0` bump is left for release.
 
 ### Changed (Phase 1 carry-forward)
 
