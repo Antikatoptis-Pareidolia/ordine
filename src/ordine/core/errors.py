@@ -113,3 +113,7 @@ class RunnerError(OrdineError):
 
 class ConfigError(OrdineError):
     """Raised when application configuration is invalid or conflicts."""
+
+
+class InstanceLockError(OrdineError):
+    """Raised when another process already holds the single-writer DB lock."""

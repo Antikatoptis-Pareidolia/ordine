@@ -70,7 +70,8 @@ Logs: `journalctl --user -u ordine -f`
 
 Optional retention at startup: set `on_serve_start = true` under `[retention]` in config.
 
-The packaged unit assumes **localhost-first**: `ordine serve` binds `127.0.0.1` by default and there is no authentication. Do not expose the port on a non-loopback interface without a reverse proxy and auth. Optional `Protect*` hardening can be added as a drop-in — see comments in `packaging/ordine.service`.
+The packaged unit assumes **localhost-first**: `ordine serve` binds `127.0.0.1` by default and there is no authentication. Non-loopback binds are **refused** unless you set `web.i_understand_no_auth = true` or pass `--i-understand-no-auth`. Do not expose the port without a reverse proxy and auth. Optional `Protect*` hardening can be added as a drop-in — see comments in `packaging/ordine.service`.
+Only one `serve`/`run` writer may own a given database (advisory lock); `ordine status` remains read-only.
 
 
 ## Dependency notes

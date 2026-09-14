@@ -149,6 +149,7 @@ class ServiceManager:
             pipeline_id=pipeline_id,
             stale_after=stale_after,
             reconcile_policy=self._config.reconcile_policy,
+            db_path=self._config.db_path,
         )
         service.start()
         with self._lock:
@@ -207,6 +208,24 @@ class ServiceManager:
                     pipeline_id,
                 )
             runtime.action_pending = None
+
+    def worker_snapshot(self, pipeline_id: int) -> dict[str, object]:
+        """Return worker alive / last_activity for dashboard and status."""
+        with self._lock:
+            runtime = self.runtime(pipeline_id)
+            service = runtime._service
+            if service is None:
+                return {
+                    "worker_alive": False,
+                    "last_activity": None,
+                    "stop_failed": runtime.status == "degraded",
+                }
+            activity = service.last_activity
+            return {
+                "worker_alive": service.worker_alive,
+                "last_activity": None if activity is None else activity.isoformat(),
+                "stop_failed": service.stop_failed,
+            }
 
     def action_pending_label(self, pipeline_id: int) -> ActionPending | None:
         """Return a pending action label until runtime status confirms the transition."""

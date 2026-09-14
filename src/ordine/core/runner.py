@@ -16,6 +16,7 @@ from typing import Any, Literal, cast
 
 from ordine.core.engines import EngineRegistry
 from ordine.core.errors import RunnerError
+from ordine.core.heartbeat import clear_heartbeat, write_heartbeat
 from ordine.core.ledger import Ledger, TaskStatus, TaskView
 from ordine.core.naming import LedgerNamingService
 from ordine.core.playbook import ManifestTrigger, Playbook, StepSpec
@@ -351,6 +352,7 @@ class PipelineService:
         stale_after: timedelta = timedelta(minutes=15),
         reconcile_policy: Literal["retry", "fail"] = "retry",
         stop_join_timeout: float = 120.0,
+        db_path: Path | None = None,
     ) -> None:
         self._ledger = ledger
         self._runner = runner
@@ -359,11 +361,13 @@ class PipelineService:
         self._stale_after = stale_after
         self._reconcile_policy = reconcile_policy
         self._stop_join_timeout = stop_join_timeout
+        self._db_path = db_path
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._trigger: FolderWatchService | ManualScanService | ManifestTriggerService | None = None
         self._started = False
         self._stop_failed = False
+        self._last_activity: datetime | None = None
 
     def start(self) -> None:
         """Reconcile stale tasks, start the trigger, and begin the worker loop."""
@@ -402,6 +406,7 @@ class PipelineService:
             target=self._worker_loop, name="pipeline-worker", daemon=True
         )
         self._worker.start()
+        self._touch_heartbeat(alive=True)
 
     def stop(self) -> bool:
         """Stop gracefully after the in-flight task completes.
@@ -426,6 +431,7 @@ class PipelineService:
                 )
                 if isinstance(self._trigger, (FolderWatchService, ManifestTriggerService)):
                     self._trigger.stop()
+                self._touch_heartbeat(alive=True, stop_failed=True)
                 # Keep _worker and _started so we never claim a clean stop.
                 return False
             self._worker = None
@@ -434,6 +440,8 @@ class PipelineService:
         self._trigger = None
         self._started = False
         self._stop_failed = False
+        if self._db_path is not None:
+            clear_heartbeat(self._db_path, self._pipeline_id)
         return True
 
     @property
@@ -446,6 +454,27 @@ class PipelineService:
         """True when the pipeline worker thread is still running."""
         return self._worker is not None and self._worker.is_alive()
 
+    @property
+    def last_activity(self) -> datetime | None:
+        """UTC timestamp of the last worker loop activity, if any."""
+        return self._last_activity
+
+    def _touch_heartbeat(self, *, alive: bool, stop_failed: bool = False) -> None:
+        self._last_activity = datetime.now(tz=UTC)
+        if self._db_path is None:
+            return
+        try:
+            write_heartbeat(
+                self._db_path,
+                pipeline_id=self._pipeline_id,
+                pipeline_name=self._playbook.name,
+                alive=alive,
+                last_activity=self._last_activity,
+                stop_failed=stop_failed,
+            )
+        except OSError:
+            logger.debug("heartbeat write failed", exc_info=True)
+
     def _worker_loop(self) -> None:
         while not self._stop.is_set():
             try:
@@ -453,5 +482,6 @@ class PipelineService:
             except Exception:
                 logger.exception("unexpected worker error")
                 status = None
+            self._touch_heartbeat(alive=True, stop_failed=self._stop_failed)
             if status is None and not self._stop.is_set():
                 self._stop.wait(0.5)

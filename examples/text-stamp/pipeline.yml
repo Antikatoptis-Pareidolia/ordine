@@ -1,0 +1,14 @@
+version: 1
+name: text-stamp
+description: Non-image example — stamp markdown samples and publish via manifest (no shell.run)
+trigger:
+  type: manual
+  path: examples/text-stamp/samples
+  glob: "*.md"
+  ordinal_regex: 'doc_(\d+)\.md'
+steps:
+  - util.copy
+  - file.rename_from_manifest:
+      manifest: examples/text-stamp/manifest.csv
+  - file.move:
+      dest: examples/text-stamp/publish

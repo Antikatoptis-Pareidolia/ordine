@@ -82,6 +82,7 @@ def pipeline_cards(request: Request) -> list[dict[str, Any]]:
                 "max_flag_level": max_level,
                 "start_problems": runtime.start_problems,
                 "start_error": runtime.start_error,
+                **services.worker_snapshot(summary.id),
             }
         )
     return cards

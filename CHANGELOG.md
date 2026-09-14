@@ -7,24 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Schema migration framework with SQLite `user_version` N→N+1 runner; trivial `1→2` meta-table migration; fresh installs stamp latest (A2).
+- Single-writer advisory lock (`{db}.lock`) for `serve` / `run`; second writer exits non-zero. `status` stays read-only (S13).
+- Hard refuse for non-loopback bind unless `web.i_understand_no_auth` or `--i-understand-no-auth` (S1).
+- Lab / `dry-run` stub `shell.run` by default; `--allow-shell` / lab allow-shell + ack for real execution (S5).
+- Optional `shell.run` `env_mode: allowlist` + `env_allowlist` to avoid full `os.environ` inheritance (S4).
+- Worker alive / last activity heartbeats in `ordine status --json` (`workers`) and dashboard chips (A6).
+- CLI `approve-branch` parity with web AI Approve (`--apply` / `--yes`) (A7).
+- Secondary coverage floors for `web/security.py` and `shell.py` (B3).
+- Python 3.13 on the CI test matrix (B4).
+- Examples: `examples/text-stamp/` (non-image) and `examples/shell-caution/` (annotated `shell.run`) (D2).
+- Layer boundary test: `core` must not import `executors` / `llm` / `web` / `cli` (D3).
+
+### Changed
+
+- Lab shell trust UX: default is stub (stronger than Phase 1 ack-only); enabling real shell still requires acknowledgment (S5).
+- `docs/upgrade.md` documents migrations, single-writer lock, and non-loopback ack (A2/S13/S1).
+
 ### Fixed
 
 - `PipelineService.stop()` no longer drops a live worker thread after the join timeout; ServiceManager surfaces `degraded` / `stop_failed` instead of claiming a clean pause (A1).
 
-### Changed
+### Notes
+
+- Package version remains `0.2.2` in this PR; the `0.3.0` bump is left for release.
+
+### Changed (Phase 1 carry-forward)
 
 - Split `web.bind` (listen address) from `web.allowed_hosts` (HTTP Host allowlist). Settings refuses wildcard allowlist entries; bind/port changes flash a restart-required notice. CLI `--host` is bind-only (S2/A3).
 - Lab start, dashboard register, and AI Approve require explicit acknowledgment when playbooks include `shell.run`; AI Approve shows a danger callout and second confirm (S5/S6/S7/D5).
 - Release workflow now runs the same core coverage gate as CI (`coverage.json` + `check_core_coverage.py`) (B2).
 
-### Added
+### Added (Phase 1 carry-forward)
 
 - `docs/upgrade.md` covering DB/workdir backup, schema mismatch symptoms, and pipx/deb upgrade (D1).
 - Systemd unit comments and install notes documenting localhost-first assumptions plus optional `Protect*` drop-in example (S12/B5).
 
 ### Documentation
 
-- Security docs clarify `shell.run` env inheritance, plugins-as-code, and preferring keyring over plaintext `.env` (S4/S9/S10).
+- Security docs clarify `shell.run` env inheritance / allowlist, plugins-as-code, non-loopback bind policy, and preferring keyring over plaintext `.env` (S1/S4/S9/S10).
 - Release checklist no longer treats the historical 0.1.0 naming gate as a blocker (D4).
 
 ## [0.2.2] - 2026-08-19

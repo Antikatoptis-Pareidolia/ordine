@@ -1,0 +1,19 @@
+version: 1
+name: shell-caution
+description: CAUTION example — shell.run executes arbitrary commands; prefer env_mode allowlist
+trigger:
+  type: manual
+  path: examples/shell-caution/samples
+  glob: "*.txt"
+  ordinal_regex: 'item_(\d+)\.txt'
+steps:
+  # CAUTION: shell.run is arbitrary code. Review cmd before serve/run.
+  # Prefer env_mode: allowlist so secrets in the operator environment are not inherited.
+  - id: shell.run
+    params:
+      cmd: 'printf "stamped:%s\n" "$(cat "{input}")" > "{step_dir}/out.txt"'
+      output: out.txt
+      env_mode: allowlist
+      env_allowlist: ["PATH", "HOME"]
+  - file.move:
+      dest: examples/shell-caution/publish

@@ -10,6 +10,7 @@ import logging
 import shutil
 import sqlite3
 import uuid
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from pathlib import Path
@@ -25,6 +26,7 @@ from ordine.core.ledger import Ledger, TaskView
 from ordine.core.playbook import FailurePolicy, Playbook, RecoveryBranch, StepSpec
 from ordine.core.registry import StepRegistry
 from ordine.core.runner import execute_step_sequence, failure_policy_groups
+from ordine.core.shell_policy import shell_mode
 from ordine.core.steps import StepResult
 from ordine.core.triggers import ordinal_for_trigger
 from ordine.core.workdir import TaskWorkdir
@@ -276,6 +278,7 @@ class DryRunSession:
         glob_pattern: str,
         yaml_text: str,
         session_id: str,
+        allow_shell: bool = False,
     ) -> None:
         problems = registry.check_playbook(playbook)
         if problems:
@@ -299,6 +302,7 @@ class DryRunSession:
         self._glob_pattern = glob_pattern
         self._yaml_text = yaml_text
         self._session_id = session_id
+        self._allow_shell = allow_shell
         self._closed = False
 
     @property
@@ -321,6 +325,15 @@ class DryRunSession:
     def output_redirections(self) -> list[tuple[str, str]]:
         return list(self._output_redirections)
 
+    @property
+    def allow_shell(self) -> bool:
+        """True when shell.run executes for real in this lab/dry-run session."""
+        return self._allow_shell
+
+    def _shell_cm(self) -> AbstractContextManager[None]:
+        """Context manager: stub shell.run unless allow_shell was requested."""
+        return shell_mode("execute" if self._allow_shell else "stub")
+
     @classmethod
     def create(
         cls,
@@ -334,6 +347,7 @@ class DryRunSession:
         sandbox_root: Path,
         yaml_text: str,
         max_samples: int = 20,
+        allow_shell: bool = False,
     ) -> DryRunSession:
         """Copy samples into a fresh sandbox and register an ephemeral ledger pipeline."""
         session_id = uuid.uuid4().hex[:8]
@@ -401,6 +415,7 @@ class DryRunSession:
             glob_pattern=glob,
             yaml_text=yaml_text,
             session_id=session_id,
+            allow_shell=allow_shell,
         )
 
     def _ensure_open(self) -> None:
@@ -486,21 +501,22 @@ class DryRunSession:
         task = self._task_view(task_ix)
         workdir = self._workdir(task_ix)
         step_input = runtime.current_input
-        result, _ = execute_step_sequence(
-            task=task,
-            workdir=workdir,
-            seq=[step],
-            primary_index=step_index + 1,
-            branch_name=None,
-            branch_no=0,
-            seq_input=step_input,
-            attempt_no=1,
-            ledger=self._ledger,
-            registry=self._registry,
-            engine=self._engine,
-            playbook=self._playbook,
-            pipeline_id=self._pipeline_id,
-        )
+        with self._shell_cm():
+            result, _ = execute_step_sequence(
+                task=task,
+                workdir=workdir,
+                seq=[step],
+                primary_index=step_index + 1,
+                branch_name=None,
+                branch_no=0,
+                seq_input=step_input,
+                attempt_no=1,
+                ledger=self._ledger,
+                registry=self._registry,
+                engine=self._engine,
+                playbook=self._playbook,
+                pipeline_id=self._pipeline_id,
+            )
         status: LabStepStatus = "replayed" if replayed else cast(LabStepStatus, result.status)
         if replayed and result.status == "ok":
             status = "replayed"
@@ -580,21 +596,22 @@ class DryRunSession:
             branch_message: str | None = None
             for attempt_no in range(1, retries + 2):
                 attempt_id = self._ledger.start_attempt(task.id, branch_name, attempt_no)
-                result, _ = execute_step_sequence(
-                    task=task,
-                    workdir=workdir,
-                    seq=seq,
-                    primary_index=step_index + 1,
-                    branch_name=branch_name,
-                    branch_no=branch_no,
-                    seq_input=step_input,
-                    attempt_no=attempt_no,
-                    ledger=self._ledger,
-                    registry=self._registry,
-                    engine=self._engine,
-                    playbook=self._playbook,
-                    pipeline_id=self._pipeline_id,
-                )
+                with self._shell_cm():
+                    result, _ = execute_step_sequence(
+                        task=task,
+                        workdir=workdir,
+                        seq=seq,
+                        primary_index=step_index + 1,
+                        branch_name=branch_name,
+                        branch_no=branch_no,
+                        seq_input=step_input,
+                        attempt_no=attempt_no,
+                        ledger=self._ledger,
+                        registry=self._registry,
+                        engine=self._engine,
+                        playbook=self._playbook,
+                        pipeline_id=self._pipeline_id,
+                    )
                 self._ledger.finish_attempt(
                     attempt_id,
                     ok=result.status == "ok",
@@ -650,21 +667,22 @@ class DryRunSession:
             for attempt_no in range(1, retries + 2):
                 if branch_name is not None:
                     attempt_id = self._ledger.start_attempt(task.id, branch_name, attempt_no)
-                result, _ = execute_step_sequence(
-                    task=task,
-                    workdir=workdir,
-                    seq=seq,
-                    primary_index=step_index + 1,
-                    branch_name=branch_name,
-                    branch_no=branch_no,
-                    seq_input=step_input,
-                    attempt_no=attempt_no,
-                    ledger=self._ledger,
-                    registry=self._registry,
-                    engine=self._engine,
-                    playbook=self._playbook,
-                    pipeline_id=self._pipeline_id,
-                )
+                with self._shell_cm():
+                    result, _ = execute_step_sequence(
+                        task=task,
+                        workdir=workdir,
+                        seq=seq,
+                        primary_index=step_index + 1,
+                        branch_name=branch_name,
+                        branch_no=branch_no,
+                        seq_input=step_input,
+                        attempt_no=attempt_no,
+                        ledger=self._ledger,
+                        registry=self._registry,
+                        engine=self._engine,
+                        playbook=self._playbook,
+                        pipeline_id=self._pipeline_id,
+                    )
                 if branch_name is not None:
                     self._ledger.finish_attempt(
                         attempt_id,

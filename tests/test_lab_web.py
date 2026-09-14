@@ -251,13 +251,15 @@ steps:
     setup = client.get(f"/pipelines/{pipeline_id}/lab")
     assert setup.status_code == 200
     assert "shell.run" in setup.text
-    assert "Dry-run still executes them for real" in setup.text
+    assert "stubs" in setup.text.lower() or "stub" in setup.text.lower()
+    assert 'name="allow_shell_execution"' in setup.text
     assert 'name="acknowledge_shell_run"' in setup.text
 
     samples = tmp_path / "samples-shell"
     samples.mkdir()
     (samples / "item.txt").write_text("x", encoding="utf-8")
-    denied = client.post(
+    # Default stub mode: no allow_shell / ack required.
+    stubbed = client.post(
         f"/pipelines/{pipeline_id}/lab",
         data={
             "sample_dir": str(samples),
@@ -267,8 +269,21 @@ steps:
         headers=POST_HEADERS,
         follow_redirects=False,
     )
+    assert stubbed.status_code == 303
+
+    denied = client.post(
+        f"/pipelines/{pipeline_id}/lab",
+        data={
+            "sample_dir": str(samples),
+            "glob": "*",
+            "max_samples": "5",
+            "allow_shell_execution": "on",
+        },
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
     assert denied.status_code == 200
-    assert "Acknowledge the shell.run warning" in denied.text
+    assert "Acknowledge the shell.run danger callout" in denied.text
 
     allowed = client.post(
         f"/pipelines/{pipeline_id}/lab",
@@ -276,6 +291,7 @@ steps:
             "sample_dir": str(samples),
             "glob": "*",
             "max_samples": "5",
+            "allow_shell_execution": "on",
             "acknowledge_shell_run": "on",
         },
         headers=POST_HEADERS,
