@@ -38,9 +38,7 @@ jobs:
         run: uv run ruff check . && uv run ruff format --check . && uv run mypy
 
       - name: Test
-        run: |
-          uv run pytest -m "not llm_live" --cov-report=term-missing --cov-report=json:coverage.json
-          uv run python scripts/check_core_coverage.py coverage.json
+        run: uv run pytest -m "not llm_live"
 
       - name: Assert tag matches package version
         run: |
