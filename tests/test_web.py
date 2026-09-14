@@ -30,7 +30,8 @@ db = "{tmp_path / "ordine.sqlite3"}"
 workdir_root = "{tmp_path / "workdirs"}"
 
 [web]
-host = "testserver"
+bind = "testserver"
+allowed_hosts = ["testserver", "localhost", "127.0.0.1"]
 port = 8484
 autostart_pipelines = false
 """,
@@ -353,7 +354,8 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "20",
             "reconcile_policy": "retry",
-            "web_host": "testserver",
+            "web_bind": "testserver",
+            "web_allowed_hosts": "testserver",
             "web_port": "8484",
         },
         headers=POST_HEADERS,
@@ -368,7 +370,8 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "0",
             "reconcile_policy": "retry",
-            "web_host": "testserver",
+            "web_bind": "testserver",
+            "web_allowed_hosts": "testserver",
             "web_port": "8484",
         },
         headers=POST_HEADERS,
@@ -381,7 +384,8 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "20",
             "reconcile_policy": "retry",
-            "web_host": "testserver",
+            "web_bind": "testserver",
+            "web_allowed_hosts": "testserver",
             "web_port": "65536",
         },
         headers=POST_HEADERS,
@@ -394,19 +398,21 @@ def test_settings_write_back(tmp_path: Path) -> None:
         data={
             "stale_after_minutes": "20",
             "reconcile_policy": "retry",
-            "web_host": " ",
+            "web_bind": " ",
+            "web_allowed_hosts": "testserver",
             "web_port": "8484",
         },
         headers=POST_HEADERS,
     )
-    assert "web.host must not be empty" in invalid_host.text
+    assert "web.bind must not be empty" in invalid_host.text
 
     invalid_provider = client.post(
         "/settings",
         data={
             "stale_after_minutes": "20",
             "reconcile_policy": "retry",
-            "web_host": "testserver",
+            "web_bind": "testserver",
+            "web_allowed_hosts": "testserver",
             "web_port": "8484",
             "llm_provider": "unexpected",
         },

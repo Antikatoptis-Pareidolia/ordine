@@ -26,8 +26,16 @@
   </section>
   <section aria-labelledby="web-heading">
     <h2 id="web-heading">Web</h2>
-    <label for="web_host">host</label>
-    <input id="web_host" name="web_host" value="{{ config.web_host }}" required />
+    <p class="hint">
+      <strong>bind</strong> is the listen address (applied only after restarting <code>ordine serve</code>).
+      <strong>allowed_hosts</strong> is the HTTP Host allowlist (applied on save). Never put
+      <code>0.0.0.0</code> or <code>::</code> in allowed_hosts — those are bind addresses, not Host names.
+      CLI <code>--host</code> overrides bind only.
+    </p>
+    <label for="web_bind">bind</label>
+    <input id="web_bind" name="web_bind" value="{{ config.web_bind }}" required />
+    <label for="web_allowed_hosts">allowed_hosts (comma-separated)</label>
+    <input id="web_allowed_hosts" name="web_allowed_hosts" value="{{ allowed_hosts_text }}" required />
     <label for="web_port">port</label>
     <input id="web_port" name="web_port" type="number" min="1" max="65535" value="{{ config.web_port }}" required />
     <label><input type="checkbox" name="autostart_pipelines"{% if config.autostart_pipelines %} checked{% endif %} /> autostart_pipelines</label>
@@ -51,10 +59,22 @@
     <label for="llm_session_token_cap">session_token_cap</label>
     <input id="llm_session_token_cap" name="llm_session_token_cap" type="number" min="1" value="{{ config.llm_session_token_cap }}" required />
     <p>key present: {{ llm_key_label }}</p>
-    <p class="hint">Keys entered here are stored in the system keyring. Environment variables and <code>~/.config/ordine/.env</code> are equally valid alternatives: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>ORDINE_LLM_API_KEY</code>. Clear removes the keyring entry only.</p>
+    {% if llm_key_from_dotenv %}
+    <p class="flash flash-error" role="alert">
+      API key is loaded from plaintext <code>~/.config/ordine/.env</code>. Prefer the OS keyring
+      (Set key below) or an environment variable.
+    </p>
+    {% endif %}
+    <p class="hint">Keys entered here are stored in the system keyring. Environment variables and <code>~/.config/ordine/.env</code> are equally valid alternatives: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>ORDINE_LLM_API_KEY</code>. Clear removes the keyring entry only. Prefer keyring over plaintext <code>.env</code>.</p>
   </section>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if saved %}<p class="flash flash-info">Settings saved.</p>{% endif %}
+  {% if bind_restart_notice %}
+  <p class="flash flash-error" role="alert">
+    Bind address/port changes are written to disk but the listener does not move until you restart
+    <code>ordine serve</code>. Host allowlist changes apply immediately.
+  </p>
+  {% endif %}
   <button type="submit">Save</button>
 </form>
 

@@ -104,8 +104,8 @@ def test_malformed_section_is_rejected(tmp_path: Path, section: str) -> None:
         ("[runner]\nstale_after_minutes = 0\n", "stale_after_minutes"),
         ("[runner]\nreconcile_policy = 'maybe'\n", "reconcile_policy"),
         ("[log]\nlevel = 3\n", "log.level"),
-        ("[web]\nhost = 3\n", "web.host"),
-        ("[web]\nhost = ''\n", "web.host"),
+        ("[web]\nhost = 3\n", "web.bind"),
+        ("[web]\nhost = ''\n", "web.bind"),
         ("[web]\nport = '8484'\n", "web.port"),
         ("[web]\nport = 0\n", "web.port"),
         ("[web]\nport = 65536\n", "web.port"),
@@ -172,7 +172,8 @@ days = 7
         path,
         stale_after_minutes=22,
         reconcile_policy="fail",
-        web_host="localhost",
+        web_bind="localhost",
+        web_allowed_hosts=["localhost", "127.0.0.1"],
         web_port=9000,
         autostart_pipelines=True,
     )
@@ -188,11 +189,12 @@ days = 7
     config = load_config(path)
     assert config.stale_after_minutes == 22
     assert config.reconcile_policy == "fail"
-    assert (config.web_host, config.web_port, config.autostart_pipelines) == (
+    assert (config.web_bind, config.web_port, config.autostart_pipelines) == (
         "localhost",
         9000,
         True,
     )
+    assert config.web_allowed_hosts == ("localhost", "127.0.0.1")
     assert (config.llm_provider, config.llm_model) == ("openai", "gpt-test")
     assert config.llm_max_tokens == 2048
     assert config.llm_session_token_cap == 42_000
@@ -228,3 +230,56 @@ workdir_root = "~/custom-workdirs"
     config = load_config(path)
     assert config.db_path == tmp_path / "custom.db"
     assert config.workdir_root == tmp_path / "custom-workdirs"
+
+
+def test_legacy_host_derives_safe_allowlist_for_wildcard(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f"""[paths]
+db = "{tmp_path / "db.sqlite3"}"
+workdir_root = "{tmp_path / "workdirs"}"
+
+[web]
+host = "0.0.0.0"
+port = 8484
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.web_bind == "0.0.0.0"
+    assert config.web_allowed_hosts == ("127.0.0.1", "localhost")
+
+
+def test_allowed_hosts_rejects_wildcards(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f"""[paths]
+db = "{tmp_path / "db.sqlite3"}"
+workdir_root = "{tmp_path / "workdirs"}"
+
+[web]
+bind = "127.0.0.1"
+allowed_hosts = ["0.0.0.0"]
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="wildcard"):
+        load_config(path)
+
+
+def test_bind_and_allowed_hosts_split(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f"""[paths]
+db = "{tmp_path / "db.sqlite3"}"
+workdir_root = "{tmp_path / "workdirs"}"
+
+[web]
+bind = "0.0.0.0"
+allowed_hosts = ["127.0.0.1", "localhost", "mybox.local"]
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.web_bind == "0.0.0.0"
+    assert config.web_allowed_hosts == ("127.0.0.1", "localhost", "mybox.local")
