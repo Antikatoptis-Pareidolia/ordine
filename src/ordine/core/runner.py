@@ -350,6 +350,7 @@ class PipelineService:
         pipeline_id: int,
         stale_after: timedelta = timedelta(minutes=15),
         reconcile_policy: Literal["retry", "fail"] = "retry",
+        stop_join_timeout: float = 120.0,
     ) -> None:
         self._ledger = ledger
         self._runner = runner
@@ -357,16 +358,23 @@ class PipelineService:
         self._pipeline_id = pipeline_id
         self._stale_after = stale_after
         self._reconcile_policy = reconcile_policy
+        self._stop_join_timeout = stop_join_timeout
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._trigger: FolderWatchService | ManualScanService | ManifestTriggerService | None = None
         self._started = False
+        self._stop_failed = False
 
     def start(self) -> None:
         """Reconcile stale tasks, start the trigger, and begin the worker loop."""
         if self._started:
             return
+        if self._stop_failed and self.worker_alive:
+            raise RunnerError(
+                "cannot start: previous stop left an orphan worker; restart the process"
+            )
         self._started = True
+        self._stop_failed = False
         self._stop.clear()
         self._ledger.reconcile(
             self._pipeline_id,
@@ -395,18 +403,48 @@ class PipelineService:
         )
         self._worker.start()
 
-    def stop(self) -> None:
-        """Stop gracefully after the in-flight task completes."""
-        if not self._started:
-            return
+    def stop(self) -> bool:
+        """Stop gracefully after the in-flight task completes.
+
+        Returns:
+            True when the worker exited cleanly (or was already stopped). False when the
+            join timed out and the worker thread is still alive — the thread reference is
+            retained and ``stop_failed`` stays True so callers can surface degraded status.
+        """
+        if not self._started and not self._stop_failed:
+            return True
         self._stop.set()
         if self._worker is not None:
-            self._worker.join(timeout=120.0)
+            self._worker.join(timeout=self._stop_join_timeout)
+            if self._worker.is_alive():
+                self._stop_failed = True
+                logger.error(
+                    "pipeline worker did not stop within %.1fs (pipeline_id=%s); "
+                    "leaving thread reference intact — status is degraded/stop_failed",
+                    self._stop_join_timeout,
+                    self._pipeline_id,
+                )
+                if isinstance(self._trigger, (FolderWatchService, ManifestTriggerService)):
+                    self._trigger.stop()
+                # Keep _worker and _started so we never claim a clean stop.
+                return False
             self._worker = None
         if isinstance(self._trigger, (FolderWatchService, ManifestTriggerService)):
             self._trigger.stop()
         self._trigger = None
         self._started = False
+        self._stop_failed = False
+        return True
+
+    @property
+    def stop_failed(self) -> bool:
+        """True when the last stop attempt left a live worker thread behind."""
+        return self._stop_failed
+
+    @property
+    def worker_alive(self) -> bool:
+        """True when the pipeline worker thread is still running."""
+        return self._worker is not None and self._worker.is_alive()
 
     def _worker_loop(self) -> None:
         while not self._stop.is_set():
