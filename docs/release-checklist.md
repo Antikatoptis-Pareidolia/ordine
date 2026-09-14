@@ -6,7 +6,7 @@ Use this for every `vX.Y.Z` tag. CI automates build/test/publish; the VM gate st
 
 - [ ] All changes on `main`; CI green
 - [ ] `[Unreleased]` in `CHANGELOG.md` has bullets for this release
-- [ ] **Name decision** complete — see [naming-checklist.md](naming-checklist.md) (blocks first `0.1.0` cut)
+- [ ] Historical naming notes (optional): [naming-checklist.md](naming-checklist.md)
 - [ ] `uv run pytest -m "not llm_live"` green locally
 - [ ] Run the full local gate before pushing the release commit (`ruff check .`, `ruff format --check .`, `mypy`, `pytest -m "not llm_live"` with coverage floor)
 - [ ] `bash scripts/build_deb.sh` succeeds; `ls deb-dist/*.deb`
@@ -30,7 +30,7 @@ git push origin main --tags
 
 `release.yml` on `v*`:
 
-1. Full lint, mypy, pytest
+1. Full lint, mypy, pytest with core coverage gate (`scripts/check_core_coverage.py`)
 2. Assert tag (without `v`) == package version
 3. Build wheel/sdist and build the `.deb` from that wheel plus `uv.lock`
 4. Extract the changelog and create a draft GitHub Release with all artifacts

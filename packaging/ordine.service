@@ -1,6 +1,28 @@
+# Ordine systemd user unit.
+#
+# Threat model: localhost-first. Default `ordine serve` binds 127.0.0.1 only.
+# There is no authentication — do not expose the port on a LAN/public interface
+# without a reverse proxy and auth in front (or an explicit future auth feature).
+#
+# Bind vs Host allowlist are separate in config.toml:
+#   [web] bind = "127.0.0.1"
+#   [web] allowed_hosts = ["127.0.0.1", "localhost"]
+#
+# Optional hardening drop-in (create as ~/.config/systemd/user/ordine.service.d/protect.conf):
+#   [Service]
+#   NoNewPrivileges=yes
+#   ProtectSystem=strict
+#   ProtectHome=read-only
+#   ReadWritePaths=%h/.config/ordine %h/.local/share/ordine
+#   PrivateTmp=yes
+#
+# pipx installs: set ExecStart=%h/.local/bin/ordine serve instead of /usr/bin/ordine.
+
 [Unit]
 Description=Ordine pipeline service (web UI + workers)
 After=network.target
+Documentation=https://github.com/Antikatoptis-Pareidolia/ordine/blob/main/docs/install.md
+Documentation=https://github.com/Antikatoptis-Pareidolia/ordine/blob/main/docs/security.md
 
 [Service]
 Type=simple

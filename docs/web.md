@@ -6,10 +6,10 @@ Local-first web interface for operating pipelines without the CLI. Built with Fa
 
 ```bash
 ordine serve              # binds 127.0.0.1:8484 by default
-ordine serve --host 0.0.0.0 --port 9000   # prints a loud warning (no auth in v1)
+ordine serve --host 0.0.0.0 --port 9000   # bind override only; prints a loud warning (no auth)
 ```
 
-Configuration comes from the same TOML as the CLI (`[web]` section: `host`, `port`, `autostart_pipelines`).
+Configuration comes from the same TOML as the CLI (`[web]` section: `bind`, `allowed_hosts`, `port`, `autostart_pipelines`). Legacy `host` is accepted as bind. CLI `--host` / `--port` override the listen address only — they do not change the Host allowlist. Saving bind/port in Settings requires restarting the process; `allowed_hosts` updates apply on save. Wildcards (`0.0.0.0` / `::`) are refused as allowlist entries.
 
 ## Pages
 
@@ -43,9 +43,9 @@ Illegal transitions redirect back with a flash message — never HTTP 500.
 
 ## Security posture (v1)
 
-- **Bind address:** `127.0.0.1` default. Non-local `--host` prints a warning; there is no authentication.
-- **Request hardening:** Every request Host must match the configured bind host (loopback aliases
-  are equivalent; wildcard binds accept IP hosts). Each POST must then either carry
+- **Bind address:** `web.bind` defaults to `127.0.0.1`. Non-local bind/`--host` prints a warning; there is no authentication.
+- **Host allowlist:** `web.allowed_hosts` (loopback aliases are equivalent). Wildcards never widen the allowlist.
+- **Request hardening:** Every request Host must match `allowed_hosts`. Each POST must then either carry
   `HX-Request: true` (HTMX) or include a same-origin `Origin`/`Referer`. Foreign/rebound hosts,
   foreign origins, and bare POSTs receive **403**.
 - **Artifacts:** `GET /artifacts/{task_id}/{rel_path}` resolves `(workdir / rel_path)` and rejects paths that escape the task workdir (404). Some malformed paths (e.g. a leading slash) are rejected by FastAPI routing with **422** before the handler runs — defense-in-depth; no file is served either way. Images served inline; `log.txt` as `text/plain`; other files as download.

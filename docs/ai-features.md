@@ -54,3 +54,7 @@ Text context includes only the user’s own playbook, task logs, and optionally 
 ## Out of scope
 
 Auto-detection of recurring failures, streaming UI, background LLM queues, and GUI/screenshot context.
+
+## Trust notes
+
+AI Approve may introduce any registered step, including `shell.run`. The approval panel lists step ids, shows a danger callout when `shell.run` is present, and requires a second confirmation checkbox before save.

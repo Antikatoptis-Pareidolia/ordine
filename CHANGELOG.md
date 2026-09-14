@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `PipelineService.stop()` no longer drops a live worker thread after the join timeout; ServiceManager surfaces `degraded` / `stop_failed` instead of claiming a clean pause (A1).
+
+### Changed
+
+- Split `web.bind` (listen address) from `web.allowed_hosts` (HTTP Host allowlist). Settings refuses wildcard allowlist entries; bind/port changes flash a restart-required notice. CLI `--host` is bind-only (S2/A3).
+- Lab start, dashboard register, and AI Approve require explicit acknowledgment when playbooks include `shell.run`; AI Approve shows a danger callout and second confirm (S5/S6/S7/D5).
+- Release workflow mirrors the CI core coverage gate (`scripts/check_core_coverage.py`) (B2).
+
+### Added
+
+- `docs/upgrade.md` covering DB/workdir backup, schema mismatch symptoms, and pipx/deb upgrade (D1).
+- Systemd unit comments and install notes documenting localhost-first assumptions plus optional `Protect*` drop-in example (S12/B5).
+
+### Documentation
+
+- Security docs clarify `shell.run` env inheritance, plugins-as-code, and preferring keyring over plaintext `.env` (S4/S9/S10).
+- Release checklist no longer treats the historical 0.1.0 naming gate as a blocker (D4).
+
 ## [0.2.2] - 2026-08-19
 
 The issues addressed here were identified, reproduced, and resolved during a follow-up audit with
