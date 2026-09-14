@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Split `web.bind` (listen address) from `web.allowed_hosts` (HTTP Host allowlist). Settings refuses wildcard allowlist entries; bind/port changes flash a restart-required notice. CLI `--host` is bind-only (S2/A3).
 - Lab start, dashboard register, and AI Approve require explicit acknowledgment when playbooks include `shell.run`; AI Approve shows a danger callout and second confirm (S5/S6/S7/D5).
-- Release workflow mirrors the CI core coverage gate (`scripts/check_core_coverage.py`) (B2).
+- Release workflow core coverage gate prepared as `patches/b2-release-coverage.patch` pending a token with `workflow` scope (B2).
 
 ### Added
 
