@@ -33,12 +33,43 @@ _ALLOWED_SECTIONS: dict[str, frozenset[str]] = {
     "paths": frozenset({"db", "workdir_root"}),
     "runner": frozenset({"stale_after_minutes", "reconcile_policy"}),
     "log": frozenset({"level"}),
-    "web": frozenset({"host", "port", "autostart_pipelines"}),
+    "web": frozenset({"host", "bind", "allowed_hosts", "port", "autostart_pipelines"}),
     "llm": frozenset(
         {"provider", "model", "base_url", "max_tokens", "session_token_cap", "session_image_cap"}
     ),
     "retention": frozenset({"days", "keep_failed", "on_serve_start"}),
 }
+
+
+WILDCARD_BIND_ADDRESSES = frozenset({"0.0.0.0", "::"})
+LOOPBACK_HOST_ALIASES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def is_wildcard_host(value: str) -> bool:
+    """Return True when *value* is a wildcard bind/allowlist address."""
+    return value.strip().lower().strip("[]") in WILDCARD_BIND_ADDRESSES
+
+
+def normalize_allowed_hosts(hosts: list[str] | tuple[str, ...] | str) -> tuple[str, ...]:
+    """Normalize a host allowlist from a list or comma-separated string."""
+    if isinstance(hosts, str):
+        parts = [part.strip() for part in hosts.split(",")]
+    else:
+        parts = [str(part).strip() for part in hosts]
+    cleaned = tuple(part for part in parts if part)
+    if not cleaned:
+        raise ConfigError("web.allowed_hosts must contain at least one non-empty host")
+    return cleaned
+
+
+def default_allowed_hosts_for_bind(bind: str) -> tuple[str, ...]:
+    """Derive a safe Host allowlist for *bind* (never wildcards)."""
+    normalized = bind.strip().lower().strip("[]")
+    if normalized in WILDCARD_BIND_ADDRESSES:
+        return ("127.0.0.1", "localhost")
+    if normalized in LOOPBACK_HOST_ALIASES:
+        return ("127.0.0.1", "localhost")
+    return (bind.strip(),)
 
 
 @dataclass(frozen=True)
@@ -50,7 +81,8 @@ class AppConfig:
     stale_after_minutes: int = 15
     reconcile_policy: Literal["retry", "fail"] = "retry"
     log_level: str = "INFO"
-    web_host: str = "127.0.0.1"
+    web_bind: str = "127.0.0.1"
+    web_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost")
     web_port: int = 8484
     autostart_pipelines: bool = False
     llm_provider: str = "none"
@@ -127,9 +159,36 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
     if not isinstance(level, str):
         raise ConfigError("log.level must be a string")
 
-    web_host = web.get("host", defaults.web_host)
-    if not isinstance(web_host, str) or not web_host.strip():
-        raise ConfigError("web.host must be a non-empty string")
+    # Prefer web.bind; accept legacy web.host as bind fallback.
+    raw_bind = web.get("bind", web.get("host", defaults.web_bind))
+    if not isinstance(raw_bind, str) or not raw_bind.strip():
+        raise ConfigError("web.bind (or legacy web.host) must be a non-empty string")
+    web_bind = raw_bind.strip()
+
+    if "allowed_hosts" in web:
+        raw_allowed = web["allowed_hosts"]
+        if isinstance(raw_allowed, str) or (
+            isinstance(raw_allowed, list) and all(isinstance(item, str) for item in raw_allowed)
+        ):
+            web_allowed_hosts = normalize_allowed_hosts(raw_allowed)
+        else:
+            raise ConfigError("web.allowed_hosts must be a string or list of strings")
+    elif "host" in web and "bind" not in web:
+        # Legacy single-field config: derive allowlist from host, never widening wildcards.
+        web_allowed_hosts = default_allowed_hosts_for_bind(web_bind)
+    else:
+        web_allowed_hosts = (
+            defaults.web_allowed_hosts
+            if "bind" not in web
+            else default_allowed_hosts_for_bind(web_bind)
+        )
+
+    for host in web_allowed_hosts:
+        if is_wildcard_host(host):
+            raise ConfigError(
+                "web.allowed_hosts must not include wildcard addresses "
+                f"{host!r}; use web.bind for listen address and list concrete Host names"
+            )
 
     web_port = web.get("port", defaults.web_port)
     if not isinstance(web_port, int) or isinstance(web_port, bool) or not 1 <= web_port <= 65535:
@@ -204,7 +263,8 @@ def _parse_config(raw: dict[str, object], *, config_file: Path | None) -> AppCon
         stale_after_minutes=stale_after,
         reconcile_policy=reconcile,
         log_level=level,
-        web_host=web_host,
+        web_bind=web_bind,
+        web_allowed_hosts=web_allowed_hosts,
         web_port=web_port,
         autostart_pipelines=autostart,
         llm_provider=llm_provider,
@@ -246,7 +306,8 @@ def save_web_runner_settings(
     *,
     stale_after_minutes: int,
     reconcile_policy: str,
-    web_host: str,
+    web_bind: str,
+    web_allowed_hosts: list[str] | tuple[str, ...] | str,
     web_port: int,
     autostart_pipelines: bool,
 ) -> None:
@@ -264,7 +325,10 @@ def save_web_runner_settings(
     web = dict(raw.get("web", {}))
     runner["stale_after_minutes"] = stale_after_minutes
     runner["reconcile_policy"] = reconcile_policy
-    web["host"] = web_host
+    allowed = list(normalize_allowed_hosts(web_allowed_hosts))
+    web["bind"] = web_bind.strip()
+    web["allowed_hosts"] = allowed
+    web.pop("host", None)  # drop legacy key once split fields are written
     web["port"] = web_port
     web["autostart_pipelines"] = autostart_pipelines
     raw["runner"] = runner
@@ -328,7 +392,10 @@ reconcile_policy = "retry"  # retry | fail
 level = "INFO"
 
 [web]
-host = "127.0.0.1"
+# bind is the listen address (restart required to apply).
+bind = "127.0.0.1"
+# allowed_hosts is the HTTP Host allowlist (never use 0.0.0.0 or :: here).
+allowed_hosts = ["127.0.0.1", "localhost"]
 port = 8484
 autostart_pipelines = false
 

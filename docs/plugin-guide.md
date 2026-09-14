@@ -3,6 +3,10 @@
 Ordine steps are Python plugins discovered via **entry points**. Install a plugin package
 and its steps appear in `StepRegistry.load()` with no core code changes.
 
+**Plugins are code.** Entry-point packages load in-process with Ordine's privileges. Review
+sources before installing third-party plugins; treat them like playbooks you would not run
+blindly. See [security.md](security.md).
+
 ## Contract
 
 Every step is a class implementing:

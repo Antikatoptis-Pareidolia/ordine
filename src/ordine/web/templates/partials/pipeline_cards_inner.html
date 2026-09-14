@@ -35,6 +35,8 @@
     <button type="button" disabled>pausing…</button>
     {% elif card.action_pending == "starting" %}
     <button type="button" disabled>starting…</button>
+    {% elif card.service_status == "degraded" %}
+    <span class="error">stop_failed — restart ordine serve</span>
     {% elif card.service_status == "running" %}
     <form action="/pipelines/{{ card.id }}/pause" method="post" style="display:inline" class="pipeline-action-form" onsubmit="const b=this.querySelector('button'); b.disabled=true; b.textContent='pausing…';">
       <button type="submit">Pause</button>

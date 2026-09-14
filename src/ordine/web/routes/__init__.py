@@ -19,6 +19,7 @@ from starlette import status
 
 from ordine.cli import output as cli_output
 from ordine.core.config import AppConfig
+from ordine.core.dryrun import playbook_contains_shell_run
 from ordine.core.errors import (
     FieldError,
     IllegalTransitionError,
@@ -167,6 +168,25 @@ async def register_pipeline(request: Request) -> HTMLResponse | RedirectResponse
                 "register_yaml": form_dict.get("yaml_text", ""),
                 "register_error": register_error,
                 "register_problems": problems,
+                "register_shell_warning": False,
+                **_flash(request),
+            },
+            status_code=200,
+        )
+    shell_warning = playbook_contains_shell_run(playbook)
+    if shell_warning and form_dict.get("acknowledge_shell_run") != "on":
+        return templates.TemplateResponse(
+            request,
+            "dashboard.html",
+            {
+                "request": request,
+                "cards": pipeline_cards(request),
+                "register_yaml": form_dict.get("yaml_text", ""),
+                "register_error": (
+                    "This playbook contains shell.run. Confirm the danger callout to register."
+                ),
+                "register_problems": [],
+                "register_shell_warning": True,
                 **_flash(request),
             },
             status_code=200,

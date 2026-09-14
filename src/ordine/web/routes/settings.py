@@ -12,7 +12,14 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from ordine.core.config import AppConfig, load_config, save_llm_settings, save_web_runner_settings
+from ordine.core.config import (
+    AppConfig,
+    is_wildcard_host,
+    load_config,
+    normalize_allowed_hosts,
+    save_llm_settings,
+    save_web_runner_settings,
+)
 from ordine.core.errors import ConfigError
 from ordine.llm.errors import LLMError
 from ordine.llm.keys import clear_key, key_presence_label, set_key
@@ -38,16 +45,24 @@ def _flash(request: Request) -> dict[str, str | None]:
 
 
 def _settings_context(
-    request: Request, *, error: str | None, saved: bool = False
+    request: Request,
+    *,
+    error: str | None,
+    saved: bool = False,
+    bind_restart_notice: bool = False,
 ) -> dict[str, object]:
     config = _config(request)
     provider = config.llm_provider
+    key_label = key_presence_label(provider)
     return {
         "request": request,
         "config": config,
+        "allowed_hosts_text": ", ".join(config.web_allowed_hosts),
         "error": error,
         "saved": saved,
-        "llm_key_label": key_presence_label(provider),
+        "bind_restart_notice": bind_restart_notice,
+        "llm_key_label": key_label,
+        "llm_key_from_dotenv": key_label.endswith("(.env file)"),
         **_flash(request),
     }
 
@@ -67,7 +82,8 @@ async def settings_post(
     request: Request,
     stale_after_minutes: Annotated[int, Form()],
     reconcile_policy: Annotated[str, Form()],
-    web_host: Annotated[str, Form()],
+    web_bind: Annotated[str, Form()],
+    web_allowed_hosts: Annotated[str, Form()],
     web_port: Annotated[int, Form()],
     llm_provider: Annotated[str, Form()] = "none",
     llm_model: Annotated[str, Form()] = "",
@@ -93,11 +109,35 @@ async def settings_post(
             _settings_context(request, error="stale_after_minutes must be at least 1"),
             status_code=200,
         )
-    if not web_host.strip():
+    if not web_bind.strip():
         return templates.TemplateResponse(
             request,
             "settings.html",
-            _settings_context(request, error="web.host must not be empty"),
+            _settings_context(request, error="web.bind must not be empty"),
+            status_code=200,
+        )
+    try:
+        allowed = normalize_allowed_hosts(web_allowed_hosts)
+    except ConfigError as exc:
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(request, error=str(exc)),
+            status_code=200,
+        )
+    wildcards = [host for host in allowed if is_wildcard_host(host)]
+    if wildcards:
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            _settings_context(
+                request,
+                error=(
+                    "Refusing to save 0.0.0.0/:: as Host allowlist entries. "
+                    "Use web.bind for the listen address and list concrete Host names "
+                    f"in allowed_hosts (rejected: {', '.join(wildcards)})."
+                ),
+            ),
             status_code=200,
         )
     if not 1 <= web_port <= 65535:
@@ -135,12 +175,14 @@ async def settings_post(
             _settings_context(request, error="No config file on disk; create one with ordine init"),
             status_code=200,
         )
+    bind_changed = web_bind.strip() != config.web_bind or web_port != config.web_port
     try:
         save_web_runner_settings(
             config.config_file,
             stale_after_minutes=stale_after_minutes,
             reconcile_policy=reconcile_policy,
-            web_host=web_host,
+            web_bind=web_bind.strip(),
+            web_allowed_hosts=allowed,
             web_port=web_port,
             autostart_pipelines=autostart,
         )
@@ -164,7 +206,12 @@ async def settings_post(
     return templates.TemplateResponse(
         request,
         "settings.html",
-        _settings_context(request, error=None, saved=True),
+        _settings_context(
+            request,
+            error=None,
+            saved=True,
+            bind_restart_notice=bind_changed,
+        ),
     )
 
 

@@ -5,6 +5,19 @@
   <h3>Suggested recovery branch</h3>
   <p>{{ suggestion.rationale }}</p>
   <p>Branch <code>{{ suggestion.branch.name }}</code> on step {{ suggestion.target_step_index }}</p>
+  {% if suggestion_step_ids %}
+  <p>Step ids in suggestion:
+    {% for step_id in suggestion_step_ids %}
+    <span class="chip {% if step_id == 'shell.run' %}chip-failed{% else %}chip-pending{% endif %}">{{ step_id }}</span>
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if shell_run_added %}
+  <p class="flash flash-error" role="alert">
+    Danger: this suggestion adds <code>shell.run</code>, which executes arbitrary shell commands
+    with your full environment. Approving will save it as the current playbook version.
+  </p>
+  {% endif %}
   {% if changes %}
   <h4>Changes</h4>
   <ul>
@@ -14,6 +27,14 @@
   </ul>
   {% endif %}
   <form action="/tasks/{{ task_id }}/ai/approve-branch" method="post" style="display:inline">
+    {% if shell_run_added %}
+    <p>
+      <label>
+        <input type="checkbox" name="confirm_shell_run" value="on" required />
+        I understand and want to approve a branch that adds <code>shell.run</code>
+      </label>
+    </p>
+    {% endif %}
     <button type="submit">Approve &amp; save</button>
   </form>
   <form action="/tasks/{{ task_id }}/ai/open-branch-editor" method="post" style="display:inline">

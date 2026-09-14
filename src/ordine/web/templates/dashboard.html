@@ -16,9 +16,23 @@
 <section aria-labelledby="register-heading">
   <h2 id="register-heading">Register pipeline</h2>
   <p><a href="/pipelines/new">Open editor for new pipeline</a></p>
+  {% if register_shell_warning %}
+  <p class="flash flash-error" role="alert">
+    This playbook contains <code>shell.run</code>, which executes arbitrary shell commands
+    with your environment. Review the YAML carefully before registering.
+  </p>
+  {% endif %}
   <form action="/pipelines" method="post">
     <label for="yaml_text">Paste playbook YAML</label>
     <textarea id="yaml_text" name="yaml_text" rows="12" required>{{ register_yaml or "" }}</textarea>
+    {% if register_shell_warning %}
+    <p>
+      <label>
+        <input type="checkbox" name="acknowledge_shell_run" value="on" required />
+        I understand this playbook includes <code>shell.run</code> and want to register it
+      </label>
+    </p>
+    {% endif %}
     <button type="submit">Register</button>
   </form>
   {% if register_error %}

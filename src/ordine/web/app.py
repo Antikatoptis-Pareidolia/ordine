@@ -83,10 +83,10 @@ def create_app(config: AppConfig) -> FastAPI:
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         current_config = request.app.state.config
-        if not request_host_is_allowed(request, configured_host=current_config.web_host):
+        if not request_host_is_allowed(request, allowed_hosts=current_config.web_allowed_hosts):
             return JSONResponse({"detail": "Forbidden"}, status_code=403)
         if request.method == "POST" and not post_is_allowed(
-            request, configured_host=current_config.web_host
+            request, allowed_hosts=current_config.web_allowed_hosts
         ):
             return JSONResponse({"detail": "Forbidden"}, status_code=403)
         response = await call_next(request)

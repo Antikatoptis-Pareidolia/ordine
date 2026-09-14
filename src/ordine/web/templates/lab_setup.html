@@ -30,14 +30,16 @@
 </section>
 {% endif %}
 
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
 <form method="post" action="/pipelines/{{ pipeline_id }}/lab">
   <p>
     <label for="sample_dir">Sample directory</label>
-    <input id="sample_dir" name="sample_dir" required placeholder="~/samples" />
+    <input id="sample_dir" name="sample_dir" required placeholder="~/samples" value="{{ sample_dir or "" }}" />
   </p>
   <p>
     <label for="glob">Glob</label>
-    <input id="glob" name="glob" value="*" />
+    <input id="glob" name="glob" value="{{ glob or "*" }}" />
   </p>
   <p>
     <label for="version_id">Playbook version</label>
@@ -51,8 +53,16 @@
   </p>
   <p>
     <label for="max_samples">Max samples</label>
-    <input id="max_samples" name="max_samples" type="number" min="1" max="20" value="20" />
+    <input id="max_samples" name="max_samples" type="number" min="1" max="20" value="{{ max_samples or 20 }}" />
   </p>
+  {% if shell_warning %}
+  <p class="flash flash-error" role="alert">
+    <label>
+      <input type="checkbox" name="acknowledge_shell_run" value="on" required />
+      I understand <code>shell.run</code> will execute for real in this lab session
+    </label>
+  </p>
+  {% endif %}
   <p class="hint">Samples are copied into an isolated sandbox. Production DB and source files are never modified.</p>
   <button type="submit">Start lab session</button>
 </form>

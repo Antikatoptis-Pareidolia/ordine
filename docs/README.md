@@ -7,6 +7,7 @@ Read these in any order; each doc is scoped to one concern. This index was recon
 | Doc | Topic |
 |-----|-------|
 | [install.md](install.md) | pipx, `.deb`, from source, systemd user unit |
+| [upgrade.md](upgrade.md) | Backup DB/workdirs, schema mismatch, pipx/deb upgrade |
 | [cli.md](cli.md) | `ordine` commands, `--json`, config paths |
 | [chaining.md](chaining.md) | manifest → generate → cleanup chain |
 

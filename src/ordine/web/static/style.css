@@ -67,6 +67,7 @@ body {
 .chip-flagged { background: var(--chip-flagged); }
 .chip-running { background: var(--chip-running); }
 .chip-paused { background: var(--chip-paused); }
+.chip-degraded { background: #dc2626; color: #fff; }
 .chip-warning { background: #ca8a04; color: #fff; }
 
 .on-failure-details {

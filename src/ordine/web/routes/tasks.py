@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from ordine.core.config import AppConfig
+from ordine.core.dryrun import playbook_contains_shell_run, playbook_step_ids
 from ordine.core.errors import LedgerError
 from ordine.core.ledger import Ledger
 from ordine.core.playbook import loads_playbook
@@ -168,10 +169,15 @@ async def task_suggest_branch(request: Request, task_id: int) -> HTMLResponse:
     )
     _branch_store(request).put(task_id, pipeline_id=task.pipeline_id, suggestion=suggestion)
     changes = []
+    shell_run_added = False
+    step_ids: list[str] = []
     if suggestion.new_playbook is not None:
         _pid, yaml_text = ledger.get_current_playbook(task.pipeline_id)
         old = loads_playbook(yaml_text)
         changes = summarize_playbook_changes(old, suggestion.new_playbook)
+        step_ids = playbook_step_ids(suggestion.new_playbook)
+        # Warn whenever the suggested playbook includes shell.run (Approve may add it).
+        shell_run_added = playbook_contains_shell_run(suggestion.new_playbook)
     return templates.TemplateResponse(
         request,
         "partials/ai_branch_approval.html",
@@ -182,18 +188,43 @@ async def task_suggest_branch(request: Request, task_id: int) -> HTMLResponse:
             "changes": changes,
             "problems": suggestion.problems,
             "llm_configured": True,
+            "shell_run_added": shell_run_added,
+            "suggestion_step_ids": step_ids,
         },
     )
 
 
-@router.post("/tasks/{task_id}/ai/approve-branch")
-async def task_approve_branch(request: Request, task_id: int) -> RedirectResponse:
+@router.post("/tasks/{task_id}/ai/approve-branch", response_model=None)
+async def task_approve_branch(request: Request, task_id: int) -> RedirectResponse | HTMLResponse:
     ledger = _ledger(request)
     pending = _branch_store(request).get(task_id)
     if pending is None or pending.suggestion.new_playbook is None:
         return RedirectResponse(
             f"/tasks/{task_id}",
             status_code=status.HTTP_303_SEE_OTHER,
+        )
+    form = await request.form()
+    new_playbook = pending.suggestion.new_playbook
+    if playbook_contains_shell_run(new_playbook) and form.get("confirm_shell_run") != "on":
+        templates = _templates(request)
+        _pid, old_yaml = ledger.get_current_playbook(pending.pipeline_id)
+        old_playbook = loads_playbook(old_yaml)
+        changes = summarize_playbook_changes(old_playbook, new_playbook)
+        return templates.TemplateResponse(
+            request,
+            "partials/ai_branch_approval.html",
+            {
+                "request": request,
+                "task_id": task_id,
+                "suggestion": pending.suggestion,
+                "changes": changes,
+                "problems": pending.suggestion.problems,
+                "llm_configured": True,
+                "shell_run_added": True,
+                "suggestion_step_ids": playbook_step_ids(new_playbook),
+                "error": "Confirm the shell.run danger callout before approving.",
+            },
+            status_code=200,
         )
     note = f"AI branch: {pending.suggestion.branch.name}"
     version = apply_branch(

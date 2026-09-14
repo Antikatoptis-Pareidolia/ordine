@@ -192,6 +192,16 @@ def playbook_contains_shell_run(playbook: Playbook) -> bool:
     return False
 
 
+def playbook_step_ids(playbook: Playbook) -> list[str]:
+    """Return every step id in primary steps and recovery branches (depth-first)."""
+    return _playbook_step_ids(playbook)
+
+
+def suggestion_adds_shell_run(before: Playbook, after: Playbook) -> bool:
+    """Return True when *after* contains shell.run and *before* did not."""
+    return playbook_contains_shell_run(after) and not playbook_contains_shell_run(before)
+
+
 def _playbook_step_ids(playbook: Playbook) -> list[str]:
     ids: list[str] = []
 

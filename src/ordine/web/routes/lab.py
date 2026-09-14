@@ -233,10 +233,11 @@ async def lab_setup(request: Request, pipeline_id: int) -> HTMLResponse:
     )
 
 
-@router.post("/pipelines/{pipeline_id}/lab")
-async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse:
+@router.post("/pipelines/{pipeline_id}/lab", response_model=None)
+async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse | HTMLResponse:
     form = await request.form()
-    sample_dir = Path(str(form.get("sample_dir", ""))).expanduser()
+    sample_dir_raw = str(form.get("sample_dir", ""))
+    sample_dir = Path(sample_dir_raw).expanduser()
     glob_pattern = str(form.get("glob", "*"))
     version_id = str(form.get("version_id", "")).strip()
     max_samples = int(str(form.get("max_samples", "20")))
@@ -246,6 +247,33 @@ async def lab_create(request: Request, pipeline_id: int) -> RedirectResponse:
     else:
         yaml_text = ledger.get_version_yaml(pipeline_id, version_id)
     playbook = loads_playbook(yaml_text)
+    if playbook_contains_shell_run(playbook) and form.get("acknowledge_shell_run") != "on":
+        registry = _registry(request)
+        versions = ledger.list_versions(pipeline_id)
+        sandbox_preview = _sandbox_root(request) / "preview"
+        _, output_redirections = redirect_output_dirs(playbook, registry, sandbox_preview)
+        templates = _templates(request)
+        return templates.TemplateResponse(
+            request,
+            "lab_setup.html",
+            {
+                "request": request,
+                "pipeline_id": pipeline_id,
+                "pipeline_name": _pipeline_name(request, pipeline_id),
+                "current_version": version_id,
+                "versions": versions,
+                "shell_warning": True,
+                "ordinal_warnings": lab_ordinal_warnings(playbook),
+                "output_redirections": output_redirections,
+                "sample_dir": sample_dir_raw,
+                "glob": glob_pattern,
+                "max_samples": max_samples,
+                "error": "Acknowledge the shell.run warning before starting the lab session.",
+                "flash": None,
+                "flash_level": "info",
+            },
+            status_code=200,
+        )
     registry = _registry(request)
     engines = request.app.state.engines
     sandbox_root = _sandbox_root(request)

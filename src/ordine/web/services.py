@@ -21,7 +21,7 @@ from ordine.core.runner import PipelineRunner, PipelineService
 
 logger = logging.getLogger(__name__)
 
-RuntimeStatus = Literal["running", "paused"]
+RuntimeStatus = Literal["running", "paused", "degraded"]
 ActionPending = Literal["starting", "pausing"]
 
 
@@ -79,13 +79,29 @@ class ServiceManager:
                 return
             if runtime.status == "running" and runtime._service is not None:
                 return
+            if (
+                runtime.status == "degraded"
+                and runtime._service is not None
+                and runtime._service.worker_alive
+            ):
+                runtime.start_error = (
+                    "cannot start: previous stop left an orphan worker; "
+                    "restart the ordine serve process"
+                )
+                return
             runtime.action_pending = "starting"
             runtime.start_problems = []
             runtime.start_error = None
             old_service = runtime._service
 
-        if old_service is not None:
-            old_service.stop()
+        if old_service is not None and old_service.stop() is False:
+            with self._lock:
+                runtime = self.runtime(pipeline_id)
+                runtime._service = old_service
+                runtime.status = "degraded"
+                runtime.start_error = "stop_failed: pipeline worker still alive after join timeout"
+                runtime.action_pending = None
+            return
 
         try:
             version_id, yaml_text = self._ledger.get_current_playbook(pipeline_id)
@@ -150,11 +166,20 @@ class ServiceManager:
                 runtime.status = "running"
                 runtime.running_version = version_id
                 runtime.action_pending = None
-        if pending_service is not None:
-            pending_service.stop()
+        if pending_service is not None and pending_service.stop() is False:
+            with self._lock:
+                runtime = self.runtime(pipeline_id)
+                runtime._service = pending_service
+                runtime.status = "degraded"
+                runtime.start_error = "stop_failed: pipeline worker still alive after join timeout"
 
     def pause(self, pipeline_id: int) -> None:
-        """Gracefully stop the pipeline service (in-flight task may finish)."""
+        """Gracefully stop the pipeline service (in-flight task may finish).
+
+        When the worker does not exit within the join timeout, status becomes
+        ``degraded`` and the service reference is retained so operators can see
+        the orphaned worker.
+        """
         with self._lock:
             runtime = self._runtimes.get(pipeline_id)
             if runtime is None:
@@ -163,13 +188,24 @@ class ServiceManager:
             service = runtime._service
             runtime._service = None
             if service is None:
-                runtime.status = "paused"
+                if runtime.status != "degraded":
+                    runtime.status = "paused"
                 runtime.action_pending = None
                 return
-        service.stop()
+        clean = service.stop()
         with self._lock:
             runtime = self.runtime(pipeline_id)
-            runtime.status = "paused"
+            if clean is not False:
+                runtime.status = "paused"
+                runtime.start_error = None
+            else:
+                runtime._service = service
+                runtime.status = "degraded"
+                runtime.start_error = "stop_failed: pipeline worker still alive after join timeout"
+                logger.error(
+                    "pipeline %s pause degraded: worker still alive after stop join timeout",
+                    pipeline_id,
+                )
             runtime.action_pending = None
 
     def action_pending_label(self, pipeline_id: int) -> ActionPending | None:

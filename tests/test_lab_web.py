@@ -237,7 +237,7 @@ steps:
 def test_lab_setup_warns_on_shell_run(
     lab_client: tuple[TestClient, Ledger, Path],
 ) -> None:
-    client, ledger, _tmp_path = lab_client
+    client, ledger, tmp_path = lab_client
     yaml_text = """version: 1
 name: lab-shell-warning
 trigger:
@@ -252,6 +252,36 @@ steps:
     assert setup.status_code == 200
     assert "shell.run" in setup.text
     assert "Dry-run still executes them for real" in setup.text
+    assert 'name="acknowledge_shell_run"' in setup.text
+
+    samples = tmp_path / "samples-shell"
+    samples.mkdir()
+    (samples / "item.txt").write_text("x", encoding="utf-8")
+    denied = client.post(
+        f"/pipelines/{pipeline_id}/lab",
+        data={
+            "sample_dir": str(samples),
+            "glob": "*",
+            "max_samples": "5",
+        },
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert denied.status_code == 200
+    assert "Acknowledge the shell.run warning" in denied.text
+
+    allowed = client.post(
+        f"/pipelines/{pipeline_id}/lab",
+        data={
+            "sample_dir": str(samples),
+            "glob": "*",
+            "max_samples": "5",
+            "acknowledge_shell_run": "on",
+        },
+        headers=POST_HEADERS,
+        follow_redirects=False,
+    )
+    assert allowed.status_code == 303
 
 
 def test_lab_run_all_shows_no_ordinal_failure_message(

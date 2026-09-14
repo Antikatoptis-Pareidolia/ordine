@@ -965,7 +965,12 @@ def example(
 @app.command()
 def serve(
     ctx: typer.Context,
-    host: Annotated[str | None, typer.Option("--host", help="Bind host")] = None,
+    host: Annotated[
+        str | None,
+        typer.Option(
+            "--host", help="Listen/bind address override (does not change Host allowlist)"
+        ),
+    ] = None,
     port: Annotated[int | None, typer.Option("--port", help="Bind port")] = None,
 ) -> None:
     """Start the web UI and pipeline service manager."""
@@ -977,12 +982,14 @@ def serve(
         typer.echo("internal error: missing CLI context", err=True)
         raise typer.Exit(code=2)
     config = ctx.obj.config
-    bind_host = host if host is not None else config.web_host
+    # --host/--port override the listen address only; Host allowlisting stays in config.
+    bind_host = host if host is not None else config.web_bind
     bind_port = port if port is not None else config.web_port
-    if bind_host not in ("127.0.0.1", "localhost"):
+    if bind_host not in ("127.0.0.1", "localhost", "::1"):
         typer.echo(
             "WARNING: binding to a non-local host without authentication — "
-            "anyone on the network can control pipelines.",
+            "anyone on the network can control pipelines. "
+            "Host allowlisting uses web.allowed_hosts (not this bind override).",
             err=True,
         )
     if config.retention_on_serve_start:
