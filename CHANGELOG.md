@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-22
+
+### Security
+
+- Pillow 12.3.0 → 13.0.0, closing 25 published advisories (e.g. CVE-2026-112895, High 8.7: denial of service via a crafted file). Pillow reads every file the watched-folder image steps receive, so every v0.3.0 install carried this exposure. The `Pillow` constraint moves from `<13` to `<14`.
+- anyio 4.14.1 → 4.15.1 (3 advisories) and certifi 2026.6.17 → 2026.10.19 (1 advisory) in the lock file.
+
+### Fixed
+
+- `core/heartbeat.py` now has direct unit tests, so the 85% core coverage gate no longer depends on the CI runner (the v0.3.0 `test (3.13)` job failed on it while all tests passed).
+
 ## [0.3.0] - 2026-09-14
 
 ### Added
